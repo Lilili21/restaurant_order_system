@@ -1,0 +1,1762 @@
+{
+  "orders": [
+    {
+      "id": "call_1773264114923",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "new",
+      "createdAt": "2026-03-11T21:21:54.923Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773256216333",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T19:10:16.333Z",
+      "items": [
+        {
+          "id": "item_1773256216333_rc7e3l",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 2,
+          "served": true
+        },
+        {
+          "id": "item_1773258058837_fpwx2s",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 2,
+          "served": true
+        },
+        {
+          "id": "item_1773258062482_70j7e3",
+          "menuItemId": "m5",
+          "name": "Лимонад с мятой",
+          "price": 18,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 124
+    },
+    {
+      "id": "ord_1773255588984",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "preparing",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:59:48.984Z",
+      "items": [
+        {
+          "id": "item_1773255588984_yz6tl5",
+          "menuItemId": "m3",
+          "name": "Шаурма на тарелке",
+          "price": 54,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773256135694_6geci6",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 166
+    },
+    {
+      "id": "ord_1773254622381",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "preparing",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:43:42.381Z",
+      "items": [
+        {
+          "id": "item_1773254622381_o7ga8t",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773255567785_1vzsmr",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773255567785_0gyi1i",
+          "menuItemId": "m3",
+          "name": "Шаурма на тарелке",
+          "price": 54,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773255567785_0do7lf",
+          "menuItemId": "m4",
+          "name": "Филе лосося",
+          "price": 78,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 185
+    },
+    {
+      "id": "ord_1773254605078",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:43:25.078Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773253327328",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T18:22:07.328Z",
+      "items": [
+        {
+          "id": "item_1773253327328_dee7r7",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773253327328_hrec4o",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 106
+    },
+    {
+      "id": "ord_1773253299916",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:21:39.916Z",
+      "items": [
+        {
+          "id": "item_1773253299916_caqt20",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 29
+    },
+    {
+      "id": "ord_1773253275916",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:21:15.916Z",
+      "items": [
+        {
+          "id": "item_1773253275916_7ehufi",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773253275916_1ahxb6",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773253162182",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:19:22.182Z",
+      "items": [
+        {
+          "id": "item_1773253162182_kgwh4r",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773253162182_jcc4ps",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773253122116",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:18:42.116Z",
+      "items": [
+        {
+          "id": "item_1773253122116_6mle13",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773253122116_c3e9y0",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773252862599",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:14:22.599Z",
+      "items": [
+        {
+          "id": "item_1773252862599_xh5hjv",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773252808911",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:13:28.911Z",
+      "items": [
+        {
+          "id": "item_1773252808911_vdfnak",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773252808911_axs22b",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773252808911_v02h1t",
+          "menuItemId": "m3",
+          "name": "Шаурма на тарелке",
+          "price": 54,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773252808911_qigx7l",
+          "menuItemId": "m4",
+          "name": "Филе лосося",
+          "price": 78,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773252808911_2cnwfy",
+          "menuItemId": "m5",
+          "name": "Лимонад с мятой",
+          "price": 18,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773252808911_81d2hi",
+          "menuItemId": "m6",
+          "name": "Кнафе",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 259
+    },
+    {
+      "id": "ord_1773252600460",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T18:10:00.460Z",
+      "items": [
+        {
+          "id": "item_1773252600460_4ml9q0",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 7,
+          "served": true
+        },
+        {
+          "id": "item_1773252607776_bx6pbw",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 2,
+          "served": true
+        },
+        {
+          "id": "item_1773252703158_tn7djw",
+          "menuItemId": "m5",
+          "name": "Лимонад с мятой",
+          "price": 18,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 269
+    },
+    {
+      "id": "ord_1773247954844",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:52:34.844Z",
+      "items": [
+        {
+          "id": "item_1773247954844_8vvdiq",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 3,
+          "served": true
+        },
+        {
+          "id": "item_1773252511393_qqod6f",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 2,
+          "served": true
+        }
+      ],
+      "total": 135
+    },
+    {
+      "id": "ord_1773247950100",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:52:30.100Z",
+      "items": [
+        {
+          "id": "item_1773247950100_2qmz5e",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 29
+    },
+    {
+      "id": "ord_1773247625906",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:47:05.906Z",
+      "items": [
+        {
+          "id": "item_1773247625906_dn9i92",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773247609423",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:46:49.423Z",
+      "items": [
+        {
+          "id": "item_1773247609423_cypxwn",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247609423_ye32vl",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773247583084",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:46:23.084Z",
+      "items": [
+        {
+          "id": "item_1773247583084_b5xau3",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 29
+    },
+    {
+      "id": "ord_1773247551009",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:45:51.009Z",
+      "items": [
+        {
+          "id": "item_1773247551009_p839h3",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247551009_bqqr78",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773247480463",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:44:40.463Z",
+      "items": [
+        {
+          "id": "item_1773247480463_6dniq6",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773247446834",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:44:06.834Z",
+      "items": [
+        {
+          "id": "item_1773247446834_01wyqy",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773247396984",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:43:16.984Z",
+      "items": [
+        {
+          "id": "item_1773247396984_0jk9q6",
+          "menuItemId": "m3",
+          "name": "Шаурма на тарелке",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 54
+    },
+    {
+      "id": "ord_1773247378551",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T16:42:58.551Z",
+      "items": [
+        {
+          "id": "item_1773247378551_3p8oi3",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247378551_qre8jc",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "call_1773247277054",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 1,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-11T16:41:17.054Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773247052751",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:37:32.751Z",
+      "items": [
+        {
+          "id": "item_1773247052751_terwib",
+          "menuItemId": "m4",
+          "name": "Филе лосося",
+          "price": 78,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 78
+    },
+    {
+      "id": "ord_1773247047118",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T16:37:27.118Z",
+      "items": [
+        {
+          "id": "item_1773247047118_a9ha3d",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247047118_2qroc4",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247047118_kx2exw",
+          "menuItemId": "m3",
+          "name": "Шаурма на тарелке",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 107
+    },
+    {
+      "id": "ord_1773247034330",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:37:14.330Z",
+      "items": [
+        {
+          "id": "item_1773247034330_tb9tny",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773247034330_jfjtmj",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773246544680",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T16:29:04.680Z",
+      "items": [
+        {
+          "id": "item_1773246544680_tj03pr",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773246424906",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:27:04.906Z",
+      "items": [
+        {
+          "id": "item_1773246424906_rtkoeh",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773246424906_f8at0u",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773246402871",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:26:42.871Z",
+      "items": [
+        {
+          "id": "item_1773246402871_dmpb7p",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773246344286",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:25:44.286Z",
+      "items": [
+        {
+          "id": "item_1773246344286_o5dn5u",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773246344286_h4wmnb",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 82
+    },
+    {
+      "id": "ord_1773246082231",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:21:22.231Z",
+      "items": [
+        {
+          "id": "item_1773246082231_561gr2",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1773246056324",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:20:56.324Z",
+      "items": [
+        {
+          "id": "item_1773246056324_yh4nt3",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773246056324_j5xk0q",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773245759842",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T16:15:59.842Z",
+      "items": [
+        {
+          "id": "item_1773245759842_81273j",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773245759842_vaca83",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "call_1773245751575",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-11T16:15:51.575Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773245736316",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:15:36.316Z",
+      "items": [
+        {
+          "id": "item_1773245736316_4cg032",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773245736316_zsy2qz",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773245282584",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-11T16:08:02.584Z",
+      "items": [
+        {
+          "id": "item_1773245282584_ywfegl",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773245282584_l15l8i",
+          "menuItemId": "m2",
+          "name": "Салат табуле",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 53
+    },
+    {
+      "id": "ord_1773245277391",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T16:07:57.391Z",
+      "items": [
+        {
+          "id": "item_1773245277391_hb9ygo",
+          "menuItemId": "m6",
+          "name": "Кнафе",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773245277391_0s6fcs",
+          "menuItemId": "m5",
+          "name": "Лимонад с мятой",
+          "price": 18,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 50
+    },
+    {
+      "id": "ord_demo_1",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "status": "cancelled",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-11T15:59:32.961Z",
+      "total": 92,
+      "items": [
+        {
+          "id": "ord_demo_1_item_1",
+          "menuItemId": "m1",
+          "name": "Хумус с питой",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "ord_demo_1_item_2",
+          "menuItemId": "m5",
+          "name": "Лимонад с мятой",
+          "price": 18,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "ord_demo_1_item_3",
+          "menuItemId": "m6",
+          "name": "Кнафе",
+          "price": 32,
+          "quantity": 1,
+          "note": "Разделить на две ложки",
+          "served": false
+        }
+      ]
+    }
+  ],
+  "currentTableSessions": [
+    [
+      "olive-bistro:3",
+      1
+    ],
+    [
+      "olive-bistro:6",
+      1
+    ],
+    [
+      "olive-bistro:1",
+      3
+    ],
+    [
+      "olive-bistro:2",
+      2
+    ],
+    [
+      "olive-bistro:4",
+      2
+    ],
+    [
+      "olive-bistro:5",
+      1
+    ],
+    [
+      "olive-bistro:7",
+      1
+    ],
+    [
+      "olive-bistro:8",
+      1
+    ]
+  ],
+  "closedTableSummaries": [
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 2,
+      "closedAt": "2026-03-11T18:12:20.908Z",
+      "total": 269,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_1773252600460"
+      ],
+      "orders": [
+        {
+          "id": "ord_1773252600460",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 2,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T18:10:00.460Z",
+          "items": [
+            {
+              "id": "item_1773252600460_4ml9q0",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 7,
+              "served": true
+            },
+            {
+              "id": "item_1773252607776_bx6pbw",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 2,
+              "served": true
+            },
+            {
+              "id": "item_1773252703158_tn7djw",
+              "menuItemId": "m5",
+              "name": "Лимонад с мятой",
+              "price": 18,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 269
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 1,
+      "closedAt": "2026-03-11T18:09:45.658Z",
+      "total": 160,
+      "orderCount": 3,
+      "orderIds": [
+        "call_1773247277054",
+        "ord_1773247047118",
+        "ord_1773247034330"
+      ],
+      "orders": [
+        {
+          "id": "call_1773247277054",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 1,
+          "kind": "waiter_call",
+          "status": "served",
+          "createdAt": "2026-03-11T16:41:17.054Z",
+          "items": [],
+          "total": 0
+        },
+        {
+          "id": "ord_1773247047118",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-11T16:37:27.118Z",
+          "items": [
+            {
+              "id": "item_1773247047118_a9ha3d",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247047118_2qroc4",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247047118_kx2exw",
+              "menuItemId": "m3",
+              "name": "Шаурма на тарелке",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 107
+        },
+        {
+          "id": "ord_1773247034330",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:37:14.330Z",
+          "items": [
+            {
+              "id": "item_1773247034330_tb9tny",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247034330_jfjtmj",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 53
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 1,
+      "closedAt": "2026-03-11T18:09:42.792Z",
+      "total": 869,
+      "orderCount": 19,
+      "orderIds": [
+        "ord_1773247954844",
+        "ord_1773247950100",
+        "ord_1773247625906",
+        "ord_1773247609423",
+        "ord_1773247583084",
+        "ord_1773247551009",
+        "ord_1773247480463",
+        "ord_1773247446834",
+        "ord_1773247396984",
+        "ord_1773247378551",
+        "ord_1773247052751",
+        "ord_1773246544680",
+        "ord_1773246402871",
+        "ord_1773246344286",
+        "ord_1773246082231",
+        "ord_1773246056324",
+        "ord_1773245759842",
+        "call_1773245751575",
+        "ord_1773245736316"
+      ],
+      "orders": [
+        {
+          "id": "ord_1773247954844",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:52:34.844Z",
+          "items": [
+            {
+              "id": "item_1773247954844_8vvdiq",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 3,
+              "served": true
+            },
+            {
+              "id": "item_1773252511393_qqod6f",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 135
+        },
+        {
+          "id": "ord_1773247950100",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:52:30.100Z",
+          "items": [
+            {
+              "id": "item_1773247950100_2qmz5e",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        },
+        {
+          "id": "ord_1773247625906",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:47:05.906Z",
+          "items": [
+            {
+              "id": "item_1773247625906_dn9i92",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773247609423",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:46:49.423Z",
+          "items": [
+            {
+              "id": "item_1773247609423_cypxwn",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247609423_ye32vl",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 53
+        },
+        {
+          "id": "ord_1773247583084",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:46:23.084Z",
+          "items": [
+            {
+              "id": "item_1773247583084_b5xau3",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        },
+        {
+          "id": "ord_1773247551009",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:45:51.009Z",
+          "items": [
+            {
+              "id": "item_1773247551009_p839h3",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247551009_bqqr78",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 53
+        },
+        {
+          "id": "ord_1773247480463",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:44:40.463Z",
+          "items": [
+            {
+              "id": "item_1773247480463_6dniq6",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773247446834",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:44:06.834Z",
+          "items": [
+            {
+              "id": "item_1773247446834_01wyqy",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773247396984",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:43:16.984Z",
+          "items": [
+            {
+              "id": "item_1773247396984_0jk9q6",
+              "menuItemId": "m3",
+              "name": "Шаурма на тарелке",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 54
+        },
+        {
+          "id": "ord_1773247378551",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-11T16:42:58.551Z",
+          "items": [
+            {
+              "id": "item_1773247378551_3p8oi3",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773247378551_qre8jc",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 53
+        },
+        {
+          "id": "ord_1773247052751",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:37:32.751Z",
+          "items": [
+            {
+              "id": "item_1773247052751_terwib",
+              "menuItemId": "m4",
+              "name": "Филе лосося",
+              "price": 78,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 78
+        },
+        {
+          "id": "ord_1773246544680",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-11T16:29:04.680Z",
+          "items": [
+            {
+              "id": "item_1773246544680_tj03pr",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773246402871",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:26:42.871Z",
+          "items": [
+            {
+              "id": "item_1773246402871_dmpb7p",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773246344286",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "cancelled",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:25:44.286Z",
+          "items": [
+            {
+              "id": "item_1773246344286_o5dn5u",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": false
+            },
+            {
+              "id": "item_1773246344286_h4wmnb",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 2,
+              "served": false
+            }
+          ],
+          "total": 82
+        },
+        {
+          "id": "ord_1773246082231",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "cancelled",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:21:22.231Z",
+          "items": [
+            {
+              "id": "item_1773246082231_561gr2",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": false
+            }
+          ],
+          "total": 24
+        },
+        {
+          "id": "ord_1773246056324",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "cancelled",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:20:56.324Z",
+          "items": [
+            {
+              "id": "item_1773246056324_yh4nt3",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": false
+            },
+            {
+              "id": "item_1773246056324_j5xk0q",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": false
+            }
+          ],
+          "total": 53
+        },
+        {
+          "id": "ord_1773245759842",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "cancelled",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-11T16:15:59.842Z",
+          "items": [
+            {
+              "id": "item_1773245759842_81273j",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": false
+            },
+            {
+              "id": "item_1773245759842_vaca83",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": false
+            }
+          ],
+          "total": 53
+        },
+        {
+          "id": "call_1773245751575",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "kind": "waiter_call",
+          "status": "served",
+          "createdAt": "2026-03-11T16:15:51.575Z",
+          "items": [],
+          "total": 0
+        },
+        {
+          "id": "ord_1773245736316",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 1,
+          "sessionId": 1,
+          "status": "cancelled",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:15:36.316Z",
+          "items": [
+            {
+              "id": "item_1773245736316_4cg032",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": false
+            },
+            {
+              "id": "item_1773245736316_zsy2qz",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": false
+            }
+          ],
+          "total": 53
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 1,
+      "closedAt": "2026-03-11T17:10:10.807Z",
+      "total": 53,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_1773246424906"
+      ],
+      "orders": [
+        {
+          "id": "ord_1773246424906",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-11T16:27:04.906Z",
+          "items": [
+            {
+              "id": "item_1773246424906_rtkoeh",
+              "menuItemId": "m2",
+              "name": "Салат табуле",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1773246424906_f8at0u",
+              "menuItemId": "m1",
+              "name": "Хумус с питой",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 53
+        }
+      ]
+    }
+  ]
+}

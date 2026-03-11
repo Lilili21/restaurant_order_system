@@ -1,0 +1,569 @@
+import { initialOrders, restaurants } from "@/lib/mock-data";
+import {
+  CartItem,
+  ClosedTableSummary,
+  Order,
+  OrderItem,
+  OrderStatus,
+  ServeMode,
+  TableOverview
+} from "@/lib/types";
+import { getRestaurantBySlug } from "@/lib/menu";
+import { getMenuItemById } from "@/lib/menu-store";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+type OrdersPersistence = {
+  orders: Order[];
+  currentTableSessions: Array<[string, number]>;
+  closedTableSummaries: ClosedTableSummary[];
+};
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
+
+function createTableKey(restaurantSlug: string, tableNumber: number) {
+  return `${restaurantSlug}:${tableNumber}`;
+}
+
+function cloneInitialOrders() {
+  return initialOrders.map((order) => ({
+    ...order,
+    items: order.items.map((item) => ({ ...item }))
+  }));
+}
+
+function createDefaultTableSessions() {
+  const sessions = new Map<string, number>();
+
+  for (const order of initialOrders) {
+    const key = createTableKey(order.restaurantSlug, order.tableNumber);
+
+    sessions.set(key, Math.max(sessions.get(key) ?? 1, order.sessionId));
+  }
+
+  return sessions;
+}
+
+function getDefaultState(): OrdersPersistence {
+  return {
+    orders: cloneInitialOrders(),
+    currentTableSessions: [...createDefaultTableSessions().entries()],
+    closedTableSummaries: []
+  };
+}
+
+function loadState(): OrdersPersistence {
+  if (!existsSync(ORDERS_STORE_PATH)) {
+    return getDefaultState();
+  }
+
+  try {
+    const raw = readFileSync(ORDERS_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw) as Partial<OrdersPersistence>;
+
+    return {
+      orders: Array.isArray(parsed.orders) ? parsed.orders : cloneInitialOrders(),
+      currentTableSessions: Array.isArray(parsed.currentTableSessions)
+        ? parsed.currentTableSessions
+        : [...createDefaultTableSessions().entries()],
+      closedTableSummaries: Array.isArray(parsed.closedTableSummaries)
+        ? parsed.closedTableSummaries
+        : []
+    };
+  } catch {
+    return getDefaultState();
+  }
+}
+
+const persistedState = loadState();
+const ordersStore: Order[] = persistedState.orders;
+const currentTableSessions = new Map<string, number>(
+  persistedState.currentTableSessions
+);
+const closedTableSummaries: ClosedTableSummary[] =
+  persistedState.closedTableSummaries;
+
+function persistState() {
+  if (!existsSync(DATA_DIR)) {
+    mkdirSync(DATA_DIR, { recursive: true });
+  }
+
+  writeFileSync(
+    ORDERS_STORE_PATH,
+    JSON.stringify(
+      {
+        orders: ordersStore,
+        currentTableSessions: [...currentTableSessions.entries()],
+        closedTableSummaries
+      } satisfies OrdersPersistence,
+      null,
+      2
+    ),
+    "utf8"
+  );
+}
+
+function getCurrentSessionId(restaurantSlug: string, tableNumber: number) {
+  const key = createTableKey(restaurantSlug, tableNumber);
+  const existing = currentTableSessions.get(key);
+
+  if (existing) {
+    return existing;
+  }
+
+  currentTableSessions.set(key, 1);
+  persistState();
+  return 1;
+}
+
+if (!existsSync(ORDERS_STORE_PATH)) {
+  persistState();
+}
+
+function createOrderItem(cartItem: CartItem): OrderItem {
+  const menuItem = getMenuItemById(cartItem.menuItemId);
+
+  if (!menuItem) {
+    throw new Error(`Menu item ${cartItem.menuItemId} not found`);
+  }
+
+  return {
+    id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    menuItemId: menuItem.id,
+    name: menuItem.name,
+    price: menuItem.price,
+    quantity: cartItem.quantity,
+    note: cartItem.note?.trim() || undefined,
+    served: false
+  };
+}
+
+function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
+  const mergedItems = [...order.items];
+
+  for (const nextItem of nextItems) {
+    const existingItem = mergedItems.find(
+      (item) =>
+        item.menuItemId === nextItem.menuItemId &&
+        (item.note ?? "") === (nextItem.note ?? "") &&
+        !item.served
+    );
+
+    if (existingItem) {
+      existingItem.quantity += nextItem.quantity;
+      continue;
+    }
+
+    mergedItems.push(nextItem);
+  }
+
+  order.items = mergedItems;
+  return normalizeOrderState(order);
+}
+
+function normalizeOrderState(order: Order) {
+  if (order.kind === "waiter_call") {
+    order.total = 0;
+    return order;
+  }
+
+  order.total = order.items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  if (order.items.length === 0) {
+    order.status = "cancelled";
+    return order;
+  }
+
+  const allItemsServed = order.items.every((item) => item.served);
+  const someItemsServed = order.items.some((item) => item.served);
+
+  if (allItemsServed) {
+    order.status = "served";
+  } else if (someItemsServed || order.status === "preparing") {
+    order.status = "preparing";
+  } else if (order.status !== "cancelled") {
+    order.status = "new";
+  }
+
+  return order;
+}
+
+export function getOrders(restaurantSlug?: string) {
+  return ordersStore
+    .filter((order) => {
+      if (restaurantSlug && order.restaurantSlug !== restaurantSlug) {
+        return false;
+      }
+
+      return order.status !== "served" && order.status !== "cancelled";
+    })
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function createWaiterCall(input: {
+  restaurantSlug: string;
+  tableNumber: number;
+}) {
+  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const tableExists = restaurant.tables.some(
+    (table) => table.number === input.tableNumber
+  );
+
+  if (!tableExists) {
+    throw new Error("Table not found");
+  }
+
+  const sessionId = getCurrentSessionId(input.restaurantSlug, input.tableNumber);
+
+  const waiterCall: Order = {
+    id: `call_${Date.now()}`,
+    restaurantSlug: restaurant.slug,
+    restaurantName: restaurant.name,
+    tableNumber: input.tableNumber,
+    sessionId,
+    kind: "waiter_call",
+    status: "new",
+    createdAt: new Date().toISOString(),
+    items: [],
+    total: 0
+  };
+
+  ordersStore.unshift(waiterCall);
+  persistState();
+
+  return waiterCall;
+}
+
+export function getTableSessionOrders(
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  const sessionId = getCurrentSessionId(restaurantSlug, tableNumber);
+
+  return ordersStore
+    .filter(
+      (order) =>
+        order.restaurantSlug === restaurantSlug &&
+        order.tableNumber === tableNumber &&
+        order.sessionId === sessionId &&
+        order.status !== "cancelled" &&
+        order.kind !== "waiter_call"
+    )
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function createOrder(input: {
+  restaurantSlug: string;
+  tableNumber: number;
+  items: CartItem[];
+  serveMode?: ServeMode;
+}) {
+  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const tableExists = restaurant.tables.some(
+    (table) => table.number === input.tableNumber
+  );
+
+  if (!tableExists) {
+    throw new Error("Table not found");
+  }
+
+  if (!input.items.length) {
+    throw new Error("Order must contain at least one item");
+  }
+
+  const items = input.items.map(createOrderItem);
+  const total = items.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+  const sessionId = getCurrentSessionId(input.restaurantSlug, input.tableNumber);
+  const existingNewOrder = ordersStore.find(
+    (order) =>
+      order.restaurantSlug === restaurant.slug &&
+      order.tableNumber === input.tableNumber &&
+      order.sessionId === sessionId &&
+      order.kind !== "waiter_call" &&
+      order.status === "new"
+  );
+
+  if (existingNewOrder) {
+    const mergedOrder = mergeOrderItems(existingNewOrder, items);
+
+    if (input.serveMode) {
+      mergedOrder.serveMode = input.serveMode;
+    }
+
+    persistState();
+    return mergedOrder;
+  }
+
+  const order: Order = {
+    id: `ord_${Date.now()}`,
+    restaurantSlug: restaurant.slug,
+    restaurantName: restaurant.name,
+    tableNumber: input.tableNumber,
+    sessionId,
+    status: "new",
+    serveMode: input.serveMode ?? "all_at_once",
+    createdAt: new Date().toISOString(),
+    items,
+    total
+  };
+
+  ordersStore.unshift(order);
+  persistState();
+
+  return order;
+}
+
+export function updateOrderStatus(orderId: string, status: OrderStatus) {
+  const order = ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  order.status = status;
+
+  if (status === "served") {
+    order.items = order.items.map((item) => ({
+      ...item,
+      served: true
+    }));
+  }
+
+  if (status === "cancelled") {
+    order.items = order.items.map((item) => ({
+      ...item,
+      served: false
+    }));
+  }
+
+  const normalizedOrder = normalizeOrderState(order);
+  persistState();
+
+  return normalizedOrder;
+}
+
+export function updateOrderItemServed(
+  orderId: string,
+  orderItemId: string,
+  served: boolean
+) {
+  const order = ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (order.status === "cancelled") {
+    throw new Error("Cancelled order cannot be updated");
+  }
+
+  const orderItem = order.items.find((item) => item.id === orderItemId);
+
+  if (!orderItem) {
+    throw new Error("Order item not found");
+  }
+
+  orderItem.served = served;
+  const normalizedOrder = normalizeOrderState(order);
+  persistState();
+
+  return normalizedOrder;
+}
+
+export function removeOrderItem(
+  orderId: string,
+  orderItemId: string,
+  removeQuantity: number
+) {
+  const order = ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (order.status === "served" || order.status === "cancelled") {
+    throw new Error("Closed order cannot be edited");
+  }
+
+  const orderItem = order.items.find((item) => item.id === orderItemId);
+
+  if (!orderItem) {
+    throw new Error("Order item not found");
+  }
+
+  if (removeQuantity <= 0) {
+    throw new Error("removeQuantity must be greater than 0");
+  }
+
+  order.items = order.items
+    .map((item) =>
+      item.id === orderItemId
+        ? {
+            ...item,
+            quantity: item.quantity - removeQuantity
+          }
+        : item
+    )
+    .filter((item) => item.quantity > 0);
+
+  const normalizedOrder = normalizeOrderState(order);
+  persistState();
+
+  return normalizedOrder;
+}
+
+export function changeOrderItemQuantity(
+  orderId: string,
+  orderItemId: string,
+  delta: number
+) {
+  const order = ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (order.status === "served" || order.status === "cancelled") {
+    throw new Error("Closed order cannot be edited");
+  }
+
+  const orderItem = order.items.find((item) => item.id === orderItemId);
+
+  if (!orderItem) {
+    throw new Error("Order item not found");
+  }
+
+  order.items = order.items
+    .map((item) =>
+      item.id === orderItemId
+        ? {
+            ...item,
+            quantity: item.quantity + delta
+          }
+        : item
+    )
+    .filter((item) => item.quantity > 0);
+
+  const normalizedOrder = normalizeOrderState(order);
+  persistState();
+
+  return normalizedOrder;
+}
+
+export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
+  return restaurants
+    .filter((restaurant) =>
+      restaurantSlug ? restaurant.slug === restaurantSlug : true
+    )
+    .flatMap((restaurant) =>
+      restaurant.tables.map((table) => {
+        const currentSessionId = getCurrentSessionId(restaurant.slug, table.number);
+        const sessionOrders = ordersStore
+          .filter(
+            (order) =>
+              order.restaurantSlug === restaurant.slug &&
+              order.tableNumber === table.number &&
+              order.sessionId === currentSessionId
+          )
+          .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+        const visibleOrders = sessionOrders.filter(
+          (order) =>
+            order.status !== "cancelled" && order.kind !== "waiter_call"
+        );
+
+        return {
+          restaurantSlug: restaurant.slug,
+          restaurantName: restaurant.name,
+          tableNumber: table.number,
+          currentSessionId,
+          orderCount: visibleOrders.length,
+          total: visibleOrders.reduce((sum, order) => sum + order.total, 0),
+          statuses: [...new Set(visibleOrders.map((order) => order.status))],
+          orders: visibleOrders
+        };
+      })
+    )
+    .filter((table) => table.orders.length > 0)
+    .sort((left, right) => left.tableNumber - right.tableNumber);
+}
+
+export function closeTable(restaurantSlug: string, tableNumber: number) {
+  const restaurant = getRestaurantBySlug(restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const tableExists = restaurant.tables.some(
+    (table) => table.number === tableNumber
+  );
+
+  if (!tableExists) {
+    throw new Error("Table not found");
+  }
+
+  const sessionId = getCurrentSessionId(restaurantSlug, tableNumber);
+  const orders = ordersStore.filter(
+    (order) =>
+      order.restaurantSlug === restaurantSlug &&
+      order.tableNumber === tableNumber &&
+      order.sessionId === sessionId
+  );
+
+  const unservedOrders = orders.filter(
+    (order) => order.status !== "served" && order.status !== "cancelled"
+  );
+
+  if (unservedOrders.length > 0) {
+    throw new Error(
+      "Нельзя закрыть столик, пока не все заказы имеют статус 'Подан'"
+    );
+  }
+
+  const summary: ClosedTableSummary = {
+    restaurantSlug,
+    restaurantName: restaurant.name,
+    tableNumber,
+    sessionId,
+    closedAt: new Date().toISOString(),
+    total: orders.reduce((sum, order) => sum + order.total, 0),
+    orderCount: orders.length,
+    orderIds: orders.map((order) => order.id),
+    orders: orders.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({ ...item }))
+    }))
+  };
+
+  closedTableSummaries.unshift(summary);
+  currentTableSessions.set(
+    createTableKey(restaurantSlug, tableNumber),
+    sessionId + 1
+  );
+  persistState();
+
+  return summary;
+}
+
+export function getClosedTableSummaries(restaurantSlug?: string) {
+  return closedTableSummaries.filter((summary) =>
+    restaurantSlug ? summary.restaurantSlug === restaurantSlug : true
+  );
+}
