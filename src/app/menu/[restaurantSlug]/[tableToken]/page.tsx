@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { Cart } from "@/components/menu/Cart";
 import { getTableSession } from "@/lib/menu-store";
+import { getMenuSettings } from "@/lib/menu-settings";
 import { getTableSessionOrders } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
@@ -10,14 +11,14 @@ export const revalidate = 0;
 type MenuPageProps = {
   params: Promise<{
     restaurantSlug: string;
-    tableNumber: string;
+    tableToken: string;
   }>;
 };
 
 export default async function MenuPage({ params }: MenuPageProps) {
-  const { restaurantSlug, tableNumber } = await params;
-  const tableNumberValue = Number(tableNumber);
-  const session = getTableSession(restaurantSlug, tableNumberValue);
+  const { restaurantSlug, tableToken } = await params;
+  const session = getTableSession(restaurantSlug, tableToken);
+  const menuSettings = getMenuSettings();
 
   if (!session) {
     notFound();
@@ -29,10 +30,12 @@ export default async function MenuPage({ params }: MenuPageProps) {
         restaurantSlug={session.restaurant.slug}
         restaurantName={session.restaurant.name}
         tableNumber={session.table.number}
+        tableToken={session.table.accessToken}
         menu={session.menu}
+        showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
         initialSubmittedOrders={getTableSessionOrders(
           restaurantSlug,
-          tableNumberValue
+          session.table.number
         )}
       />
     </main>

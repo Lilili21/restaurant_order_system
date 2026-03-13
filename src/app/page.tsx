@@ -1,9 +1,14 @@
 import Link from "next/link";
 
-import { restaurants } from "@/lib/mock-data";
+import { TableLinksPanel } from "@/components/home/TableLinksPanel";
+import { getRestaurantBySlug } from "@/lib/restaurants";
 
 export default function HomePage() {
-  const restaurant = restaurants[0];
+  const restaurant = getRestaurantBySlug("olive-bistro");
+
+  if (!restaurant) {
+    return null;
+  }
 
   return (
     <main className="page-shell">
@@ -16,9 +21,6 @@ export default function HomePage() {
             Владелец или персонал сразу видят его в админке.
           </p>
           <div className="hero-actions">
-            <Link href={`/menu/${restaurant.slug}/1`} className="button-link">
-              Открыть меню столика 1
-            </Link>
             <Link href="/admin/orders" className="button-link button-link--ghost">
               Открыть админку
             </Link>
@@ -31,6 +33,8 @@ export default function HomePage() {
           <p>{restaurant.description}</p>
         </div>
       </section>
+
+      <TableLinksPanel restaurantSlug={restaurant.slug} />
     </main>
   );
 }

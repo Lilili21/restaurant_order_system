@@ -50,6 +50,11 @@ export function TablesOverview() {
   });
   const [loading, setLoading] = useState(true);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [moveAuthTable, setMoveAuthTable] = useState<TableOverview | null>(null);
+  const [targetTableNumber, setTargetTableNumber] = useState("");
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +112,87 @@ export function TablesOverview() {
       ),
       closedSessions: [summary, ...current.closedSessions]
     }));
+  }
+
+  function requestMoveTable(table: TableOverview) {
+    setMoveAuthTable(table);
+    setTargetTableNumber("");
+    setLogin("");
+    setPassword("");
+    setAuthError(null);
+  }
+
+  function closeMoveDialog() {
+    setMoveAuthTable(null);
+    setTargetTableNumber("");
+    setLogin("");
+    setPassword("");
+    setAuthError(null);
+  }
+
+  async function submitMoveTable() {
+    if (!moveAuthTable) {
+      return;
+    }
+
+    const nextTableNumber = Number.parseInt(targetTableNumber, 10);
+
+    if (!Number.isFinite(nextTableNumber) || nextTableNumber < 1) {
+      setAuthError("Укажите корректный номер столика.");
+      return;
+    }
+
+    const authResponse = await fetch("/api/admin-auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        scope: "secondary",
+        login,
+        password,
+        persist: false
+      })
+    });
+
+    if (!authResponse.ok) {
+      const error = (await authResponse.json()) as { message?: string };
+      setAuthError(error.message ?? "Неверный логин или пароль.");
+      return;
+    }
+
+    const response = await fetch("/api/tables", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        action: "move",
+        restaurantSlug: moveAuthTable.restaurantSlug,
+        tableNumber: moveAuthTable.tableNumber,
+        targetTableNumber: nextTableNumber
+      })
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as { message?: string };
+      setAuthError(error.message ?? "Не удалось перенести заказы на другой столик.");
+      return;
+    }
+
+    closeMoveDialog();
+    setDialogMessage(
+      `Заказы перенесены со столика ${moveAuthTable.tableNumber} на столик ${nextTableNumber}.`
+    );
+
+    const refreshResponse = await fetch("/api/tables");
+
+    if (!refreshResponse.ok) {
+      return;
+    }
+
+    const nextData = (await refreshResponse.json()) as TablesResponse;
+    setData(nextData);
   }
 
   function exportClosedOrdersForToday() {
@@ -222,6 +308,60 @@ export function TablesOverview() {
         </div>
       ) : null}
 
+      {moveAuthTable ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card modal-card--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="move-table-title"
+          >
+            <h2 id="move-table-title">Поменять столик</h2>
+            <div className="modal-form">
+              <input
+                className="modal-input"
+                type="number"
+                min="1"
+                placeholder="На какой столик"
+                value={targetTableNumber}
+                onChange={(event) => setTargetTableNumber(event.target.value)}
+              />
+              <input
+                className="modal-input"
+                type="text"
+                placeholder="Логин"
+                value={login}
+                onChange={(event) => setLogin(event.target.value)}
+              />
+              <input
+                className="modal-input"
+                type="password"
+                placeholder="Пароль"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            {authError ? <p className="modal-error">{authError}</p> : null}
+            <div className="modal-actions">
+              <button
+                className="button-danger"
+                type="button"
+                onClick={closeMoveDialog}
+              >
+                Закрыть
+              </button>
+              <button
+                className="button-success"
+                type="button"
+                onClick={() => void submitMoveTable()}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="tables-layout">
         {!data.tables.length ? (
           <p className="muted">
@@ -268,15 +408,24 @@ export function TablesOverview() {
                     </div>
                   </div>
 
-                  <button
-                    className="button-danger tables-action-button"
-                    type="button"
-                    onClick={() =>
-                      handleCloseTable(table.restaurantSlug, table.tableNumber)
-                    }
-                  >
-                    Закрыть столик
-                  </button>
+                  <div className="order-actions">
+                    <button
+                      className="button-neutral tables-action-button"
+                      type="button"
+                      onClick={() => requestMoveTable(table)}
+                    >
+                      Поменять столик
+                    </button>
+                    <button
+                      className="button-danger tables-action-button"
+                      type="button"
+                      onClick={() =>
+                        handleCloseTable(table.restaurantSlug, table.tableNumber)
+                      }
+                    >
+                      Закрыть столик
+                    </button>
+                  </div>
                 </article>
               );
             })}

@@ -7,11 +7,7 @@ export default function AdminMenuPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <p className="eyebrow">Menu</p>
           <h1>Редактирование меню</h1>
-          <p className="muted">
-            Здесь можно менять названия, описания, цену и доступность блюд.
-          </p>
         </div>
         <div className="admin-nav" aria-label="Навигация по админке">
           <div className="admin-switch">

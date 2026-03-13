@@ -7,7 +7,6 @@ export default function AdminTablesPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <p className="eyebrow">Tables</p>
           <h1>Заказы по столам</h1>
           <p className="muted">
             Здесь заказы сгруппированы по столикам. После закрытия столика для него

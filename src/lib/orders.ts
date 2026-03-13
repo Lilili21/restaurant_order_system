@@ -1,4 +1,4 @@
-import { initialOrders, restaurants } from "@/lib/mock-data";
+import { initialOrders } from "@/lib/mock-data";
 import {
   CartItem,
   ClosedTableSummary,
@@ -8,7 +8,7 @@ import {
   ServeMode,
   TableOverview
 } from "@/lib/types";
-import { getRestaurantBySlug } from "@/lib/menu";
+import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
 import { getMenuItemById } from "@/lib/menu-store";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -76,15 +76,25 @@ function loadState(): OrdersPersistence {
   }
 }
 
-const persistedState = loadState();
-const ordersStore: Order[] = persistedState.orders;
-const currentTableSessions = new Map<string, number>(
-  persistedState.currentTableSessions
-);
-const closedTableSummaries: ClosedTableSummary[] =
-  persistedState.closedTableSummaries;
+type RuntimeState = {
+  ordersStore: Order[];
+  currentTableSessions: Map<string, number>;
+  closedTableSummaries: ClosedTableSummary[];
+};
 
-function persistState() {
+function readRuntimeState(): RuntimeState {
+  const persistedState = loadState();
+
+  return {
+    ordersStore: persistedState.orders,
+    currentTableSessions: new Map<string, number>(
+      persistedState.currentTableSessions
+    ),
+    closedTableSummaries: persistedState.closedTableSummaries
+  };
+}
+
+function persistState(state: RuntimeState) {
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
@@ -93,9 +103,9 @@ function persistState() {
     ORDERS_STORE_PATH,
     JSON.stringify(
       {
-        orders: ordersStore,
-        currentTableSessions: [...currentTableSessions.entries()],
-        closedTableSummaries
+        orders: state.ordersStore,
+        currentTableSessions: [...state.currentTableSessions.entries()],
+        closedTableSummaries: state.closedTableSummaries
       } satisfies OrdersPersistence,
       null,
       2
@@ -104,21 +114,42 @@ function persistState() {
   );
 }
 
-function getCurrentSessionId(restaurantSlug: string, tableNumber: number) {
+function ensureCurrentSessionId(
+  state: RuntimeState,
+  restaurantSlug: string,
+  tableNumber: number
+) {
   const key = createTableKey(restaurantSlug, tableNumber);
-  const existing = currentTableSessions.get(key);
+  const existing = state.currentTableSessions.get(key);
 
   if (existing) {
-    return existing;
+    return { sessionId: existing, created: false };
   }
 
-  currentTableSessions.set(key, 1);
-  persistState();
-  return 1;
+  state.currentTableSessions.set(key, 1);
+  return { sessionId: 1, created: true };
+}
+
+export function getCurrentTableSessionId(
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  const state = readRuntimeState();
+  const { sessionId, created } = ensureCurrentSessionId(
+    state,
+    restaurantSlug,
+    tableNumber
+  );
+
+  if (created) {
+    persistState(state);
+  }
+
+  return sessionId;
 }
 
 if (!existsSync(ORDERS_STORE_PATH)) {
-  persistState();
+  persistState(readRuntimeState());
 }
 
 function createOrderItem(cartItem: CartItem): OrderItem {
@@ -131,6 +162,7 @@ function createOrderItem(cartItem: CartItem): OrderItem {
   return {
     id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     menuItemId: menuItem.id,
+    category: menuItem.category,
     name: menuItem.name,
     price: menuItem.price,
     quantity: cartItem.quantity,
@@ -141,6 +173,7 @@ function createOrderItem(cartItem: CartItem): OrderItem {
 
 function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
   const mergedItems = [...order.items];
+  const now = new Date().toISOString();
 
   for (const nextItem of nextItems) {
     const existingItem = mergedItems.find(
@@ -159,10 +192,16 @@ function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
   }
 
   order.items = mergedItems;
+  order.updatedAt = now;
   return normalizeOrderState(order);
 }
 
 function normalizeOrderState(order: Order) {
+  order.items = order.items.map((item) => ({
+    ...item,
+    category: item.category ?? getMenuItemById(item.menuItemId)?.category
+  }));
+
   if (order.kind === "waiter_call") {
     order.total = 0;
     return order;
@@ -193,6 +232,8 @@ function normalizeOrderState(order: Order) {
 }
 
 export function getOrders(restaurantSlug?: string) {
+  const { ordersStore } = readRuntimeState();
+
   return ordersStore
     .filter((order) => {
       if (restaurantSlug && order.restaurantSlug !== restaurantSlug) {
@@ -208,6 +249,7 @@ export function createWaiterCall(input: {
   restaurantSlug: string;
   tableNumber: number;
 }) {
+  const state = readRuntimeState();
   const restaurant = getRestaurantBySlug(input.restaurantSlug);
 
   if (!restaurant) {
@@ -222,7 +264,11 @@ export function createWaiterCall(input: {
     throw new Error("Table not found");
   }
 
-  const sessionId = getCurrentSessionId(input.restaurantSlug, input.tableNumber);
+  const { sessionId } = ensureCurrentSessionId(
+    state,
+    input.restaurantSlug,
+    input.tableNumber
+  );
 
   const waiterCall: Order = {
     id: `call_${Date.now()}`,
@@ -233,12 +279,13 @@ export function createWaiterCall(input: {
     kind: "waiter_call",
     status: "new",
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     items: [],
     total: 0
   };
 
-  ordersStore.unshift(waiterCall);
-  persistState();
+  state.ordersStore.unshift(waiterCall);
+  persistState(state);
 
   return waiterCall;
 }
@@ -247,9 +294,18 @@ export function getTableSessionOrders(
   restaurantSlug: string,
   tableNumber: number
 ) {
-  const sessionId = getCurrentSessionId(restaurantSlug, tableNumber);
+  const state = readRuntimeState();
+  const { sessionId, created } = ensureCurrentSessionId(
+    state,
+    restaurantSlug,
+    tableNumber
+  );
 
-  return ordersStore
+  if (created) {
+    persistState(state);
+  }
+
+  return state.ordersStore
     .filter(
       (order) =>
         order.restaurantSlug === restaurantSlug &&
@@ -267,6 +323,7 @@ export function createOrder(input: {
   items: CartItem[];
   serveMode?: ServeMode;
 }) {
+  const state = readRuntimeState();
   const restaurant = getRestaurantBySlug(input.restaurantSlug);
 
   if (!restaurant) {
@@ -290,8 +347,12 @@ export function createOrder(input: {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const sessionId = getCurrentSessionId(input.restaurantSlug, input.tableNumber);
-  const existingNewOrder = ordersStore.find(
+  const { sessionId } = ensureCurrentSessionId(
+    state,
+    input.restaurantSlug,
+    input.tableNumber
+  );
+  const existingNewOrder = state.ordersStore.find(
     (order) =>
       order.restaurantSlug === restaurant.slug &&
       order.tableNumber === input.tableNumber &&
@@ -307,7 +368,7 @@ export function createOrder(input: {
       mergedOrder.serveMode = input.serveMode;
     }
 
-    persistState();
+    persistState(state);
     return mergedOrder;
   }
 
@@ -320,18 +381,20 @@ export function createOrder(input: {
     status: "new",
     serveMode: input.serveMode ?? "all_at_once",
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     items,
     total
   };
 
-  ordersStore.unshift(order);
-  persistState();
+  state.ordersStore.unshift(order);
+  persistState(state);
 
   return order;
 }
 
 export function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const order = ordersStore.find((item) => item.id === orderId);
+  const state = readRuntimeState();
+  const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
     throw new Error("Order not found");
@@ -354,7 +417,7 @@ export function updateOrderStatus(orderId: string, status: OrderStatus) {
   }
 
   const normalizedOrder = normalizeOrderState(order);
-  persistState();
+  persistState(state);
 
   return normalizedOrder;
 }
@@ -364,7 +427,8 @@ export function updateOrderItemServed(
   orderItemId: string,
   served: boolean
 ) {
-  const order = ordersStore.find((item) => item.id === orderId);
+  const state = readRuntimeState();
+  const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
     throw new Error("Order not found");
@@ -382,7 +446,7 @@ export function updateOrderItemServed(
 
   orderItem.served = served;
   const normalizedOrder = normalizeOrderState(order);
-  persistState();
+  persistState(state);
 
   return normalizedOrder;
 }
@@ -392,7 +456,8 @@ export function removeOrderItem(
   orderItemId: string,
   removeQuantity: number
 ) {
-  const order = ordersStore.find((item) => item.id === orderId);
+  const state = readRuntimeState();
+  const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
     throw new Error("Order not found");
@@ -424,7 +489,7 @@ export function removeOrderItem(
     .filter((item) => item.quantity > 0);
 
   const normalizedOrder = normalizeOrderState(order);
-  persistState();
+  persistState(state);
 
   return normalizedOrder;
 }
@@ -434,7 +499,8 @@ export function changeOrderItemQuantity(
   orderItemId: string,
   delta: number
 ) {
-  const order = ordersStore.find((item) => item.id === orderId);
+  const state = readRuntimeState();
+  const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
     throw new Error("Order not found");
@@ -462,20 +528,32 @@ export function changeOrderItemQuantity(
     .filter((item) => item.quantity > 0);
 
   const normalizedOrder = normalizeOrderState(order);
-  persistState();
+  persistState(state);
 
   return normalizedOrder;
 }
 
 export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
-  return restaurants
+  const state = readRuntimeState();
+  let shouldPersist = false;
+
+  const overviews = getRestaurants()
     .filter((restaurant) =>
       restaurantSlug ? restaurant.slug === restaurantSlug : true
     )
     .flatMap((restaurant) =>
       restaurant.tables.map((table) => {
-        const currentSessionId = getCurrentSessionId(restaurant.slug, table.number);
-        const sessionOrders = ordersStore
+        const { sessionId: currentSessionId, created } = ensureCurrentSessionId(
+          state,
+          restaurant.slug,
+          table.number
+        );
+
+        if (created) {
+          shouldPersist = true;
+        }
+
+        const sessionOrders = state.ordersStore
           .filter(
             (order) =>
               order.restaurantSlug === restaurant.slug &&
@@ -502,9 +580,16 @@ export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
     )
     .filter((table) => table.orders.length > 0)
     .sort((left, right) => left.tableNumber - right.tableNumber);
+
+  if (shouldPersist) {
+    persistState(state);
+  }
+
+  return overviews;
 }
 
 export function closeTable(restaurantSlug: string, tableNumber: number) {
+  const state = readRuntimeState();
   const restaurant = getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
@@ -519,8 +604,8 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
     throw new Error("Table not found");
   }
 
-  const sessionId = getCurrentSessionId(restaurantSlug, tableNumber);
-  const orders = ordersStore.filter(
+  const { sessionId } = ensureCurrentSessionId(state, restaurantSlug, tableNumber);
+  const orders = state.ordersStore.filter(
     (order) =>
       order.restaurantSlug === restaurantSlug &&
       order.tableNumber === tableNumber &&
@@ -552,17 +637,90 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
     }))
   };
 
-  closedTableSummaries.unshift(summary);
-  currentTableSessions.set(
+  state.closedTableSummaries.unshift(summary);
+  state.currentTableSessions.set(
     createTableKey(restaurantSlug, tableNumber),
     sessionId + 1
   );
-  persistState();
+  persistState(state);
 
   return summary;
 }
 
+export function moveTableOrders(
+  restaurantSlug: string,
+  fromTableNumber: number,
+  toTableNumber: number
+) {
+  const state = readRuntimeState();
+  const restaurant = getRestaurantBySlug(restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  if (fromTableNumber === toTableNumber) {
+    throw new Error("Выберите другой столик.");
+  }
+
+  const fromTableExists = restaurant.tables.some(
+    (table) => table.number === fromTableNumber
+  );
+  const toTableExists = restaurant.tables.some(
+    (table) => table.number === toTableNumber
+  );
+
+  if (!fromTableExists || !toTableExists) {
+    throw new Error("Столик не найден.");
+  }
+
+  const { sessionId: fromSessionId } = ensureCurrentSessionId(
+    state,
+    restaurantSlug,
+    fromTableNumber
+  );
+  const { sessionId: toSessionId } = ensureCurrentSessionId(
+    state,
+    restaurantSlug,
+    toTableNumber
+  );
+
+  const movableOrders = state.ordersStore.filter(
+    (order) =>
+      order.restaurantSlug === restaurantSlug &&
+      order.tableNumber === fromTableNumber &&
+      order.sessionId === fromSessionId &&
+      order.kind !== "waiter_call" &&
+      order.status !== "cancelled"
+  );
+
+  if (!movableOrders.length) {
+    throw new Error("На этом столике нет активных заказов для переноса.");
+  }
+
+  state.ordersStore = state.ordersStore.map((order) =>
+    movableOrders.some((item) => item.id === order.id)
+      ? {
+          ...order,
+          tableNumber: toTableNumber,
+          sessionId: toSessionId
+        }
+      : order
+  );
+
+  persistState(state);
+
+  return {
+    restaurantSlug,
+    fromTableNumber,
+    toTableNumber,
+    movedOrders: movableOrders.length
+  };
+}
+
 export function getClosedTableSummaries(restaurantSlug?: string) {
+  const { closedTableSummaries } = readRuntimeState();
+
   return closedTableSummaries.filter((summary) =>
     restaurantSlug ? summary.restaurantSlug === restaurantSlug : true
   );

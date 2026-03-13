@@ -12,10 +12,12 @@ export type Table = {
   number: number;
   seats: number;
   zone: string;
+  accessToken: string;
   qrCodeValue: string;
 };
 
 export type MenuCategory = "starters" | "mains" | "drinks" | "desserts";
+export type MenuLanguage = "he" | "en" | "ru";
 
 export type MenuItem = {
   id: string;
@@ -23,8 +25,15 @@ export type MenuItem = {
   category: MenuCategory;
   name: string;
   description: string;
+  nameHe: string;
+  nameRu: string;
+  nameEn: string;
+  descriptionHe: string;
+  descriptionRu: string;
+  descriptionEn: string;
   price: number;
   image: string;
+  showImage: boolean;
   available: boolean;
 };
 
@@ -37,6 +46,7 @@ export type CartItem = {
 export type OrderItem = {
   id: string;
   menuItemId: string;
+  category?: MenuCategory;
   name: string;
   price: number;
   quantity: number;
@@ -58,6 +68,7 @@ export type Order = {
   serveMode?: ServeMode;
   status: OrderStatus;
   createdAt: string;
+  updatedAt?: string;
   items: OrderItem[];
   total: number;
 };

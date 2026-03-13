@@ -13,18 +13,28 @@ const categoryLabels: Record<MenuCategory, string> = {
 };
 
 type EditableMenuItem = MenuItem & {
-  draftName: string;
-  draftDescription: string;
+  draftNameHe: string;
+  draftNameRu: string;
+  draftNameEn: string;
+  draftDescriptionHe: string;
+  draftDescriptionRu: string;
+  draftDescriptionEn: string;
   draftPrice: string;
   draftImage: string;
+  draftShowImage: boolean;
   saving?: boolean;
 };
 
 type NewMenuItemDraft = {
-  name: string;
-  description: string;
+  nameHe: string;
+  nameRu: string;
+  nameEn: string;
+  descriptionHe: string;
+  descriptionRu: string;
+  descriptionEn: string;
   price: string;
   image: string;
+  showImage: boolean;
   category: MenuCategory;
   available: boolean;
   saving: boolean;
@@ -33,10 +43,15 @@ type NewMenuItemDraft = {
 function toEditableItem(item: MenuItem): EditableMenuItem {
   return {
     ...item,
-    draftName: item.name,
-    draftDescription: item.description,
+    draftNameHe: item.nameHe || item.name,
+    draftNameRu: item.nameRu || item.nameHe || item.name,
+    draftNameEn: item.nameEn || item.nameHe || item.name,
+    draftDescriptionHe: item.descriptionHe || item.description,
+    draftDescriptionRu: item.descriptionRu || item.descriptionHe || item.description,
+    draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
     draftPrice: String(item.price),
-    draftImage: item.image
+    draftImage: item.image,
+    draftShowImage: item.showImage ?? true
   };
 }
 
@@ -64,41 +79,71 @@ export function MenuEditor() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [secondaryCredentials, setSecondaryCredentials] = useState<{
+    login: string;
+    password: string;
+  } | null>(null);
   const [items, setItems] = useState<EditableMenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [kitchenLoadWarningEnabled, setKitchenLoadWarningEnabled] = useState(false);
+  const [kitchenLoadWarningSaving, setKitchenLoadWarningSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [newItem, setNewItem] = useState<NewMenuItemDraft>({
-    name: "",
-    description: "",
+    nameHe: "",
+    nameRu: "",
+    nameEn: "",
+    descriptionHe: "",
+    descriptionRu: "",
+    descriptionEn: "",
     price: "",
     image: "",
+    showImage: true,
     category: "starters",
     available: true,
     saving: false
   });
 
   useEffect(() => {
-    if (!isAuthorized) {
+    if (!isAuthorized || !secondaryCredentials) {
       return;
     }
 
+    const authHeaders = {
+      "x-admin-secondary-login": secondaryCredentials.login,
+      "x-admin-secondary-password": secondaryCredentials.password
+    };
     let cancelled = false;
 
     async function load() {
-      const response = await fetch("/api/menu?restaurantSlug=olive-bistro", {
-        cache: "no-store"
-      });
+      const [menuResponse, settingsResponse] = await Promise.all([
+        fetch("/api/menu?restaurantSlug=olive-bistro", {
+          cache: "no-store",
+          headers: authHeaders
+        }),
+        fetch("/api/menu-settings", {
+          cache: "no-store"
+        })
+      ]);
 
-      if (!response.ok) {
+      if (!menuResponse.ok) {
         return;
       }
 
-      const data = (await response.json()) as MenuItem[];
+      const data = (await menuResponse.json()) as MenuItem[];
 
       if (!cancelled) {
         setItems(data.map(toEditableItem));
         setLoading(false);
+      }
+
+      if (!cancelled && settingsResponse.ok) {
+        const settings = (await settingsResponse.json()) as {
+          kitchenLoadWarningEnabled?: boolean;
+        };
+
+        setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
       }
     }
 
@@ -107,29 +152,49 @@ export function MenuEditor() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthorized]);
+  }, [isAuthorized, secondaryCredentials]);
 
-  function submitAuth() {
-    if (login === "admin" && password === "admin") {
-      setIsAuthorized(true);
-      setAuthError(null);
-      setLogin("");
-      setPassword("");
+  async function submitAuth() {
+    const response = await fetch("/api/admin-auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        scope: "secondary",
+        login,
+        password,
+        persist: false
+      })
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as { message?: string };
+      setAuthError(error.message ?? "Неверный логин или пароль.");
       return;
     }
 
-    setAuthError("Неверный логин или пароль.");
+    setIsAuthorized(true);
+    setSecondaryCredentials({ login, password });
+    setAuthError(null);
+    setLogin("");
+    setPassword("");
   }
 
   function updateDraft(
     itemId: string,
     field:
-      | "draftName"
-      | "draftDescription"
+      | "draftNameHe"
+      | "draftNameRu"
+      | "draftNameEn"
+      | "draftDescriptionHe"
+      | "draftDescriptionRu"
+      | "draftDescriptionEn"
       | "draftPrice"
       | "draftImage"
+      | "draftShowImage"
       | "category",
-    value: string
+    value: string | boolean
   ) {
     setItems((current) =>
       current.map((item) =>
@@ -209,6 +274,32 @@ export function MenuEditor() {
     );
   }
 
+  async function toggleKitchenLoadWarning(nextValue: boolean) {
+    setKitchenLoadWarningEnabled(nextValue);
+    setKitchenLoadWarningSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        kitchenLoadWarningEnabled: nextValue
+      })
+    });
+
+    if (!response.ok) {
+      setKitchenLoadWarningEnabled(!nextValue);
+      setMessage("Не удалось обновить предупреждение для меню.");
+      setKitchenLoadWarningSaving(false);
+      return;
+    }
+
+    setKitchenLoadWarningSaving(false);
+  }
+
   async function saveItem(itemId: string) {
     const currentItem = items.find((item) => item.id === itemId);
 
@@ -225,14 +316,25 @@ export function MenuEditor() {
     const response = await fetch("/api/menu", {
       method: "PATCH",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
         id: itemId,
-        name: currentItem.draftName,
-        description: currentItem.draftDescription,
+        name: currentItem.draftNameHe,
+        description: currentItem.draftDescriptionHe,
+        nameHe: currentItem.draftNameHe,
+        nameRu: currentItem.draftNameRu || currentItem.draftNameHe,
+        nameEn: currentItem.draftNameEn || currentItem.draftNameHe,
+        descriptionHe: currentItem.draftDescriptionHe,
+        descriptionRu:
+          currentItem.draftDescriptionRu || currentItem.draftDescriptionHe,
+        descriptionEn:
+          currentItem.draftDescriptionEn || currentItem.draftDescriptionHe,
         price: Number(currentItem.draftPrice),
         image: currentItem.draftImage,
+        showImage: currentItem.draftShowImage,
         available: currentItem.available,
         category: currentItem.category
       })
@@ -263,7 +365,7 @@ export function MenuEditor() {
   }
 
   async function createItem() {
-    if (!newItem.name.trim() || !newItem.price.trim()) {
+    if (!newItem.nameHe.trim() || !newItem.price.trim()) {
       setMessage("Для новой позиции заполните название и цену.");
       return;
     }
@@ -273,16 +375,25 @@ export function MenuEditor() {
     const response = await fetch("/api/menu", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
         restaurantSlug: "olive-bistro",
-        name: newItem.name,
-        description: newItem.description,
+        name: newItem.nameHe,
+        description: newItem.descriptionHe,
+        nameHe: newItem.nameHe,
+        nameRu: newItem.nameRu || newItem.nameHe,
+        nameEn: newItem.nameEn || newItem.nameHe,
+        descriptionHe: newItem.descriptionHe,
+        descriptionRu: newItem.descriptionRu || newItem.descriptionHe,
+        descriptionEn: newItem.descriptionEn || newItem.descriptionHe,
         price: Number(newItem.price),
-      image: newItem.image,
-      available: newItem.available,
-      category: newItem.category
+        image: newItem.image,
+        showImage: newItem.showImage,
+        available: newItem.available,
+        category: newItem.category
       })
     });
 
@@ -296,10 +407,15 @@ export function MenuEditor() {
     setItems((current) => [toEditableItem(createdItem), ...current]);
     setShowCreateForm(false);
     setNewItem({
-      name: "",
-      description: "",
+      nameHe: "",
+      nameRu: "",
+      nameEn: "",
+      descriptionHe: "",
+      descriptionRu: "",
+      descriptionEn: "",
       price: "",
       image: "",
+      showImage: true,
       category: "starters",
       available: true,
       saving: false
@@ -346,7 +462,7 @@ export function MenuEditor() {
             <button
               className="button-success"
               type="button"
-              onClick={submitAuth}
+              onClick={() => void submitAuth()}
             >
               Войти
             </button>
@@ -364,9 +480,44 @@ export function MenuEditor() {
     return <p className="muted">Загружаем меню...</p>;
   }
 
+  const filteredItems = items.filter((item) =>
+    selectedCategories.length === 0
+      ? true
+      : selectedCategories.includes(item.category)
+  );
+
+  function toggleCategory(category: MenuCategory) {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((value) => value !== category)
+        : [...current, category]
+    );
+  }
+
   return (
     <div className="orders-layout">
       {message ? <p className="status-message">{message}</p> : null}
+      <div className="menu-notice-control">
+        <label className="menu-notice-control__toggle">
+          <input
+            type="checkbox"
+            checked={kitchenLoadWarningEnabled}
+            disabled={kitchenLoadWarningSaving}
+            onChange={(event) =>
+              void toggleKitchenLoadWarning(event.target.checked)
+            }
+          />
+          <span
+            className={
+              kitchenLoadWarningEnabled
+                ? "menu-notice-control__text menu-notice-control__text--active"
+                : "menu-notice-control__text"
+            }
+          >
+            Сейчас возможна более долгая подача заказов из-за высокой загрузки кухни.
+          </span>
+        </label>
+      </div>
       <div className="menu-editor__create">
         <button
           className="button-success"
@@ -375,6 +526,37 @@ export function MenuEditor() {
         >
           {showCreateForm ? "Скрыть форму" : "Добавить блюдо"}
         </button>
+      </div>
+      <div className="orders-filter">
+        <div className="orders-filter__chips">
+          <button
+            type="button"
+            className={
+              selectedCategories.length === 0
+                ? "orders-filter__chip orders-filter__chip--active"
+                : "orders-filter__chip"
+            }
+            onClick={() => setSelectedCategories([])}
+          >
+            Все типы
+          </button>
+          {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(
+            ([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  selectedCategories.includes(value)
+                    ? "orders-filter__chip orders-filter__chip--active"
+                    : "orders-filter__chip"
+                }
+                onClick={() => toggleCategory(value)}
+              >
+                {label}
+              </button>
+            )
+          )}
+        </div>
       </div>
       <div className="orders-grid">
         {showCreateForm ? (
@@ -386,14 +568,31 @@ export function MenuEditor() {
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Название блюда"
-                value={newItem.name}
-                onChange={(event) => updateNewItem("name", event.target.value)}
+                placeholder="שם המנה"
+                value={newItem.nameHe}
+                onChange={(event) => updateNewItem("nameHe", event.target.value)}
+                dir="rtl"
               />
               <span className="status-pill menu-editor__availability status-pill--served">
                 В наличии
               </span>
             </div>
+
+            <input
+              className="modal-input"
+              type="text"
+                placeholder="Название блюда"
+                value={newItem.nameRu}
+                onChange={(event) => updateNewItem("nameRu", event.target.value)}
+              />
+
+            <input
+              className="modal-input"
+              type="text"
+              placeholder="Dish name (EN)"
+              value={newItem.nameEn}
+              onChange={(event) => updateNewItem("nameEn", event.target.value)}
+            />
 
             <select
               className="modal-input"
@@ -413,59 +612,91 @@ export function MenuEditor() {
 
             <textarea
               className="modal-input menu-editor__textarea"
-              placeholder="Описание"
-              value={newItem.description}
+              placeholder="תיאור"
+              value={newItem.descriptionHe}
+              dir="rtl"
               onChange={(event) =>
-                updateNewItem("description", event.target.value)
+                updateNewItem("descriptionHe", event.target.value)
               }
             />
 
-            <div className="menu-editor__upload">
-              <label className="button-neutral menu-editor__upload-icon">
-                <svg
-                  className="menu-editor__upload-svg"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+            <textarea
+              className="modal-input menu-editor__textarea"
+              placeholder="Описание"
+              value={newItem.descriptionRu}
+              onChange={(event) =>
+                updateNewItem("descriptionRu", event.target.value)
+              }
+            />
+
+            <textarea
+              className="modal-input menu-editor__textarea"
+              placeholder="Description (EN)"
+              value={newItem.descriptionEn}
+              onChange={(event) =>
+                updateNewItem("descriptionEn", event.target.value)
+              }
+            />
+
+            <label className="menu-editor__toggle">
+              <input
+                type="checkbox"
+                checked={newItem.showImage}
+                onChange={(event) =>
+                  updateNewItem("showImage", event.target.checked)
+                }
+              />
+              <span>Картинка</span>
+            </label>
+
+            {newItem.showImage ? (
+              <div className="menu-editor__upload">
+                <label className="button-neutral menu-editor__upload-icon">
+                  <svg
+                    className="menu-editor__upload-svg"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <input
+                    className="menu-editor__file-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={uploadNewImage}
                   />
-                </svg>
-                <input
-                  className="menu-editor__file-input"
-                  type="file"
-                  accept="image/*"
-                  onChange={uploadNewImage}
-                />
-              </label>
-              <div className="menu-editor__upload-state" />
-              <button
-                className="button-neutral menu-editor__upload-icon"
-                type="button"
-                onClick={clearNewImage}
-                disabled={!newItem.image}
-              >
-                <svg
-                  className="menu-editor__upload-svg"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
+                </label>
+                <div className="menu-editor__upload-state" />
+                <button
+                  className="button-neutral menu-editor__upload-icon"
+                  type="button"
+                  onClick={clearNewImage}
+                  disabled={!newItem.image}
                 >
-                  <path
-                    d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+                  <svg
+                    className="menu-editor__upload-svg"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
 
             <label className="menu-editor__field">
               <span>Цена</span>
@@ -506,16 +737,17 @@ export function MenuEditor() {
         </article>
         ) : null}
 
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <article key={item.id} className="order-card">
             <div className="menu-editor__top-row">
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Название блюда"
-                value={item.draftName}
+                placeholder="שם המנה"
+                value={item.draftNameHe}
+                dir="rtl"
                 onChange={(event) =>
-                  updateDraft(item.id, "draftName", event.target.value)
+                  updateDraft(item.id, "draftNameHe", event.target.value)
                 }
               />
               <span
@@ -528,6 +760,25 @@ export function MenuEditor() {
             </div>
 
             <div className="menu-editor__form">
+              <input
+                className="modal-input"
+                type="text"
+                placeholder="Название блюда"
+                value={item.draftNameRu}
+                onChange={(event) =>
+                  updateDraft(item.id, "draftNameRu", event.target.value)
+                }
+              />
+              <input
+                className="modal-input"
+                type="text"
+                placeholder="Dish name (EN)"
+                value={item.draftNameEn}
+                onChange={(event) =>
+                  updateDraft(item.id, "draftNameEn", event.target.value)
+                }
+              />
+
               <select
                 className="modal-input"
                 value={item.category}
@@ -546,58 +797,91 @@ export function MenuEditor() {
 
               <textarea
                 className="modal-input menu-editor__textarea"
-                value={item.draftDescription}
+                placeholder="תיאור"
+                value={item.draftDescriptionHe}
+                dir="rtl"
                 onChange={(event) =>
-                  updateDraft(item.id, "draftDescription", event.target.value)
+                  updateDraft(item.id, "draftDescriptionHe", event.target.value)
                 }
               />
 
-              <div className="menu-editor__upload">
-                <label className="button-neutral menu-editor__upload-icon">
-                  <svg
-                    className="menu-editor__upload-svg"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+              <textarea
+                className="modal-input menu-editor__textarea"
+                placeholder="Описание"
+                value={item.draftDescriptionRu}
+                onChange={(event) =>
+                  updateDraft(item.id, "draftDescriptionRu", event.target.value)
+                }
+              />
+
+              <textarea
+                className="modal-input menu-editor__textarea"
+                placeholder="Description (EN)"
+                value={item.draftDescriptionEn}
+                onChange={(event) =>
+                  updateDraft(item.id, "draftDescriptionEn", event.target.value)
+                }
+              />
+
+              <label className="menu-editor__toggle">
+                <input
+                  type="checkbox"
+                  checked={item.draftShowImage}
+                  onChange={(event) =>
+                    updateDraft(item.id, "draftShowImage", event.target.checked)
+                  }
+                />
+                <span>Картинка</span>
+              </label>
+
+              {item.draftShowImage ? (
+                <div className="menu-editor__upload">
+                  <label className="button-neutral menu-editor__upload-icon">
+                    <svg
+                      className="menu-editor__upload-svg"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <input
+                      className="menu-editor__file-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => void uploadExistingImage(item.id, event)}
                     />
-                  </svg>
-                  <input
-                    className="menu-editor__file-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => void uploadExistingImage(item.id, event)}
-                  />
-                </label>
-                <div className="menu-editor__upload-state" />
-                <button
-                  className="button-neutral menu-editor__upload-icon"
-                  type="button"
-                  onClick={() => clearExistingImage(item.id)}
-                  disabled={!item.draftImage}
-                >
-                  <svg
-                    className="menu-editor__upload-svg"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
+                  </label>
+                  <div className="menu-editor__upload-state" />
+                  <button
+                    className="button-neutral menu-editor__upload-icon"
+                    type="button"
+                    onClick={() => clearExistingImage(item.id)}
+                    disabled={!item.draftImage}
                   >
-                    <path
-                      d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
+                    <svg
+                      className="menu-editor__upload-svg"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              ) : null}
 
               <label className="menu-editor__field">
                 <span>Цена</span>

@@ -4,32 +4,135 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
-import { CartItem, MenuItem, Order, ServeMode } from "@/lib/types";
+import { CartItem, MenuItem, MenuLanguage, Order, ServeMode } from "@/lib/types";
 
 type CartProps = {
   restaurantSlug: string;
   restaurantName: string;
   tableNumber: number;
+  tableToken: string;
   menu: MenuItem[];
+  showKitchenLoadWarning: boolean;
   initialSubmittedOrders: Order[];
 };
 
 const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
 
+const uiText = {
+  he: {
+    table: "שולחן",
+    callWaiter: "קריאה למלצר",
+    reviewOrderTitle: "בדקו את ההזמנה",
+    reviewOrderText: "אנא בדקו שהכול נכון לפני השליחה.",
+    reviewOrderOk: "אישור",
+    reviewOrderChange: "לשנות",
+    serveModeTitle: "איך להגיש את ההזמנה?",
+    serveModeText: "בחרו את אופן ההגשה שנוח לכם.",
+    serveAll: "להגיש הכול יחד",
+    serveAsReady: "להגיש לפי המוכנות",
+    newOrder: "הזמנה חדשה",
+    emptyCart: "עדיין ריק. הוסיפו מנות מהתפריט.",
+    total: "סה\"כ",
+    submit: "שליחת הזמנה",
+    submitting: "שולחים...",
+    sent: "נשלח",
+    currentOrders: "הזמנות נוכחיות",
+    totalOrders: "סכום כולל",
+    sentStatus: "נשלח",
+    thankYou: "תודה",
+    orderSent: "ההזמנה נשלחה. אנחנו מכינים באהבה.",
+    waiterCalled: "המלצר הוזמן",
+    kitchenLoadWarning:
+      "ייתכן עיכוב בהגשת ההזמנה עקב עומס במטבח.",
+    addDish: "הוסיפו לפחות מנה אחת.",
+    submitError: "לא הצלחנו לשלוח את ההזמנה",
+    waiterError: "לא הצלחנו לקרוא למלצר",
+    close: "סגירת חלון"
+  },
+  ru: {
+    table: "Столик",
+    callWaiter: "Вызвать официанта",
+    reviewOrderTitle: "Проверьте заказ",
+    reviewOrderText: "Пожалуйста, проверьте ваш заказ перед отправкой.",
+    reviewOrderOk: "ОК",
+    reviewOrderChange: "Изменить",
+    serveModeTitle: "Как подать заказ?",
+    serveModeText: "Выберите удобный вариант подачи блюд.",
+    serveAll: "Подать все сразу",
+    serveAsReady: "По мере готовности",
+    newOrder: "Новый заказ",
+    emptyCart: "Пока пусто. Добавьте блюда из меню слева.",
+    total: "Итого",
+    submit: "Отправить заказ",
+    submitting: "Отправка...",
+    sent: "Отправлено",
+    currentOrders: "Текущие заказы",
+    totalOrders: "Общая сумма",
+    sentStatus: "Отправлен",
+    thankYou: "спасибо",
+    orderSent: "Поздравляем, ваш заказ отправлен. Мы готовим с любовью.",
+    waiterCalled: "Официант вызван",
+    kitchenLoadWarning:
+      "Сейчас возможна более долгая подача заказов из-за высокой загрузки кухни.",
+    addDish: "Добавьте хотя бы одно блюдо.",
+    submitError: "Не удалось отправить заказ",
+    waiterError: "Не удалось вызвать официанта",
+    close: "Закрыть окно"
+  },
+  en: {
+    table: "Table",
+    callWaiter: "Call waiter",
+    reviewOrderTitle: "Check your order",
+    reviewOrderText: "Please review your order before sending it.",
+    reviewOrderOk: "OK",
+    reviewOrderChange: "Change",
+    serveModeTitle: "How should we serve your order?",
+    serveModeText: "Choose the serving option that works best for you.",
+    serveAll: "Serve everything together",
+    serveAsReady: "Serve as ready",
+    newOrder: "New order",
+    emptyCart: "It is empty for now. Add dishes from the menu.",
+    total: "Total",
+    submit: "Send order",
+    submitting: "Sending...",
+    sent: "Sent",
+    currentOrders: "Current orders",
+    totalOrders: "Total amount",
+    sentStatus: "Sent",
+    thankYou: "thanks",
+    orderSent: "Your order has been sent. We are cooking with love.",
+    waiterCalled: "Waiter has been called",
+    kitchenLoadWarning:
+      "Order preparation may take longer than usual right now due to a busy kitchen.",
+    addDish: "Add at least one dish.",
+    submitError: "Failed to send the order",
+    waiterError: "Failed to call the waiter",
+    close: "Close dialog"
+  }
+} as const;
+
 export function Cart({
   restaurantSlug,
   restaurantName,
   tableNumber,
+  tableToken,
   menu,
+  showKitchenLoadWarning,
   initialSubmittedOrders
 }: CartProps) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [showServeModeDialog, setShowServeModeDialog] = useState(false);
+  const [language, setLanguage] = useState<MenuLanguage>("he");
+  const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
     initialSubmittedOrders
+  );
+  const [currentSessionId, setCurrentSessionId] = useState(
+    initialSubmittedOrders[0]?.sessionId ?? 1
   );
   const [waiterCallBlockedUntil, setWaiterCallBlockedUntil] = useState(0);
 
@@ -57,6 +160,25 @@ export function Cart({
     0
   );
   const waiterCallDisabled = waiterCallBlockedUntil > Date.now();
+  const text = uiText[language];
+
+  useEffect(() => {
+    const savedLanguage = window.localStorage.getItem(
+      `menu-language:${restaurantSlug}:${tableToken}`
+    );
+
+    if (savedLanguage === "he" || savedLanguage === "ru" || savedLanguage === "en") {
+      setLanguage(savedLanguage);
+    }
+  }, [restaurantSlug, tableToken]);
+
+  function setNextLanguage(nextLanguage: MenuLanguage) {
+    setLanguage(nextLanguage);
+    window.localStorage.setItem(
+      `menu-language:${restaurantSlug}:${tableToken}`,
+      nextLanguage
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +189,7 @@ export function Cart({
       }
 
       const response = await fetch(
-        `/api/tables/${restaurantSlug}/${tableNumber}`,
+        `/api/tables/${restaurantSlug}/${tableToken}`,
         {
           cache: "no-store"
         }
@@ -78,31 +200,57 @@ export function Cart({
       }
 
       const data = (await response.json()) as {
+        currentSessionId?: number;
         submittedOrders?: Order[];
       };
 
       if (!cancelled) {
-        setSubmittedOrders(data.submittedOrders ?? []);
+        const nextSessionId = data.currentSessionId ?? currentSessionId;
+        const nextOrders = data.submittedOrders ?? [];
+
+        setCurrentSessionId(nextSessionId);
+        setSubmittedOrders((current) => {
+          if (nextSessionId !== currentSessionId) {
+            return nextOrders;
+          }
+
+          if (nextOrders.length === 0) {
+            return current;
+          }
+
+          const mergedById = new Map<string, Order>();
+
+          [...current, ...nextOrders].forEach((order) => {
+            if (order.sessionId === nextSessionId) {
+              mergedById.set(order.id, order);
+            }
+          });
+
+          return [...mergedById.values()].sort((left, right) =>
+            right.createdAt.localeCompare(left.createdAt)
+          );
+        });
       }
     }
 
+    void syncSubmittedOrders();
     const intervalId = window.setInterval(syncSubmittedOrders, 4000);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [restaurantSlug, tableNumber]);
+  }, [restaurantSlug, tableToken, currentSessionId]);
 
   useEffect(() => {
-    const storageKey = `waiter-call:${restaurantSlug}:${tableNumber}`;
+    const storageKey = `waiter-call:${restaurantSlug}:${tableToken}`;
     const savedValue = window.localStorage.getItem(storageKey);
     const savedTimestamp = savedValue ? Number(savedValue) : 0;
 
     if (savedTimestamp > Date.now()) {
       setWaiterCallBlockedUntil(savedTimestamp);
     }
-  }, [restaurantSlug, tableNumber]);
+  }, [restaurantSlug, tableToken]);
 
   useEffect(() => {
     if (!waiterCallBlockedUntil || waiterCallBlockedUntil <= Date.now()) {
@@ -150,6 +298,7 @@ export function Cart({
     setSubmitting(true);
     setMessage(null);
     setShowServeModeDialog(false);
+    setShowReviewDialog(false);
 
     try {
       const response = await fetch("/api/orders", {
@@ -166,7 +315,7 @@ export function Cart({
       });
 
       if (!response.ok) {
-        throw new Error("Не удалось отправить заказ");
+        throw new Error(text.submitError);
       }
 
       const order = (await response.json()) as Order;
@@ -180,12 +329,10 @@ export function Cart({
 
         return current.map((item) => (item.id === order.id ? order : item));
       });
-      setDialogMessage(
-        "Поздравляем, ваш заказ отправлен. Мы готовим с любовью."
-      );
+      setDialogMessage(text.orderSent);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Произошла ошибка при заказе."
+        error instanceof Error ? error.message : text.submitError
       );
     } finally {
       setSubmitting(false);
@@ -194,11 +341,11 @@ export function Cart({
 
   function openServeModeDialog() {
     if (!items.length) {
-      setMessage("Добавьте хотя бы одно блюдо.");
+      setMessage(text.addDish);
       return;
     }
 
-    setShowServeModeDialog(true);
+    setShowReviewDialog(true);
   }
 
   async function callWaiter() {
@@ -222,23 +369,29 @@ export function Cart({
       });
 
       if (!response.ok) {
-        throw new Error("Не удалось вызвать официанта");
+        throw new Error(text.waiterError);
       }
 
       const blockedUntil = Date.now() + WAITER_CALL_COOLDOWN_MS;
-      const storageKey = `waiter-call:${restaurantSlug}:${tableNumber}`;
+      const storageKey = `waiter-call:${restaurantSlug}:${tableToken}`;
       window.localStorage.setItem(storageKey, String(blockedUntil));
       setWaiterCallBlockedUntil(blockedUntil);
-      setDialogMessage("Официант вызван");
+      setDialogMessage(text.waiterCalled);
     } catch (error) {
       setDialogMessage(
-        error instanceof Error ? error.message : "Произошла ошибка при вызове."
+        error instanceof Error ? error.message : text.waiterError
       );
     }
   }
 
-  function formatOrderLabel(createdAt: string) {
-    return `Заказ · ${new Date(createdAt).toLocaleTimeString("ru-RU", {
+  function formatOrderLabel(timestamp: string) {
+    const locale =
+      language === "he" ? "he-IL" : language === "en" ? "en-US" : "ru-RU";
+    const prefix =
+      language === "he" ? "הזמנה" : language === "en" ? "Order" : "Заказ";
+
+    return `${prefix} · ${new Date(timestamp).toLocaleTimeString(locale, {
+      hour12: false,
       hour: "2-digit",
       minute: "2-digit"
     })}`;
@@ -252,7 +405,13 @@ export function Cart({
             className="modal-card"
             role="dialog"
             aria-modal="true"
-            aria-label="Сообщение"
+            aria-label={
+              language === "he"
+                ? "הודעה"
+                : language === "en"
+                  ? "Message"
+                  : "Сообщение"
+            }
           >
             <p className="modal-card__message">{dialogMessage}</p>
             <button
@@ -260,8 +419,62 @@ export function Cart({
               type="button"
               onClick={() => setDialogMessage(null)}
             >
-              спасибо
+              {text.thankYou}
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {showReviewDialog ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-order-dialog-title"
+          >
+            <h2 id="review-order-dialog-title">{text.reviewOrderTitle}</h2>
+            <p>{text.reviewOrderText}</p>
+            <div className="table-order-items">
+              {detailedItems.map(({ cartItem, menuItem }) => (
+                <div key={menuItem.id} className="table-order-item">
+                  <span>
+                    {language === "he"
+                      ? menuItem.nameHe || menuItem.name
+                      : language === "en"
+                        ? menuItem.nameEn || menuItem.nameHe || menuItem.name
+                        : menuItem.nameRu || menuItem.nameHe || menuItem.name}{" "}
+                    x {cartItem.quantity}
+                  </span>
+                  <strong>
+                    {formatCurrency(menuItem.price * cartItem.quantity)}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <div className="cart-summary">
+              <span>{text.total}</span>
+              <strong>{formatCurrency(total)}</strong>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="button-success"
+                type="button"
+                onClick={() => {
+                  setShowReviewDialog(false);
+                  setShowServeModeDialog(true);
+                }}
+              >
+                {text.reviewOrderOk}
+              </button>
+              <button
+                className="button-neutral"
+                type="button"
+                onClick={() => setShowReviewDialog(false)}
+              >
+                {text.reviewOrderChange}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -277,27 +490,30 @@ export function Cart({
             <button
               className="modal-card__close"
               type="button"
-              aria-label="Закрыть окно"
-              onClick={() => setShowServeModeDialog(false)}
+              aria-label={text.close}
+              onClick={() => {
+                setShowServeModeDialog(false);
+                setShowReviewDialog(false);
+              }}
             >
               X
             </button>
-            <h2 id="serve-mode-dialog-title">Как подать заказ?</h2>
-            <p>Выберите удобный вариант подачи блюд.</p>
+            <h2 id="serve-mode-dialog-title">{text.serveModeTitle}</h2>
+            <p>{text.serveModeText}</p>
             <div className="modal-actions">
               <button
                 className="button-success"
                 type="button"
                 onClick={() => submitOrder("all_at_once")}
               >
-                Подать все сразу
+                {text.serveAll}
               </button>
               <button
                 className="button-neutral"
                 type="button"
                 onClick={() => submitOrder("as_ready")}
               >
-                По мере готовности
+                {text.serveAsReady}
               </button>
             </div>
           </div>
@@ -307,17 +523,57 @@ export function Cart({
       <div className="page-shell">
         <section className="hero">
           <div>
-            <p className="eyebrow">Столик {tableNumber}</p>
+            <p className="eyebrow">
+              {text.table} {tableNumber}
+            </p>
             <h1>{restaurantName}</h1>
+            {showKitchenLoadWarning ? (
+              <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
+            ) : null}
           </div>
-          <div className="menu-action-card">
+          <div className="menu-action-card menu-action-card--stacked">
+            <div className="language-toggle" role="group" aria-label="Language">
+              <button
+                className={
+                  language === "he"
+                    ? "language-toggle__button language-toggle__button--active"
+                    : "language-toggle__button"
+                }
+                type="button"
+                onClick={() => setNextLanguage("he")}
+              >
+                HE
+              </button>
+              <button
+                className={
+                  language === "en"
+                    ? "language-toggle__button language-toggle__button--active"
+                    : "language-toggle__button"
+                }
+                type="button"
+                onClick={() => setNextLanguage("en")}
+              >
+                EN
+              </button>
+              <button
+                className={
+                  language === "ru"
+                    ? "language-toggle__button language-toggle__button--active"
+                    : "language-toggle__button"
+                }
+                type="button"
+                onClick={() => setNextLanguage("ru")}
+              >
+                RU
+              </button>
+            </div>
             <button
               className="button-danger button-danger--call"
               type="button"
               onClick={callWaiter}
               disabled={waiterCallDisabled}
             >
-              Вызвать официанта
+              {text.callWaiter}
             </button>
           </div>
         </section>
@@ -325,6 +581,7 @@ export function Cart({
         <div className="content-grid">
           <MenuList
             items={menu}
+            language={language}
             quantities={quantities}
             onAdd={addItem}
             onDecrease={(menuItemId) => changeQuantity(menuItemId, -1)}
@@ -332,19 +589,23 @@ export function Cart({
 
           <aside className="cart-panel">
             <div className="section-header">
-              <h2>Новый заказ</h2>
+              <h2>{text.newOrder}</h2>
             </div>
 
             {!detailedItems.length ? (
-              <p className="muted">
-                Пока пусто. Добавьте блюда из меню слева.
-              </p>
+              <p className="muted">{text.emptyCart}</p>
             ) : (
               <div className="cart-list">
                 {detailedItems.map(({ cartItem, menuItem }) => (
                   <div className="cart-row" key={menuItem.id}>
                     <div>
-                      <strong>{menuItem.name}</strong>
+                      <strong>
+                        {language === "he"
+                          ? menuItem.nameHe || menuItem.name
+                          : language === "en"
+                            ? menuItem.nameEn || menuItem.nameHe || menuItem.name
+                            : menuItem.nameRu || menuItem.nameHe || menuItem.name}
+                      </strong>
                       <p className="muted">{formatCurrency(menuItem.price)}</p>
                     </div>
                     <div className="quantity-box">
@@ -368,7 +629,7 @@ export function Cart({
             )}
 
             <div className="cart-summary">
-              <span>Итого</span>
+              <span>{text.total}</span>
               <strong>{formatCurrency(total)}</strong>
             </div>
 
@@ -378,32 +639,39 @@ export function Cart({
               onClick={openServeModeDialog}
               disabled={submitting}
             >
-              {submitting ? "Отправка..." : "Отправить заказ"}
+              {submitting ? text.submitting : text.submit}
             </button>
 
             {message ? <p className="status-message">{message}</p> : null}
 
             {submittedOrders.length ? (
-              <details className="submitted-orders" open={false}>
+              <details
+                className="submitted-orders"
+                open={submittedOrdersOpen}
+                onToggle={(event) =>
+                  setSubmittedOrdersOpen(event.currentTarget.open)
+                }
+              >
                 <summary className="submitted-orders__summary">
                   <div>
-                    <p className="eyebrow">Отправлено</p>
-                    <h2>Текущие заказы</h2>
+                    <p className="eyebrow">{text.sent}</p>
+                    <h2>{text.currentOrders}</h2>
                   </div>
-                  <span className="submitted-orders__hint">Развернуть</span>
                 </summary>
                 <div className="submitted-orders__content">
                   <div className="submitted-orders-total">
-                    <span>Общая сумма</span>
+                    <span>{text.totalOrders}</span>
                     <strong>{formatCurrency(submittedOrdersTotal)}</strong>
                   </div>
                   {submittedOrders.map((order) => (
                     <article key={order.id} className="submitted-order-card">
                       <div className="order-card__header">
                         <div>
-                          <strong>{formatOrderLabel(order.createdAt)}</strong>
+                          <strong>
+                            {formatOrderLabel(order.updatedAt || order.createdAt)}
+                          </strong>
                         </div>
-                        <span className="status-pill status-pill--new">Отправлен</span>
+                        <span className="status-pill status-pill--new">{text.sentStatus}</span>
                       </div>
                       <div className="table-order-items">
                         {order.items.map((item) => (

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireAdminAccess } from "@/lib/admin-auth";
 import {
   changeOrderItemQuantity,
   createOrder,
@@ -11,6 +12,12 @@ import {
 import { OrderStatus } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
+  const unauthorized = await requireAdminAccess(request, "admin");
+
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
   const sessionId = request.nextUrl.searchParams.get("sessionId");
   const orders = getOrders(restaurantSlug ?? undefined).filter((order) =>
@@ -38,6 +45,12 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const unauthorized = await requireAdminAccess(request, "admin");
+
+  if (unauthorized) {
+    return unauthorized;
+  }
+
   try {
     const body = (await request.json()) as {
       orderId?: string;

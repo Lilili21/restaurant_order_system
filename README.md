@@ -3,7 +3,7 @@
 MVP для ресторана с QR-меню:
 
 - у каждого столика своя ссылка/QR;
-- гость открывает меню по маршруту `/menu/:restaurantSlug/:tableNumber`;
+- гость открывает меню по маршруту `/menu/:restaurantSlug/:tableToken`;
 - заказ сразу попадает в админку;
 - админка разделена на вкладку заказов и вкладку столиков;
 - данные пока хранятся в памяти сервера.
@@ -35,14 +35,24 @@ node -v
 Дальше:
 
 ```bash
+cp .env.example .env.local
 npm install
 npm run dev
+```
+
+Логины и пароли теперь берутся из `.env.local`:
+
+```env
+ADMIN_LOGIN=admin1
+ADMIN_PASSWORD=admin1
+ADMIN_SECONDARY_LOGIN=admin
+ADMIN_SECONDARY_PASSWORD=admin
 ```
 
 Открыть:
 
 - `http://localhost:3010/`
-- `http://localhost:3010/menu/olive-bistro/1`
+- `http://localhost:3010/menu/olive-bistro/tbl_UxflwK16Xm3V`
 - `http://localhost:3010/admin/orders`
 - `http://localhost:3010/admin/tables`
 

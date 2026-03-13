@@ -7,7 +7,6 @@ export default function AdminOrdersPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <p className="eyebrow">Live Orders</p>
           <h1>Новые заказы</h1>
           <p className="muted">
             Эта страница опрашивает API каждые 4 секунды и показывает новые заказы.
