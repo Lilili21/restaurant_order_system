@@ -5,13 +5,13 @@ export const restaurants: Restaurant[] = [
     id: "rest_olive",
     slug: "olive-bistro",
     name: "Olive Bistro",
-    description: "Ресторан с QR-меню и моментальными заказами для официантов.",
+    description: "Restaurant with QR menus and instant order delivery for staff.",
     currency: "ILS",
     tables: Array.from({ length: 8 }, (_, index) => ({
       id: `olive_table_${index + 1}`,
       number: index + 1,
       seats: index < 4 ? 2 : 4,
-      zone: index < 4 ? "Зал A" : "Терраса",
+      zone: index < 4 ? "Hall A" : "Terrace",
       accessToken: `olive-demo-token-${index + 1}`,
       qrCodeValue: `/menu/olive-bistro/olive-demo-token-${index + 1}`
     }))

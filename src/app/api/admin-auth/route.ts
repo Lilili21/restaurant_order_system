@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     if (!verifyAdminCredentials(body.scope, body.login ?? "", body.password ?? "")) {
       return NextResponse.json(
-        { message: "Неверный логин или пароль." },
+        { message: "Invalid login or password." },
         { status: 401 }
       );
     }

@@ -6,10 +6,10 @@ import { formatCurrency } from "@/lib/menu";
 import { MenuCategory, MenuItem } from "@/lib/types";
 
 const categoryLabels: Record<MenuCategory, string> = {
-  starters: "Закуски",
-  mains: "Основные блюда",
-  drinks: "Напитки",
-  desserts: "Десерты"
+  starters: "Starters",
+  mains: "Main courses",
+  drinks: "Drinks",
+  desserts: "Desserts"
 };
 
 type EditableMenuItem = MenuItem & {
@@ -65,10 +65,10 @@ function readImageFile(file: File) {
         return;
       }
 
-      reject(new Error("Не удалось прочитать изображение."));
+      reject(new Error("Failed to read the image."));
     };
 
-    reader.onerror = () => reject(new Error("Не удалось прочитать изображение."));
+    reader.onerror = () => reject(new Error("Failed to read the image."));
     reader.readAsDataURL(file);
   });
 }
@@ -170,7 +170,7 @@ export function MenuEditor() {
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setAuthError(error.message ?? "Неверный логин или пароль.");
+      setAuthError(error.message ?? "Invalid login or password.");
       return;
     }
 
@@ -215,12 +215,12 @@ export function MenuEditor() {
 
   function clearExistingImage(itemId: string) {
     updateDraft(itemId, "draftImage", "");
-    setMessage("Картинка удалена.");
+    setMessage("Image removed.");
   }
 
   function clearNewImage() {
     updateNewItem("image", "");
-    setMessage("Картинка удалена.");
+    setMessage("Image removed.");
   }
 
   async function uploadExistingImage(
@@ -236,10 +236,10 @@ export function MenuEditor() {
     try {
       const image = await readImageFile(file);
       updateDraft(itemId, "draftImage", image);
-      setMessage(`Картинка загружена.`);
+      setMessage("Image uploaded.");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Не удалось загрузить картинку."
+        error instanceof Error ? error.message : "Failed to upload the image."
       );
     } finally {
       event.target.value = "";
@@ -256,10 +256,10 @@ export function MenuEditor() {
     try {
       const image = await readImageFile(file);
       updateNewItem("image", image);
-      setMessage("Картинка загружена.");
+      setMessage("Image uploaded.");
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Не удалось загрузить картинку."
+        error instanceof Error ? error.message : "Failed to upload the image."
       );
     } finally {
       event.target.value = "";
@@ -292,7 +292,7 @@ export function MenuEditor() {
 
     if (!response.ok) {
       setKitchenLoadWarningEnabled(!nextValue);
-      setMessage("Не удалось обновить предупреждение для меню.");
+      setMessage("Failed to update the kitchen warning.");
       setKitchenLoadWarningSaving(false);
       return;
     }
@@ -341,7 +341,7 @@ export function MenuEditor() {
     });
 
     if (!response.ok) {
-      setMessage("Не удалось сохранить изменения меню.");
+      setMessage("Failed to save menu changes.");
       setItems((current) =>
         current.map((item) =>
           item.id === itemId ? { ...item, saving: false } : item
@@ -361,12 +361,12 @@ export function MenuEditor() {
           : item
       )
     );
-    setMessage(`Сохранено: ${updatedItem.name}`);
+    setMessage(`Saved: ${updatedItem.name}`);
   }
 
   async function createItem() {
     if (!newItem.nameHe.trim() || !newItem.price.trim()) {
-      setMessage("Для новой позиции заполните название и цену.");
+      setMessage("Fill in the item name and price for the new entry.");
       return;
     }
 
@@ -398,7 +398,7 @@ export function MenuEditor() {
     });
 
     if (!response.ok) {
-      setMessage("Не удалось добавить новую позицию.");
+      setMessage("Failed to add the new menu item.");
       setNewItem((current) => ({ ...current, saving: false }));
       return;
     }
@@ -420,7 +420,7 @@ export function MenuEditor() {
       available: true,
       saving: false
     });
-    setMessage(`Добавлено: ${createdItem.name}`);
+    setMessage(`Added: ${createdItem.name}`);
   }
 
   if (!isAuthorized && authOpen) {
@@ -435,24 +435,24 @@ export function MenuEditor() {
           <button
             className="modal-card__close"
             type="button"
-            aria-label="Закрыть окно"
+            aria-label="Close dialog"
             onClick={() => setAuthOpen(false)}
           >
             X
           </button>
-          <h2 id="menu-auth-title">Вход в меню</h2>
+          <h2 id="menu-auth-title">Menu access</h2>
           <div className="modal-form">
             <input
               className="modal-input"
               type="text"
-              placeholder="Логин"
+              placeholder="Login"
               value={login}
               onChange={(event) => setLogin(event.target.value)}
             />
             <input
               className="modal-input"
               type="password"
-              placeholder="Пароль"
+              placeholder="Password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -464,7 +464,7 @@ export function MenuEditor() {
               type="button"
               onClick={() => void submitAuth()}
             >
-              Войти
+              Sign in
             </button>
           </div>
         </div>
@@ -473,11 +473,11 @@ export function MenuEditor() {
   }
 
   if (!isAuthorized) {
-    return <p className="muted">Вход в редактирование меню отменён.</p>;
+    return <p className="muted">Menu editor access was cancelled.</p>;
   }
 
   if (loading) {
-    return <p className="muted">Загружаем меню...</p>;
+    return <p className="muted">Loading menu...</p>;
   }
 
   const filteredItems = items.filter((item) =>
@@ -514,7 +514,7 @@ export function MenuEditor() {
                 : "menu-notice-control__text"
             }
           >
-            Сейчас возможна более долгая подача заказов из-за высокой загрузки кухни.
+            Order preparation may take longer than usual right now due to a busy kitchen.
           </span>
         </label>
       </div>
@@ -524,7 +524,7 @@ export function MenuEditor() {
           type="button"
           onClick={() => setShowCreateForm((current) => !current)}
         >
-          {showCreateForm ? "Скрыть форму" : "Добавить блюдо"}
+          {showCreateForm ? "Hide form" : "Add dish"}
         </button>
       </div>
       <div className="orders-filter">
@@ -538,7 +538,7 @@ export function MenuEditor() {
             }
             onClick={() => setSelectedCategories([])}
           >
-            Все типы
+            All categories
           </button>
           {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(
             ([value, label]) => (
@@ -561,7 +561,7 @@ export function MenuEditor() {
       <div className="orders-grid">
         {showCreateForm ? (
         <article className="order-card">
-          <h3>Добавить блюдо</h3>
+          <h3>Add dish</h3>
 
           <div className="menu-editor__form">
             <div className="menu-editor__top-row">
@@ -574,14 +574,14 @@ export function MenuEditor() {
                 dir="rtl"
               />
               <span className="status-pill menu-editor__availability status-pill--served">
-                В наличии
+                Available
               </span>
             </div>
 
             <input
               className="modal-input"
               type="text"
-                placeholder="Название блюда"
+                placeholder="Dish name"
                 value={newItem.nameRu}
                 onChange={(event) => updateNewItem("nameRu", event.target.value)}
               />
@@ -622,7 +622,7 @@ export function MenuEditor() {
 
             <textarea
               className="modal-input menu-editor__textarea"
-              placeholder="Описание"
+              placeholder="Description"
               value={newItem.descriptionRu}
               onChange={(event) =>
                 updateNewItem("descriptionRu", event.target.value)
@@ -646,7 +646,7 @@ export function MenuEditor() {
                   updateNewItem("showImage", event.target.checked)
                 }
               />
-              <span>Картинка</span>
+              <span>Image</span>
             </label>
 
             {newItem.showImage ? (
@@ -699,7 +699,7 @@ export function MenuEditor() {
             ) : null}
 
             <label className="menu-editor__field">
-              <span>Цена</span>
+              <span>Price</span>
               <input
                 className="modal-input"
                 type="number"
@@ -718,7 +718,7 @@ export function MenuEditor() {
                     updateNewItem("available", event.target.checked)
                   }
                 />
-                <span>В наличии</span>
+                <span>Available</span>
               </label>
               <strong>{formatCurrency(Number(newItem.price) || 0)}</strong>
             </div>
@@ -731,7 +731,7 @@ export function MenuEditor() {
               disabled={newItem.saving}
               onClick={() => void createItem()}
             >
-              {newItem.saving ? "Добавляем..." : "Добавить"}
+              {newItem.saving ? "Adding..." : "Add"}
             </button>
           </div>
         </article>
@@ -755,7 +755,7 @@ export function MenuEditor() {
                   item.available ? "status-pill--served" : "status-pill--cancelled"
                 }`}
               >
-                {item.available ? "В наличии" : "Нет в наличии"}
+                {item.available ? "Available" : "Unavailable"}
               </span>
             </div>
 
@@ -763,7 +763,7 @@ export function MenuEditor() {
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Название блюда"
+                placeholder="Dish name"
                 value={item.draftNameRu}
                 onChange={(event) =>
                   updateDraft(item.id, "draftNameRu", event.target.value)
@@ -807,7 +807,7 @@ export function MenuEditor() {
 
               <textarea
                 className="modal-input menu-editor__textarea"
-                placeholder="Описание"
+                placeholder="Description"
                 value={item.draftDescriptionRu}
                 onChange={(event) =>
                   updateDraft(item.id, "draftDescriptionRu", event.target.value)
@@ -831,7 +831,7 @@ export function MenuEditor() {
                     updateDraft(item.id, "draftShowImage", event.target.checked)
                   }
                 />
-                <span>Картинка</span>
+                <span>Image</span>
               </label>
 
               {item.draftShowImage ? (
@@ -884,7 +884,7 @@ export function MenuEditor() {
               ) : null}
 
               <label className="menu-editor__field">
-                <span>Цена</span>
+                <span>Price</span>
                 <input
                   className="modal-input"
                   type="number"
@@ -903,7 +903,7 @@ export function MenuEditor() {
                     checked={item.available}
                     onChange={() => toggleAvailability(item.id)}
                   />
-                  <span>В наличии</span>
+                  <span>Available</span>
                 </label>
                 <strong>{formatCurrency(Number(item.draftPrice) || 0)}</strong>
               </div>
@@ -916,7 +916,7 @@ export function MenuEditor() {
                 disabled={item.saving}
                 onClick={() => void saveItem(item.id)}
               >
-                {item.saving ? "Сохраняем..." : "Сохранить"}
+                {item.saving ? "Saving..." : "Save"}
               </button>
             </div>
           </article>

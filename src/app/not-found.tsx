@@ -12,8 +12,8 @@ export default function NotFound() {
       }}
     >
       <div style={{ textAlign: "center" }}>
-        <h1 style={{ marginBottom: "12px" }}>Страница не найдена</h1>
-        <p>Проверьте адрес и попробуйте ещё раз.</p>
+        <h1 style={{ marginBottom: "12px" }}>Page not found</h1>
+        <p>Check the address and try again.</p>
       </div>
     </main>
   );

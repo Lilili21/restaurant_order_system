@@ -93,13 +93,13 @@ export function TablesOverview() {
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setDialogMessage(error.message ?? "Не удалось закрыть столик.");
+      setDialogMessage(error.message ?? "Failed to close the table.");
       return;
     }
 
     const summary = (await response.json()) as ClosedTableSummary;
     setDialogMessage(
-      `Столик ${summary.tableNumber} закрыт. Сессия #${summary.sessionId}: ${formatCurrency(summary.total)}.`
+      `Table ${summary.tableNumber} closed. Session #${summary.sessionId}: ${formatCurrency(summary.total)}.`
     );
 
     setData((current) => ({
@@ -138,7 +138,7 @@ export function TablesOverview() {
     const nextTableNumber = Number.parseInt(targetTableNumber, 10);
 
     if (!Number.isFinite(nextTableNumber) || nextTableNumber < 1) {
-      setAuthError("Укажите корректный номер столика.");
+      setAuthError("Enter a valid table number.");
       return;
     }
 
@@ -157,7 +157,7 @@ export function TablesOverview() {
 
     if (!authResponse.ok) {
       const error = (await authResponse.json()) as { message?: string };
-      setAuthError(error.message ?? "Неверный логин или пароль.");
+      setAuthError(error.message ?? "Invalid login or password.");
       return;
     }
 
@@ -176,13 +176,13 @@ export function TablesOverview() {
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setAuthError(error.message ?? "Не удалось перенести заказы на другой столик.");
+      setAuthError(error.message ?? "Failed to move orders to another table.");
       return;
     }
 
     closeMoveDialog();
     setDialogMessage(
-      `Заказы перенесены со столика ${moveAuthTable.tableNumber} на столик ${nextTableNumber}.`
+      `Orders moved from table ${moveAuthTable.tableNumber} to table ${nextTableNumber}.`
     );
 
     const refreshResponse = await fetch("/api/tables");
@@ -202,14 +202,14 @@ export function TablesOverview() {
     );
 
     if (!sessions.length) {
-      setDialogMessage("За сегодня нет закрытых заказов для выгрузки.");
+      setDialogMessage("There are no closed orders for export today.");
       return;
     }
 
     const rows = sessions.flatMap((session) =>
       session.orders.flatMap((order) =>
         order.items.map((item) => ({
-          closedAt: new Date(session.closedAt).toLocaleString("ru-RU"),
+          closedAt: new Date(session.closedAt).toLocaleString("en-GB"),
           restaurantName: session.restaurantName,
           tableNumber: session.tableNumber,
           sessionId: session.sessionId,
@@ -237,16 +237,16 @@ export function TablesOverview() {
   <body>
     <table border="1">
       <tr>
-        <th>Дата закрытия</th>
-        <th>Ресторан</th>
-        <th>Стол</th>
-        <th>ID сессии</th>
-        <th>ID заказа</th>
-        <th>Статус</th>
-        <th>Блюдо</th>
-        <th>Кол-во</th>
-        <th>Сумма позиции</th>
-        <th>Сумма сессии</th>
+        <th>Closed at</th>
+        <th>Restaurant</th>
+        <th>Table</th>
+        <th>Session ID</th>
+        <th>Order ID</th>
+        <th>Status</th>
+        <th>Dish</th>
+        <th>Qty</th>
+        <th>Item total</th>
+        <th>Session total</th>
       </tr>
       ${rows
         .map(
@@ -282,7 +282,7 @@ export function TablesOverview() {
   }
 
   if (loading) {
-    return <p className="muted">Загружаем столики...</p>;
+    return <p className="muted">Loading tables...</p>;
   }
 
   return (
@@ -295,7 +295,7 @@ export function TablesOverview() {
             aria-modal="true"
             aria-labelledby="tables-dialog-title"
           >
-            <h2 id="tables-dialog-title">Уведомление</h2>
+            <h2 id="tables-dialog-title">Notice</h2>
             <p>{dialogMessage}</p>
             <button
               className="button-success"
@@ -316,27 +316,27 @@ export function TablesOverview() {
             aria-modal="true"
             aria-labelledby="move-table-title"
           >
-            <h2 id="move-table-title">Поменять столик</h2>
+            <h2 id="move-table-title">Move table</h2>
             <div className="modal-form">
               <input
                 className="modal-input"
                 type="number"
                 min="1"
-                placeholder="На какой столик"
+                placeholder="Move to table"
                 value={targetTableNumber}
                 onChange={(event) => setTargetTableNumber(event.target.value)}
               />
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Логин"
+                placeholder="Login"
                 value={login}
                 onChange={(event) => setLogin(event.target.value)}
               />
               <input
                 className="modal-input"
                 type="password"
-                placeholder="Пароль"
+                placeholder="Password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -348,14 +348,14 @@ export function TablesOverview() {
                 type="button"
                 onClick={closeMoveDialog}
               >
-                Закрыть
+                Close
               </button>
               <button
                 className="button-success"
                 type="button"
                 onClick={() => void submitMoveTable()}
               >
-                Сохранить
+                Save
               </button>
             </div>
           </div>
@@ -365,7 +365,7 @@ export function TablesOverview() {
       <div className="tables-layout">
         {!data.tables.length ? (
           <p className="muted">
-            Во вкладке столиков больше нет активных заказов.
+            There are no active orders left in the tables view.
           </p>
         ) : (
           <div className="tables-grid">
@@ -380,13 +380,13 @@ export function TablesOverview() {
                   <div className="order-card__header">
                     <div>
                       <p className="eyebrow">{table.restaurantName}</p>
-                      <h3>Столик {table.tableNumber}</h3>
+                      <h3>Table {table.tableNumber}</h3>
                     </div>
                     <span className="session-badge">ID #{table.currentSessionId}</span>
                   </div>
 
                   <div className="table-summary">
-                    <span>Текущая сумма</span>
+                    <span>Current total</span>
                     <strong>{formatCurrency(table.total)}</strong>
                   </div>
 
@@ -397,7 +397,7 @@ export function TablesOverview() {
                           <div key={item.key} className="table-order-item">
                             <span className="table-order-item__name">{item.name}</span>
                             <span className="table-order-item__quantity">
-                              {item.quantity} шт.
+                              {item.quantity} pcs
                             </span>
                             <strong className="table-order-item__price">
                               {formatCurrency(item.total)}
@@ -414,7 +414,7 @@ export function TablesOverview() {
                       type="button"
                       onClick={() => requestMoveTable(table)}
                     >
-                      Поменять столик
+                      Move table
                     </button>
                     <button
                       className="button-danger tables-action-button"
@@ -423,7 +423,7 @@ export function TablesOverview() {
                         handleCloseTable(table.restaurantSlug, table.tableNumber)
                       }
                     >
-                      Закрыть столик
+                      Close table
                     </button>
                   </div>
                 </article>
@@ -434,8 +434,8 @@ export function TablesOverview() {
 
         <section className="closed-sessions">
           <div className="section-header">
-            <p className="eyebrow">История закрытий</p>
-            <h2>Закрытые столики</h2>
+            <p className="eyebrow">History</p>
+            <h2>Closed tables</h2>
           </div>
 
           <div className="closed-actions">
@@ -444,12 +444,12 @@ export function TablesOverview() {
               type="button"
               onClick={exportClosedOrdersForToday}
             >
-              Выгрузить за день в Excel
+              Export today to Excel
             </button>
           </div>
 
           {!data.closedSessions.length ? (
-            <p className="muted">Пока нет закрытых столиков.</p>
+            <p className="muted">No closed tables yet.</p>
           ) : (
             <div className="closed-grid">
               {data.closedSessions.map((session) => (
@@ -459,19 +459,19 @@ export function TablesOverview() {
                 >
                   <p className="eyebrow">{session.restaurantName}</p>
                   <h2>
-                    Столик {session.tableNumber} · ID #{session.sessionId}
+                    Table {session.tableNumber} · ID #{session.sessionId}
                   </h2>
                   <p>
-                    Заказов: {session.orderCount} · Сумма: {formatCurrency(session.total)}
+                    Orders: {session.orderCount} · Total: {formatCurrency(session.total)}
                   </p>
                   <details className="closed-details">
-                    <summary>Посмотреть заказы</summary>
+                    <summary>View orders</summary>
                     <div className="closed-details__content">
                       {session.orders.map((order) => (
                         <div key={order.id} className="closed-order">
                           <p className="muted">
-                            Статус: {order.status} ·{" "}
-                            {new Date(order.createdAt).toLocaleTimeString("ru-RU")}
+                            Status: {order.status} ·{" "}
+                            {new Date(order.createdAt).toLocaleTimeString("en-GB")}
                           </p>
                           <div className="table-order-items">
                             {order.items.map((item) => (
@@ -480,7 +480,7 @@ export function TablesOverview() {
                                   {item.name}
                                 </span>
                                 <span className="table-order-item__quantity">
-                                  {item.quantity} шт.
+                                  {item.quantity} pcs
                                 </span>
                                 <strong className="table-order-item__price">
                                   {formatCurrency(item.price * item.quantity)}

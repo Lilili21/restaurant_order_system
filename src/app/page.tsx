@@ -15,20 +15,20 @@ export default function HomePage() {
       <section className="hero">
         <div>
           <p className="eyebrow">Restaurant MVP</p>
-          <h1>Заказы по QR-коду для столиков без онлайн-оплаты</h1>
+          <h1>QR ordering for restaurant tables without online payment</h1>
           <p className="lead">
-            Гость сканирует QR, открывает меню своего столика и отправляет заказ.
-            Владелец или персонал сразу видят его в админке.
+            Guests scan a QR code, open their table menu, and send orders instantly.
+            Owners and staff see them in the admin panel right away.
           </p>
           <div className="hero-actions">
             <Link href="/admin/orders" className="button-link button-link--ghost">
-              Открыть админку
+              Open admin panel
             </Link>
           </div>
         </div>
 
         <div className="hero-card">
-          <span>Демо-ресторан</span>
+          <span>Demo restaurant</span>
           <strong>{restaurant.name}</strong>
           <p>{restaurant.description}</p>
         </div>

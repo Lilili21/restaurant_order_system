@@ -66,11 +66,7 @@ export function MenuItemCard({
             </div>
           ) : (
             <button type="button" onClick={() => onAdd(item.id)}>
-              {language === "he"
-                ? "להוסיף"
-                : language === "en"
-                  ? "Add"
-                  : "Добавить"}
+              Add
             </button>
           )}
         </div>

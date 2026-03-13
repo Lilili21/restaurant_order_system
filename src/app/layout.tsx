@@ -5,7 +5,7 @@ import { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Restaurant QR Orders",
-  description: "MVP для заказов по QR-коду без оплаты, по отдельным столикам."
+  description: "MVP for QR-based restaurant table ordering without online payment."
 };
 
 export default function RootLayout({
