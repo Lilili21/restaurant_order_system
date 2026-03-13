@@ -28,10 +28,8 @@ export async function PATCH(request: NextRequest) {
       name?: string;
       description?: string;
       nameHe?: string;
-      nameRu?: string;
       nameEn?: string;
       descriptionHe?: string;
-      descriptionRu?: string;
       descriptionEn?: string;
       price?: number;
       available?: boolean;
@@ -48,10 +46,8 @@ export async function PATCH(request: NextRequest) {
       name: body.name,
       description: body.description,
       nameHe: body.nameHe,
-      nameRu: body.nameRu,
       nameEn: body.nameEn,
       descriptionHe: body.descriptionHe,
-      descriptionRu: body.descriptionRu,
       descriptionEn: body.descriptionEn,
       price: body.price,
       available: body.available,
@@ -84,10 +80,8 @@ export async function POST(request: NextRequest) {
       name?: string;
       description?: string;
       nameHe?: string;
-      nameRu?: string;
       nameEn?: string;
       descriptionHe?: string;
-      descriptionRu?: string;
       descriptionEn?: string;
       price?: number;
       available?: boolean;
@@ -117,10 +111,8 @@ export async function POST(request: NextRequest) {
       name: body.name,
       description: body.description ?? "",
       nameHe: body.nameHe,
-      nameRu: body.nameRu,
       nameEn: body.nameEn,
       descriptionHe: body.descriptionHe,
-      descriptionRu: body.descriptionRu,
       descriptionEn: body.descriptionEn,
       price: body.price,
       available: body.available ?? true,

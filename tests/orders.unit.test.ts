@@ -73,7 +73,7 @@ describe("orders", () => {
     });
 
     expect(() => closeTable("olive-bistro", 3)).toThrow(
-      "Нельзя закрыть столик, пока не все заказы имеют статус 'Подан'"
+      "You cannot close the table until all orders are marked as served."
     );
 
     updateOrderStatus(order.id, "served");

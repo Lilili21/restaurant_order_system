@@ -6,28 +6,19 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 3,
       "sessionId": 1,
-      "status": "preparing",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-13T14:11:52.995Z",
       "updatedAt": "2026-03-13T14:11:52.995Z",
       "items": [
-        {
-          "id": "item_1773411112994_hvarc2",
-          "menuItemId": "m2",
-          "category": "starters",
-          "name": "סלט טאבולה",
-          "price": 29,
-          "quantity": 1,
-          "served": false
-        },
         {
           "id": "item_1773411112995_4on5gp",
           "menuItemId": "m4",
           "category": "mains",
           "name": "פילה סלמון",
           "price": 78,
-          "quantity": 1,
-          "served": false
+          "quantity": 2,
+          "served": true
         },
         {
           "id": "item_1773411112995_y8au0v",
@@ -36,17 +27,17 @@
           "name": "לימונדה עם נענע",
           "price": 18,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
-      "total": 125
+      "total": 174
     },
     {
       "id": "ord_1773399413010",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
-      "tableNumber": 1,
-      "sessionId": 3,
+      "tableNumber": 3,
+      "sessionId": 1,
       "status": "new",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-13T10:56:53.010Z",

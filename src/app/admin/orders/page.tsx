@@ -7,22 +7,22 @@ export default function AdminOrdersPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <h1>Новые заказы</h1>
+          <h1>Incoming orders</h1>
           <p className="muted">
-            Эта страница опрашивает API каждые 4 секунды и показывает новые заказы.
+            This page polls the API every 4 seconds and shows active incoming orders.
           </p>
         </div>
-        <div className="admin-nav" aria-label="Навигация по админке">
+        <div className="admin-nav" aria-label="Admin navigation">
           <div className="admin-switch">
             <Link href="/admin/orders" className="admin-switch__item admin-switch__item--active">
-              Заказы
+              Orders
             </Link>
             <Link href="/admin/tables" className="admin-switch__item">
-              Столы
+              Tables
             </Link>
           </div>
           <Link href="/admin/menu" className="admin-menu-bubble">
-            Меню
+            Menu
           </Link>
         </div>
       </section>

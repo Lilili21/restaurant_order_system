@@ -63,7 +63,7 @@ export function TableLinksPanel({
     const nextTableCount = Number.parseInt(tableCountInput, 10);
 
     if (!Number.isFinite(nextTableCount) || nextTableCount < 1) {
-      setMessage("Укажите корректное количество столиков.");
+      setMessage("Enter a valid number of tables.");
       return;
     }
 
@@ -90,7 +90,7 @@ export function TableLinksPanel({
       return false;
     }
 
-    setMessage("Не удалось сохранить количество столиков.");
+    setMessage("Failed to save the table count.");
     setTableCountSaving(false);
     return false;
   }
@@ -101,7 +101,7 @@ export function TableLinksPanel({
   setSavedTableCount(appliedTableCount);
   setTableTokens(settings.tableTokens ?? {});
   setTableCountSaving(false);
-  setMessage("Количество столиков обновлено.");
+  setMessage("Table count updated.");
   return true;
   }
 
@@ -124,7 +124,7 @@ export function TableLinksPanel({
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setAuthError(error.message ?? "Неверный логин или пароль.");
+      setAuthError(error.message ?? "Invalid login or password.");
       return;
     }
 
@@ -153,7 +153,7 @@ export function TableLinksPanel({
             <button
               className="modal-card__close"
               type="button"
-              aria-label="Закрыть окно"
+              aria-label="Close dialog"
               onClick={() => {
                 setAuthOpen(false);
                 setAuthError(null);
@@ -161,12 +161,12 @@ export function TableLinksPanel({
             >
               X
             </button>
-            <h2 id="table-links-auth-title">Вход для изменения столиков</h2>
+            <h2 id="table-links-auth-title">Sign in to change tables</h2>
             <div className="modal-form">
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Логин"
+                placeholder="Login"
                 value={login}
                 onChange={(event) => {
                   setLogin(event.target.value);
@@ -176,7 +176,7 @@ export function TableLinksPanel({
               <input
                 className="modal-input"
                 type="password"
-                placeholder="Пароль"
+                placeholder="Password"
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value);
@@ -191,7 +191,7 @@ export function TableLinksPanel({
                 type="button"
                 onClick={() => void submitAuth()}
               >
-                Сохранить
+                Save
               </button>
             </div>
           </div>
@@ -201,7 +201,7 @@ export function TableLinksPanel({
       <section className="table-links-panel">
         <div className="table-links-panel__header">
           <div className="table-links-panel__field">
-            <span>Укажите, сколько надо столиков</span>
+            <span>Set the number of active tables</span>
             <input
               className="modal-input"
               type="number"
@@ -218,7 +218,7 @@ export function TableLinksPanel({
             disabled={tableCountSaving}
             onClick={() => void saveTableCount()}
           >
-            {tableCountSaving ? "Сохраняем..." : "Сохранить"}
+            {tableCountSaving ? "Saving..." : "Save"}
           </button>
         </div>
 
@@ -239,7 +239,7 @@ export function TableLinksPanel({
                 href={`/menu/${restaurantSlug}/${token}`}
                 className="table-links-panel__link"
               >
-                Столик {tableNumber}
+                Table {tableNumber}
               </Link>
             );
           })}

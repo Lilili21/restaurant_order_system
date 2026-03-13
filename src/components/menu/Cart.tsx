@@ -20,64 +20,34 @@ const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
 
 const uiText = {
   he: {
-    table: "שולחן",
-    callWaiter: "קריאה למלצר",
-    reviewOrderTitle: "בדקו את ההזמנה",
-    reviewOrderText: "אנא בדקו שהכול נכון לפני השליחה.",
-    reviewOrderOk: "אישור",
-    reviewOrderChange: "לשנות",
-    serveModeTitle: "איך להגיש את ההזמנה?",
-    serveModeText: "בחרו את אופן ההגשה שנוח לכם.",
-    serveAll: "להגיש הכול יחד",
-    serveAsReady: "להגיש לפי המוכנות",
-    newOrder: "הזמנה חדשה",
-    emptyCart: "עדיין ריק. הוסיפו מנות מהתפריט.",
-    total: "סה\"כ",
-    submit: "שליחת הזמנה",
-    submitting: "שולחים...",
-    sent: "נשלח",
-    currentOrders: "הזמנות נוכחיות",
-    totalOrders: "סכום כולל",
-    sentStatus: "נשלח",
-    thankYou: "תודה",
-    orderSent: "ההזמנה נשלחה. אנחנו מכינים באהבה.",
-    waiterCalled: "המלצר הוזמן",
+    table: "Table",
+    callWaiter: "Call waiter",
+    reviewOrderTitle: "Review your order",
+    reviewOrderText: "Please check your order before sending it.",
+    reviewOrderOk: "OK",
+    reviewOrderChange: "Edit",
+    serveModeTitle: "How should we serve your order?",
+    serveModeText: "Choose the serving option that works best for you.",
+    serveAll: "Serve everything together",
+    serveAsReady: "Serve as ready",
+    newOrder: "New order",
+    emptyCart: "It is empty for now. Add dishes from the menu.",
+    total: "Total",
+    submit: "Send order",
+    submitting: "Sending...",
+    sent: "Sent",
+    currentOrders: "Current orders",
+    totalOrders: "Total amount",
+    sentStatus: "Sent",
+    thankYou: "Thanks",
+    orderSent: "Your order has been sent. We are cooking with love.",
+    waiterCalled: "Waiter has been called",
     kitchenLoadWarning:
-      "ייתכן עיכוב בהגשת ההזמנה עקב עומס במטבח.",
-    addDish: "הוסיפו לפחות מנה אחת.",
-    submitError: "לא הצלחנו לשלוח את ההזמנה",
-    waiterError: "לא הצלחנו לקרוא למלצר",
-    close: "סגירת חלון"
-  },
-  ru: {
-    table: "Столик",
-    callWaiter: "Вызвать официанта",
-    reviewOrderTitle: "Проверьте заказ",
-    reviewOrderText: "Пожалуйста, проверьте ваш заказ перед отправкой.",
-    reviewOrderOk: "ОК",
-    reviewOrderChange: "Изменить",
-    serveModeTitle: "Как подать заказ?",
-    serveModeText: "Выберите удобный вариант подачи блюд.",
-    serveAll: "Подать все сразу",
-    serveAsReady: "По мере готовности",
-    newOrder: "Новый заказ",
-    emptyCart: "Пока пусто. Добавьте блюда из меню слева.",
-    total: "Итого",
-    submit: "Отправить заказ",
-    submitting: "Отправка...",
-    sent: "Отправлено",
-    currentOrders: "Текущие заказы",
-    totalOrders: "Общая сумма",
-    sentStatus: "Отправлен",
-    thankYou: "спасибо",
-    orderSent: "Поздравляем, ваш заказ отправлен. Мы готовим с любовью.",
-    waiterCalled: "Официант вызван",
-    kitchenLoadWarning:
-      "Сейчас возможна более долгая подача заказов из-за высокой загрузки кухни.",
-    addDish: "Добавьте хотя бы одно блюдо.",
-    submitError: "Не удалось отправить заказ",
-    waiterError: "Не удалось вызвать официанта",
-    close: "Закрыть окно"
+      "Order preparation may take longer than usual right now due to a busy kitchen.",
+    addDish: "Add at least one dish.",
+    submitError: "Failed to send the order",
+    waiterError: "Failed to call the waiter",
+    close: "Close dialog"
   },
   en: {
     table: "Table",
@@ -99,7 +69,7 @@ const uiText = {
     currentOrders: "Current orders",
     totalOrders: "Total amount",
     sentStatus: "Sent",
-    thankYou: "thanks",
+    thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
     kitchenLoadWarning:
@@ -167,7 +137,7 @@ export function Cart({
       `menu-language:${restaurantSlug}:${tableToken}`
     );
 
-    if (savedLanguage === "he" || savedLanguage === "ru" || savedLanguage === "en") {
+    if (savedLanguage === "he" || savedLanguage === "en") {
       setLanguage(savedLanguage);
     }
   }, [restaurantSlug, tableToken]);
@@ -385,10 +355,9 @@ export function Cart({
   }
 
   function formatOrderLabel(timestamp: string) {
-    const locale =
-      language === "he" ? "he-IL" : language === "en" ? "en-US" : "ru-RU";
+    const locale = language === "he" ? "he-IL" : "en-US";
     const prefix =
-      language === "he" ? "הזמנה" : language === "en" ? "Order" : "Заказ";
+      "Order";
 
     return `${prefix} · ${new Date(timestamp).toLocaleTimeString(locale, {
       hour12: false,
@@ -410,7 +379,7 @@ export function Cart({
                 ? "הודעה"
                 : language === "en"
                   ? "Message"
-                  : "Сообщение"
+                  : "Message"
             }
           >
             <p className="modal-card__message">{dialogMessage}</p>
@@ -441,9 +410,7 @@ export function Cart({
                   <span>
                     {language === "he"
                       ? menuItem.nameHe || menuItem.name
-                      : language === "en"
-                        ? menuItem.nameEn || menuItem.nameHe || menuItem.name
-                        : menuItem.nameRu || menuItem.nameHe || menuItem.name}{" "}
+                      : menuItem.nameEn || menuItem.nameHe || menuItem.name}{" "}
                     x {cartItem.quantity}
                   </span>
                   <strong>
@@ -555,17 +522,6 @@ export function Cart({
               >
                 EN
               </button>
-              <button
-                className={
-                  language === "ru"
-                    ? "language-toggle__button language-toggle__button--active"
-                    : "language-toggle__button"
-                }
-                type="button"
-                onClick={() => setNextLanguage("ru")}
-              >
-                RU
-              </button>
             </div>
             <button
               className="button-danger button-danger--call"
@@ -602,9 +558,7 @@ export function Cart({
                       <strong>
                         {language === "he"
                           ? menuItem.nameHe || menuItem.name
-                          : language === "en"
-                            ? menuItem.nameEn || menuItem.nameHe || menuItem.name
-                            : menuItem.nameRu || menuItem.nameHe || menuItem.name}
+                          : menuItem.nameEn || menuItem.nameHe || menuItem.name}
                       </strong>
                       <p className="muted">{formatCurrency(menuItem.price)}</p>
                     </div>

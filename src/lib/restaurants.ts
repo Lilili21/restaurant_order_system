@@ -17,7 +17,7 @@ export function getRestaurants() {
         id: baseTable?.id ?? `${restaurant.slug}_table_${tableNumber}`,
         number: tableNumber,
         seats: baseTable?.seats ?? (tableNumber <= 4 ? 2 : 4),
-        zone: baseTable?.zone ?? (tableNumber <= 4 ? "Зал A" : "Терраса"),
+        zone: baseTable?.zone ?? (tableNumber <= 4 ? "Hall A" : "Terrace"),
         accessToken,
         qrCodeValue: `/menu/${restaurant.slug}/${accessToken}`
       };

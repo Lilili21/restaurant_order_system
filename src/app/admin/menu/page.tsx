@@ -7,19 +7,19 @@ export default function AdminMenuPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <h1>Редактирование меню</h1>
+          <h1>Menu editor</h1>
         </div>
-        <div className="admin-nav" aria-label="Навигация по админке">
+        <div className="admin-nav" aria-label="Admin navigation">
           <div className="admin-switch">
             <Link href="/admin/orders" className="admin-switch__item">
-              Заказы
+              Orders
             </Link>
             <Link href="/admin/tables" className="admin-switch__item">
-              Столы
+              Tables
             </Link>
           </div>
           <Link href="/admin/menu" className="admin-menu-bubble admin-menu-bubble--active">
-            Меню
+            Menu
           </Link>
         </div>
       </section>

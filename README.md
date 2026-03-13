@@ -1,28 +1,28 @@
 # Menu QR Ordering MVP
 
-MVP для ресторана с QR-меню:
+MVP for a restaurant QR-menu ordering flow:
 
-- у каждого столика своя ссылка/QR;
-- гость открывает меню по маршруту `/menu/:restaurantSlug/:tableToken`;
-- заказ сразу попадает в админку;
-- админка разделена на вкладку заказов и вкладку столиков;
-- данные пока хранятся в памяти сервера.
+- each table has its own private link / QR code;
+- the guest opens the menu at `/menu/:restaurantSlug/:tableToken`;
+- the order appears in the admin panel immediately;
+- the admin area is split into `Orders`, `Tables`, and `Menu`;
+- data is currently stored in local JSON files.
 
-## Запуск
+## Run
 
-Нужен `Node.js 22.x LTS`.
+Use `Node.js 22.x LTS`.
 
-Проверка:
+Check your version:
 
 ```bash
 node -v
 ```
 
-Если у вас `v25.x`, `Next.js` может падать белым экраном и `Internal Server Error`.
+If you are on `v25.x`, `Next.js` may fail with a white screen or `Internal Server Error`.
 
-Если у вас сейчас `node -v` показывает `v25.x`, переключитесь на `node@22`.
+If `node -v` shows `v25.x`, switch to `node@22`.
 
-Через Homebrew:
+With Homebrew:
 
 ```bash
 brew install node@22
@@ -32,7 +32,7 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 node -v
 ```
 
-Дальше:
+Then:
 
 ```bash
 cp .env.example .env.local
@@ -40,7 +40,7 @@ npm install
 npm run dev
 ```
 
-Логины и пароли теперь берутся из `.env.local`:
+Credentials are read from `.env.local`:
 
 ```env
 ADMIN_LOGIN=admin1
@@ -49,36 +49,54 @@ ADMIN_SECONDARY_LOGIN=admin
 ADMIN_SECONDARY_PASSWORD=admin
 ```
 
-Открыть:
+Open:
 
 - `http://localhost:3010/`
 - `http://localhost:3010/menu/olive-bistro/tbl_UxflwK16Xm3V`
 - `http://localhost:3010/admin/orders`
 - `http://localhost:3010/admin/tables`
 
-Проект специально запускается на `3010`, чтобы не цеплять старые процессы на `3000/3001`.
+The project intentionally runs on `3010` to avoid old dev processes on `3000` / `3001`.
 
-## Запуск в VS Code
+## Run In VS Code
 
-В проекте есть:
+The project includes:
 
 - `.vscode/tasks.json`
 - `.vscode/launch.json`
 
-Сценарий:
+Flow:
 
-1. Открыть проект в VS Code.
-2. Запустить задачу `npm: install`.
-3. Открыть `Run and Debug`.
-4. Выбрать `Run App in VS Code`.
+1. Open the project in VS Code.
+2. Run the `npm: install` task.
+3. Open `Run and Debug`.
+4. Choose `Run App in VS Code`.
 
-## Что реализовано
+## Implemented
 
-- создание заказа с клиентской страницы столика;
-- статусы `Новый`, `Готовится`, `Подан`, `Отменён`;
-- чекбоксы по позициям заказа;
-- кнопка `Подан` для всего заказа;
-- кнопка `Отменить`;
-- вкладка столиков с деталями каждого заказа;
-- закрытие столика только если все заказы поданы или отменены;
-- новая `sessionId` после закрытия столика.
+- guest order creation from the table menu page
+- order statuses: `New`, `Preparing`, `Served`, `Cancelled`
+- item-level checkboxes inside orders
+- `Served` action for the whole order
+- protected `Cancel` action
+- tables view with grouped session details
+- table closing only when all orders are served or cancelled
+- automatic next `sessionId` after table closing
+- waiter call flow
+- menu editor with multilingual menu content (`HE / EN / RU`)
+- private table token links instead of public table numbers
+- unit and integration tests with `Vitest`
+
+## Tests
+
+Run:
+
+```bash
+npm run test
+```
+
+Watch mode:
+
+```bash
+npm run test:watch
+```

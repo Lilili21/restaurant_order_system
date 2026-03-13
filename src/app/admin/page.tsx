@@ -5,19 +5,19 @@ export default function AdminPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <p className="eyebrow">Админка</p>
-          <h1>Панель ресторана</h1>
+          <p className="eyebrow">Admin</p>
+          <h1>Restaurant dashboard</h1>
           <p className="muted">
-            Здесь можно смотреть входящие заказы по столикам и дальше расширять
-            систему до статусов, печати на кухню и оплаты.
+            Review incoming table orders here and keep extending the system with
+            statuses, kitchen printing, and payments.
           </p>
         </div>
         <div className="hero-actions">
           <Link href="/admin/orders" className="button-link">
-            Смотреть заказы
+            View orders
           </Link>
           <Link href="/admin/tables" className="button-link button-link--ghost">
-            Смотреть столики
+            View tables
           </Link>
         </div>
       </section>

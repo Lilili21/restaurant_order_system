@@ -618,7 +618,7 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
 
   if (unservedOrders.length > 0) {
     throw new Error(
-      "Нельзя закрыть столик, пока не все заказы имеют статус 'Подан'"
+      "You cannot close the table until all orders are marked as served."
     );
   }
 
@@ -660,7 +660,7 @@ export function moveTableOrders(
   }
 
   if (fromTableNumber === toTableNumber) {
-    throw new Error("Выберите другой столик.");
+    throw new Error("Choose a different table.");
   }
 
   const fromTableExists = restaurant.tables.some(
@@ -671,7 +671,7 @@ export function moveTableOrders(
   );
 
   if (!fromTableExists || !toTableExists) {
-    throw new Error("Столик не найден.");
+    throw new Error("Table not found.");
   }
 
   const { sessionId: fromSessionId } = ensureCurrentSessionId(
@@ -695,7 +695,7 @@ export function moveTableOrders(
   );
 
   if (!movableOrders.length) {
-    throw new Error("На этом столике нет активных заказов для переноса.");
+    throw new Error("There are no active orders on this table to move.");
   }
 
   state.ordersStore = state.ordersStore.map((order) =>

@@ -59,7 +59,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setAuthError(error.message ?? "Неверный логин или пароль.");
+      setAuthError(error.message ?? "Invalid login or password.");
       return;
     }
 
@@ -82,19 +82,19 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
           aria-modal="true"
           aria-labelledby="admin-auth-title"
         >
-          <h2 id="admin-auth-title">Вход в админку</h2>
+          <h2 id="admin-auth-title">Admin sign in</h2>
           <div className="modal-form">
             <input
               className="modal-input"
               type="text"
-              placeholder="Логин"
+              placeholder="Login"
               value={login}
               onChange={(event) => setLogin(event.target.value)}
             />
             <input
               className="modal-input"
               type="password"
-              placeholder="Пароль"
+              placeholder="Password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
@@ -106,7 +106,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
               type="button"
               onClick={() => void submitAuth()}
             >
-              Войти
+              Sign in
             </button>
           </div>
         </div>

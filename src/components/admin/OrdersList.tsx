@@ -8,15 +8,15 @@ import { Order, OrderStatus } from "@/lib/types";
 const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
 
 const statusLabels = {
-  new: "Новый",
-  preparing: "Готовится",
-  served: "Подан",
-  cancelled: "Отменён"
+  new: "New",
+  preparing: "Preparing",
+  served: "Served",
+  cancelled: "Cancelled"
 } as const;
 
 const serveModeLabels = {
-  all_at_once: "Подать все сразу",
-  as_ready: "По мере готовности"
+  all_at_once: "Serve everything together",
+  as_ready: "Serve as ready"
 } as const;
 
 export function OrdersList() {
@@ -219,7 +219,7 @@ export function OrdersList() {
 
     if (!response.ok) {
       const error = (await response.json()) as { message?: string };
-      setAuthError(error.message ?? "Неверный логин или пароль.");
+      setAuthError(error.message ?? "Invalid login or password.");
       return;
     }
 
@@ -232,7 +232,7 @@ export function OrdersList() {
   }
 
   if (loading) {
-    return <p className="muted">Загружаем входящие заказы...</p>;
+    return <p className="muted">Loading incoming orders...</p>;
   }
 
   const tableOptions = [...new Set(orders.map((order) => order.tableNumber))].sort(
@@ -261,7 +261,7 @@ export function OrdersList() {
   }
 
   if (!orders.length) {
-    return <p className="muted">Новых заказов пока нет.</p>;
+    return <p className="muted">No incoming orders yet.</p>;
   }
 
   return (
@@ -274,19 +274,19 @@ export function OrdersList() {
             aria-modal="true"
             aria-labelledby="cancel-auth-title"
           >
-            <h2 id="cancel-auth-title">Подтвердите отмену</h2>
+            <h2 id="cancel-auth-title">Confirm cancellation</h2>
             <div className="modal-form">
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Логин"
+                placeholder="Login"
                 value={login}
                 onChange={(event) => setLogin(event.target.value)}
               />
               <input
                 className="modal-input"
                 type="password"
-                placeholder="Пароль"
+                placeholder="Password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
@@ -296,7 +296,7 @@ export function OrdersList() {
               <button
                 className="button-danger"
                 type="button"
-                aria-label="Закрыть"
+                aria-label="Close"
                 onClick={closeCancelAuthDialog}
               >
                 ✕
@@ -304,7 +304,7 @@ export function OrdersList() {
               <button
                 className="button-success"
                 type="button"
-                aria-label="Подтвердить"
+                aria-label="Confirm"
                 onClick={() => void submitCancelAuth()}
               >
                 ✓
@@ -335,7 +335,7 @@ export function OrdersList() {
                 />
               </svg>
             </span>
-            Зал
+            Hall
           </button>
           <button
             type="button"
@@ -354,7 +354,7 @@ export function OrdersList() {
                 />
               </svg>
             </span>
-            Кухня
+            Kitchen
           </button>
           <button
             type="button"
@@ -373,7 +373,7 @@ export function OrdersList() {
                 />
               </svg>
             </span>
-            Бар
+            Bar
           </button>
         </div>
         </div>
@@ -388,7 +388,7 @@ export function OrdersList() {
             }
             onClick={() => setSelectedTables([])}
           >
-            Все столы
+            All tables
           </button>
           {tableOptions.map((tableNumber) => (
             <button
@@ -401,7 +401,7 @@ export function OrdersList() {
               }
               onClick={() => toggleTable(tableNumber)}
             >
-              Стол {tableNumber}
+              Table {tableNumber}
             </button>
           ))}
         </div>
@@ -409,7 +409,7 @@ export function OrdersList() {
       </div>
 
       {!filteredOrders.length ? (
-        <p className="muted">По выбранному столику активных заказов нет.</p>
+        <p className="muted">No active orders for the selected table.</p>
       ) : (
         <div className="orders-grid">
           {filteredOrders.map((order) => {
@@ -439,14 +439,14 @@ export function OrdersList() {
                 <div className="order-card__header">
                   <div>
                     <h3>
-                      Столик {order.tableNumber}
+                      Table {order.tableNumber}
                       {isHallView && order.kind === "waiter_call"
-                        ? " · Вызов официанта"
+                        ? " · Waiter call"
                         : ""}
                     </h3>
                     {order.kind === "waiter_call" ? null : (
                       <p className="muted">
-                        Сессия ID #{order.sessionId}
+                        Session #{order.sessionId}
                         {isHallView && order.serveMode
                           ? ` · ${serveModeLabels[order.serveMode]}`
                           : ""}
@@ -460,13 +460,13 @@ export function OrdersList() {
                       </span>
                     )}
                     <span className="muted">
-                      {new Date(order.createdAt).toLocaleTimeString("ru-RU")}
+                      {new Date(order.createdAt).toLocaleTimeString("en-GB")}
                     </span>
                   </div>
                 </div>
 
                 {order.kind === "waiter_call" ? (
-                  <p className="order-callout">Гость просит подойти к столику.</p>
+                  <p className="order-callout">A guest is asking for staff at the table.</p>
                 ) : (
                   <div className="order-items">
                     {visibleItems.map((item) => (
@@ -528,7 +528,7 @@ export function OrdersList() {
                   {isStationView ? null : (
                     <strong>
                       {order.kind === "waiter_call"
-                        ? "Приоритет"
+                        ? "Priority"
                         : formatCurrency(visibleTotal)}
                     </strong>
                   )}
@@ -550,21 +550,21 @@ export function OrdersList() {
                         type="button"
                         onClick={() => changeStatus(order.id, "preparing")}
                       >
-                        Готовится
+                        Preparing
                       </button>
                       <button
                         className="button-success"
                         type="button"
                         onClick={() => changeStatus(order.id, "served")}
                       >
-                        Подан
+                        Served
                       </button>
                       <button
                         className="button-danger"
                         type="button"
                         onClick={() => requestCancel(order.id)}
                       >
-                        Отменить
+                        Cancel
                       </button>
                     </>
                   )}
