@@ -49,36 +49,6 @@ const uiText = {
     waiterError: "Failed to call the waiter",
     close: "Close dialog"
   },
-  ru: {
-    table: "Table",
-    callWaiter: "Call waiter",
-    reviewOrderTitle: "Review your order",
-    reviewOrderText: "Please check your order before sending it.",
-    reviewOrderOk: "OK",
-    reviewOrderChange: "Edit",
-    serveModeTitle: "How should we serve your order?",
-    serveModeText: "Choose the serving option that works best for you.",
-    serveAll: "Serve everything together",
-    serveAsReady: "Serve as ready",
-    newOrder: "New order",
-    emptyCart: "It is empty for now. Add dishes from the menu.",
-    total: "Total",
-    submit: "Send order",
-    submitting: "Sending...",
-    sent: "Sent",
-    currentOrders: "Current orders",
-    totalOrders: "Total amount",
-    sentStatus: "Sent",
-    thankYou: "Thanks",
-    orderSent: "Your order has been sent. We are cooking with love.",
-    waiterCalled: "Waiter has been called",
-    kitchenLoadWarning:
-      "Order preparation may take longer than usual right now due to a busy kitchen.",
-    addDish: "Add at least one dish.",
-    submitError: "Failed to send the order",
-    waiterError: "Failed to call the waiter",
-    close: "Close dialog"
-  },
   en: {
     table: "Table",
     callWaiter: "Call waiter",
@@ -167,7 +137,7 @@ export function Cart({
       `menu-language:${restaurantSlug}:${tableToken}`
     );
 
-    if (savedLanguage === "he" || savedLanguage === "ru" || savedLanguage === "en") {
+    if (savedLanguage === "he" || savedLanguage === "en") {
       setLanguage(savedLanguage);
     }
   }, [restaurantSlug, tableToken]);
@@ -385,8 +355,7 @@ export function Cart({
   }
 
   function formatOrderLabel(timestamp: string) {
-    const locale =
-      language === "he" ? "he-IL" : language === "en" ? "en-US" : "ru-RU";
+    const locale = language === "he" ? "he-IL" : "en-US";
     const prefix =
       "Order";
 
@@ -441,9 +410,7 @@ export function Cart({
                   <span>
                     {language === "he"
                       ? menuItem.nameHe || menuItem.name
-                      : language === "en"
-                        ? menuItem.nameEn || menuItem.nameHe || menuItem.name
-                        : menuItem.nameRu || menuItem.nameHe || menuItem.name}{" "}
+                      : menuItem.nameEn || menuItem.nameHe || menuItem.name}{" "}
                     x {cartItem.quantity}
                   </span>
                   <strong>
@@ -555,17 +522,6 @@ export function Cart({
               >
                 EN
               </button>
-              <button
-                className={
-                  language === "ru"
-                    ? "language-toggle__button language-toggle__button--active"
-                    : "language-toggle__button"
-                }
-                type="button"
-                onClick={() => setNextLanguage("ru")}
-              >
-                RU
-              </button>
             </div>
             <button
               className="button-danger button-danger--call"
@@ -602,9 +558,7 @@ export function Cart({
                       <strong>
                         {language === "he"
                           ? menuItem.nameHe || menuItem.name
-                          : language === "en"
-                            ? menuItem.nameEn || menuItem.nameHe || menuItem.name
-                            : menuItem.nameRu || menuItem.nameHe || menuItem.name}
+                          : menuItem.nameEn || menuItem.nameHe || menuItem.name}
                       </strong>
                       <p className="muted">{formatCurrency(menuItem.price)}</p>
                     </div>

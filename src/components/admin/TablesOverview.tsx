@@ -316,7 +316,7 @@ export function TablesOverview() {
             aria-modal="true"
             aria-labelledby="move-table-title"
           >
-            <h2 id="move-table-title">Move table</h2>
+            <h2 id="move-table-title">Clients changed table</h2>
             <div className="modal-form">
               <input
                 className="modal-input"
@@ -348,7 +348,7 @@ export function TablesOverview() {
                 type="button"
                 onClick={closeMoveDialog}
               >
-                Close
+                Cancel
               </button>
               <button
                 className="button-success"
@@ -414,7 +414,7 @@ export function TablesOverview() {
                       type="button"
                       onClick={() => requestMoveTable(table)}
                     >
-                      Move table
+                      Clients changed table
                     </button>
                     <button
                       className="button-danger tables-action-button"

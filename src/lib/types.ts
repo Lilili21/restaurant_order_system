@@ -17,7 +17,7 @@ export type Table = {
 };
 
 export type MenuCategory = "starters" | "mains" | "drinks" | "desserts";
-export type MenuLanguage = "he" | "en" | "ru";
+export type MenuLanguage = "he" | "en";
 
 export type MenuItem = {
   id: string;
@@ -26,10 +26,8 @@ export type MenuItem = {
   name: string;
   description: string;
   nameHe: string;
-  nameRu: string;
   nameEn: string;
   descriptionHe: string;
-  descriptionRu: string;
   descriptionEn: string;
   price: number;
   image: string;

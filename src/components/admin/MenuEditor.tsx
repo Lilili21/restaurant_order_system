@@ -14,10 +14,8 @@ const categoryLabels: Record<MenuCategory, string> = {
 
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
-  draftNameRu: string;
   draftNameEn: string;
   draftDescriptionHe: string;
-  draftDescriptionRu: string;
   draftDescriptionEn: string;
   draftPrice: string;
   draftImage: string;
@@ -27,10 +25,8 @@ type EditableMenuItem = MenuItem & {
 
 type NewMenuItemDraft = {
   nameHe: string;
-  nameRu: string;
   nameEn: string;
   descriptionHe: string;
-  descriptionRu: string;
   descriptionEn: string;
   price: string;
   image: string;
@@ -44,10 +40,8 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
   return {
     ...item,
     draftNameHe: item.nameHe || item.name,
-    draftNameRu: item.nameRu || item.nameHe || item.name,
     draftNameEn: item.nameEn || item.nameHe || item.name,
     draftDescriptionHe: item.descriptionHe || item.description,
-    draftDescriptionRu: item.descriptionRu || item.descriptionHe || item.description,
     draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
     draftPrice: String(item.price),
     draftImage: item.image,
@@ -92,10 +86,8 @@ export function MenuEditor() {
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [newItem, setNewItem] = useState<NewMenuItemDraft>({
     nameHe: "",
-    nameRu: "",
     nameEn: "",
     descriptionHe: "",
-    descriptionRu: "",
     descriptionEn: "",
     price: "",
     image: "",
@@ -185,10 +177,8 @@ export function MenuEditor() {
     itemId: string,
     field:
       | "draftNameHe"
-      | "draftNameRu"
       | "draftNameEn"
       | "draftDescriptionHe"
-      | "draftDescriptionRu"
       | "draftDescriptionEn"
       | "draftPrice"
       | "draftImage"
@@ -325,11 +315,8 @@ export function MenuEditor() {
         name: currentItem.draftNameHe,
         description: currentItem.draftDescriptionHe,
         nameHe: currentItem.draftNameHe,
-        nameRu: currentItem.draftNameRu || currentItem.draftNameHe,
         nameEn: currentItem.draftNameEn || currentItem.draftNameHe,
         descriptionHe: currentItem.draftDescriptionHe,
-        descriptionRu:
-          currentItem.draftDescriptionRu || currentItem.draftDescriptionHe,
         descriptionEn:
           currentItem.draftDescriptionEn || currentItem.draftDescriptionHe,
         price: Number(currentItem.draftPrice),
@@ -384,10 +371,8 @@ export function MenuEditor() {
         name: newItem.nameHe,
         description: newItem.descriptionHe,
         nameHe: newItem.nameHe,
-        nameRu: newItem.nameRu || newItem.nameHe,
         nameEn: newItem.nameEn || newItem.nameHe,
         descriptionHe: newItem.descriptionHe,
-        descriptionRu: newItem.descriptionRu || newItem.descriptionHe,
         descriptionEn: newItem.descriptionEn || newItem.descriptionHe,
         price: Number(newItem.price),
         image: newItem.image,
@@ -408,10 +393,8 @@ export function MenuEditor() {
     setShowCreateForm(false);
     setNewItem({
       nameHe: "",
-      nameRu: "",
       nameEn: "",
       descriptionHe: "",
-      descriptionRu: "",
       descriptionEn: "",
       price: "",
       image: "",
@@ -581,14 +564,6 @@ export function MenuEditor() {
             <input
               className="modal-input"
               type="text"
-                placeholder="Dish name"
-                value={newItem.nameRu}
-                onChange={(event) => updateNewItem("nameRu", event.target.value)}
-              />
-
-            <input
-              className="modal-input"
-              type="text"
               placeholder="Dish name (EN)"
               value={newItem.nameEn}
               onChange={(event) => updateNewItem("nameEn", event.target.value)}
@@ -617,15 +592,6 @@ export function MenuEditor() {
               dir="rtl"
               onChange={(event) =>
                 updateNewItem("descriptionHe", event.target.value)
-              }
-            />
-
-            <textarea
-              className="modal-input menu-editor__textarea"
-              placeholder="Description"
-              value={newItem.descriptionRu}
-              onChange={(event) =>
-                updateNewItem("descriptionRu", event.target.value)
               }
             />
 
@@ -763,15 +729,6 @@ export function MenuEditor() {
               <input
                 className="modal-input"
                 type="text"
-                placeholder="Dish name"
-                value={item.draftNameRu}
-                onChange={(event) =>
-                  updateDraft(item.id, "draftNameRu", event.target.value)
-                }
-              />
-              <input
-                className="modal-input"
-                type="text"
                 placeholder="Dish name (EN)"
                 value={item.draftNameEn}
                 onChange={(event) =>
@@ -802,15 +759,6 @@ export function MenuEditor() {
                 dir="rtl"
                 onChange={(event) =>
                   updateDraft(item.id, "draftDescriptionHe", event.target.value)
-                }
-              />
-
-              <textarea
-                className="modal-input menu-editor__textarea"
-                placeholder="Description"
-                value={item.draftDescriptionRu}
-                onChange={(event) =>
-                  updateDraft(item.id, "draftDescriptionRu", event.target.value)
                 }
               />
 

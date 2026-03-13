@@ -18,18 +18,14 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     item.descriptionHe?.trim() || item.description?.trim() || "";
   const nameEn = item.nameEn?.trim() || nameHe;
   const descriptionEn = item.descriptionEn?.trim() || descriptionHe;
-  const nameRu = item.nameRu?.trim() || nameHe;
-  const descriptionRu = item.descriptionRu?.trim() || descriptionHe;
 
   return {
     ...item,
     name: nameHe,
     description: descriptionHe,
     nameHe,
-    nameRu,
     nameEn,
     descriptionHe,
-    descriptionRu,
     descriptionEn,
     showImage: item.showImage ?? true,
     image: item.image?.trim() || DEFAULT_MENU_IMAGE
@@ -87,10 +83,8 @@ export function updateMenuItem(
       | "name"
       | "description"
       | "nameHe"
-      | "nameRu"
       | "nameEn"
       | "descriptionHe"
-      | "descriptionRu"
       | "descriptionEn"
       | "price"
       | "available"
@@ -119,16 +113,8 @@ export function updateMenuItem(
     menuItem.nameHe = updates.nameHe.trim() || menuItem.nameHe;
   }
 
-  if (typeof updates.nameRu === "string") {
-    menuItem.nameRu = updates.nameRu.trim() || menuItem.nameRu;
-  }
-
   if (typeof updates.nameEn === "string") {
     menuItem.nameEn = updates.nameEn.trim() || menuItem.nameEn;
-  }
-
-  if (typeof updates.descriptionRu === "string") {
-    menuItem.descriptionRu = updates.descriptionRu.trim();
   }
 
   if (typeof updates.descriptionHe === "string") {
@@ -165,9 +151,6 @@ export function updateMenuItem(
   menuItem.nameEn = menuItem.nameEn?.trim() || menuItem.nameHe;
   menuItem.descriptionEn =
     menuItem.descriptionEn?.trim() || menuItem.descriptionHe;
-  menuItem.nameRu = menuItem.nameRu?.trim() || menuItem.nameHe;
-  menuItem.descriptionRu =
-    menuItem.descriptionRu?.trim() || menuItem.descriptionHe;
   menuItem.name = menuItem.nameHe;
   menuItem.description = menuItem.descriptionHe;
 
@@ -181,10 +164,8 @@ export function createMenuItem(input: {
   name: string;
   description: string;
   nameHe?: string;
-  nameRu?: string;
   nameEn?: string;
   descriptionHe?: string;
-  descriptionRu?: string;
   descriptionEn?: string;
   price: number;
   available: boolean;
@@ -199,10 +180,8 @@ export function createMenuItem(input: {
     name: (input.nameHe ?? input.name).trim(),
     description: (input.descriptionHe ?? input.description).trim(),
     nameHe: (input.nameHe ?? input.name).trim(),
-    nameRu: (input.nameRu ?? input.nameHe ?? input.name).trim(),
     nameEn: (input.nameEn ?? input.nameHe ?? input.name).trim(),
     descriptionHe: (input.descriptionHe ?? input.description).trim(),
-    descriptionRu: (input.descriptionRu ?? input.descriptionHe ?? input.description).trim(),
     descriptionEn: (input.descriptionEn ?? input.descriptionHe ?? input.description).trim(),
     price: Math.max(0, Math.round(input.price)),
     image: input.image?.trim() || DEFAULT_MENU_IMAGE,

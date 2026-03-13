@@ -19,13 +19,6 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks: "שתייה",
     desserts: "קינוחים"
   },
-  ru: {
-    all: "Все",
-    starters: "Закуски",
-    mains: "Основные блюда",
-    drinks: "Напитки",
-    desserts: "Десерты"
-  },
   en: {
     all: "All",
     starters: "Starters",

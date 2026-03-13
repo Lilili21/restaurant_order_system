@@ -21,15 +21,11 @@ export function MenuItemCard({
   const name =
     language === "he"
       ? item.nameHe || item.name
-      : language === "en"
-        ? item.nameEn || item.nameHe || item.name
-        : item.nameRu || item.nameHe || item.name;
+      : item.nameEn || item.nameHe || item.name;
   const description =
     language === "he"
       ? item.descriptionHe || item.description
-      : language === "en"
-        ? item.descriptionEn || item.descriptionHe || item.description
-        : item.descriptionRu || item.descriptionHe || item.description;
+      : item.descriptionEn || item.descriptionHe || item.description;
 
   return (
     <article className="menu-card">
