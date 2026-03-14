@@ -625,6 +625,50 @@ button:disabled {
   font: inherit;
 }
 
+.modal-password-field {
+  position: relative;
+}
+
+.modal-input--password {
+  padding-right: 52px;
+}
+
+.modal-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.modal-password-toggle:hover {
+  background: rgba(36, 23, 13, 0.06);
+  color: var(--text);
+  transform: translateY(-50%);
+}
+
+.modal-password-toggle svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 select.modal-input {
   appearance: none;
 }

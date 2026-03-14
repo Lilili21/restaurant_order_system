@@ -41,17 +41,31 @@ function isSafeMethod(method: string) {
 export function requireSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
   const referer = request.headers.get("referer");
-  const expectedOrigin = request.nextUrl.origin;
+  const expectedHosts = new Set(
+    [
+      request.nextUrl.host,
+      request.headers.get("x-forwarded-host"),
+      request.headers.get("host")
+    ].filter((value): value is string => Boolean(value))
+  );
 
-  if (origin && origin !== expectedOrigin) {
-    return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+  if (origin) {
+    try {
+      const originHost = new URL(origin).host;
+
+      if (!expectedHosts.has(originHost)) {
+        return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+    }
   }
 
   if (!origin && referer) {
     try {
-      const refererOrigin = new URL(referer).origin;
+      const refererHost = new URL(referer).host;
 
-      if (refererOrigin !== expectedOrigin) {
+      if (!expectedHosts.has(refererHost)) {
         return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
       }
     } catch {
