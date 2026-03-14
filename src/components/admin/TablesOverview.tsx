@@ -43,6 +43,32 @@ function groupSessionItems(table: TableOverview): SessionItemSummary[] {
   return [...grouped.values()];
 }
 
+function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummary[] {
+  const grouped = new Map<string, SessionItemSummary>();
+
+  for (const order of session.orders) {
+    for (const item of order.items) {
+      const key = item.menuItemId;
+      const existing = grouped.get(key);
+
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.total += item.price * item.quantity;
+        continue;
+      }
+
+      grouped.set(key, {
+        key,
+        name: item.name,
+        quantity: item.quantity,
+        total: item.price * item.quantity
+      });
+    }
+  }
+
+  return [...grouped.values()];
+}
+
 export function TablesOverview() {
   const [data, setData] = useState<TablesResponse>({
     tables: [],
@@ -449,31 +475,31 @@ export function TablesOverview() {
             <p className="muted">No closed tables yet.</p>
           ) : (
             <div className="closed-grid">
-              {data.closedSessions.map((session) => (
-                <article
-                  key={`${session.restaurantSlug}_${session.tableNumber}_${session.sessionId}`}
-                  className="info-card"
-                >
-                  <h2>
-                    Table {session.tableNumber} · ID #{session.sessionId}
-                  </h2>
-                  <p>
-                    Closed at{" "}
-                    {new Date(session.closedAt).toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit"
-                    })}{" "}
-                    · Total: {formatCurrency(session.total)}
-                  </p>
-                  <details className="closed-details">
-                    <summary>View orders</summary>
-                    <div className="closed-details__content">
-                      {session.orders.map((order) => (
-                        <div key={order.id} className="closed-order">
+              {data.closedSessions.map((session) => {
+                const sessionItems = groupClosedSessionItems(session);
+
+                return (
+                  <article
+                    key={`${session.restaurantSlug}_${session.tableNumber}_${session.sessionId}`}
+                    className="info-card"
+                  >
+                    <h2>Table {session.tableNumber}</h2>
+                    <p>
+                      Closed at{" "}
+                      {new Date(session.closedAt).toLocaleTimeString("en-GB", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                      })}{" "}
+                      · Total: {formatCurrency(session.total)}
+                    </p>
+                    <details className="closed-details">
+                      <summary>View order</summary>
+                      <div className="closed-details__content">
+                        <div className="closed-order">
                           <div className="table-order-items">
-                            {order.items.map((item) => (
-                              <div key={item.id} className="table-order-item">
+                            {sessionItems.map((item) => (
+                              <div key={item.key} className="table-order-item">
                                 <span className="table-order-item__name">
                                   {item.name}
                                 </span>
@@ -481,17 +507,17 @@ export function TablesOverview() {
                                   {item.quantity} pcs
                                 </span>
                                 <strong className="table-order-item__price">
-                                  {formatCurrency(item.price * item.quantity)}
+                                  {formatCurrency(item.total)}
                                 </strong>
                               </div>
                             ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </details>
-                </article>
-              ))}
+                      </div>
+                    </details>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

@@ -14,6 +14,11 @@ const statusLabels = {
   cancelled: "Cancelled"
 } as const;
 
+const serveModeLabels = {
+  all_at_once: "Serve everything together",
+  as_ready: "Serve as ready"
+} as const;
+
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -439,6 +444,9 @@ export function OrdersList() {
                         ? " · Waiter call"
                         : ""}
                     </h3>
+                    {order.kind !== "waiter_call" && isHallView ? (
+                      <p className="muted">{serveModeLabels[order.serveMode]}</p>
+                    ) : null}
                   </div>
                   <div className="order-header-meta">
                     {order.kind === "waiter_call" ? null : isStationView ? null : (
