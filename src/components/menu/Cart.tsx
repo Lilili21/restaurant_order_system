@@ -4,7 +4,14 @@ import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
-import { CartItem, MenuItem, MenuLanguage, Order, ServeMode } from "@/lib/types";
+import {
+  CartItem,
+  MenuCategory,
+  MenuItem,
+  MenuLanguage,
+  Order,
+  ServeMode
+} from "@/lib/types";
 
 type CartProps = {
   restaurantSlug: string;
@@ -20,10 +27,18 @@ type CartProps = {
 
 type FlyingOrderItem = {
   id: number;
+  icon: string;
   startX: number;
   startY: number;
   deltaX: number;
   deltaY: number;
+};
+
+const categoryFlightIcons: Record<MenuCategory, string> = {
+  starters: "🥗",
+  mains: "🍝",
+  drinks: "🥤",
+  desserts: "🍰"
 };
 
 const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
@@ -306,25 +321,35 @@ export function Cart({
     };
   }, [hasKitchenOpenTimer]);
 
-  function animateAddToOrder(sourceElement?: HTMLElement | null) {
+  function animateOrderMovement(
+    menuItemId: string,
+    direction: "to-order" | "from-order",
+    sourceElement?: HTMLElement | null
+  ) {
     const targetElement = orderJumpButtonRef.current;
+    const menuItem = menu.find((item) => item.id === menuItemId);
 
-    if (!sourceElement || !targetElement) {
+    if (!sourceElement || !targetElement || !menuItem) {
       return;
     }
 
     const sourceRect = sourceElement.getBoundingClientRect();
     const targetRect = targetElement.getBoundingClientRect();
-    const startX = sourceRect.left + sourceRect.width / 2;
-    const startY = sourceRect.top + sourceRect.height / 2;
-    const endX = targetRect.left + targetRect.width / 2;
-    const endY = targetRect.top + targetRect.height / 2;
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
+    const targetX = targetRect.left + targetRect.width / 2;
+    const targetY = targetRect.top + targetRect.height / 2;
+    const startX = direction === "to-order" ? sourceX : targetX;
+    const startY = direction === "to-order" ? sourceY : targetY;
+    const endX = direction === "to-order" ? targetX : sourceX;
+    const endY = direction === "to-order" ? targetY : sourceY;
     const id = Date.now() + Math.random();
 
     setFlyingOrderItems((current) => [
       ...current,
       {
         id,
+        icon: categoryFlightIcons[menuItem.category] ?? "🍽️",
         startX,
         startY,
         deltaX: endX - startX,
@@ -334,11 +359,11 @@ export function Cart({
 
     window.setTimeout(() => {
       setFlyingOrderItems((current) => current.filter((item) => item.id !== id));
-    }, 720);
+    }, 1150);
   }
 
   function addItem(menuItemId: string, sourceElement?: HTMLElement | null) {
-    animateAddToOrder(sourceElement);
+    animateOrderMovement(menuItemId, "to-order", sourceElement);
     setItems((current) => {
       const existing = current.find((item) => item.menuItemId === menuItemId);
 
@@ -364,6 +389,11 @@ export function Cart({
         )
         .filter((item) => item.quantity > 0)
     );
+  }
+
+  function decreaseItem(menuItemId: string, sourceElement?: HTMLElement | null) {
+    animateOrderMovement(menuItemId, "from-order", sourceElement);
+    changeQuantity(menuItemId, -1);
   }
 
   async function submitOrder(serveMode: ServeMode) {
@@ -662,7 +692,7 @@ export function Cart({
 
         return (
           <span key={item.id} className="flying-order-item" style={style}>
-            ✦
+            {item.icon}
           </span>
         );
       })}
@@ -750,7 +780,7 @@ export function Cart({
             language={language}
             quantities={quantities}
             onAdd={addItem}
-            onDecrease={(menuItemId) => changeQuantity(menuItemId, -1)}
+            onDecrease={decreaseItem}
           />
 
           <aside id="new-order-panel" className="cart-panel">

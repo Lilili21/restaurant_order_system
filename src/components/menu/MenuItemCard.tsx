@@ -21,7 +21,7 @@ type MenuItemCardProps = {
   language: MenuLanguage;
   quantity: number;
   onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
-  onDecrease: (menuItemId: string) => void;
+  onDecrease: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
 };
 
 export function MenuItemCard({
@@ -43,6 +43,10 @@ export function MenuItemCard({
 
   function handleAdd(event: MouseEvent<HTMLButtonElement>) {
     onAdd(item.id, event.currentTarget);
+  }
+
+  function handleDecrease(event: MouseEvent<HTMLButtonElement>) {
+    onDecrease(item.id, event.currentTarget);
   }
 
   return (
@@ -79,7 +83,7 @@ export function MenuItemCard({
           <strong>{formatCurrency(item.price)}</strong>
           {quantity > 0 ? (
             <div className="menu-quantity-box">
-              <button type="button" onClick={() => onDecrease(item.id)}>
+              <button type="button" onClick={handleDecrease}>
                 -
               </button>
               <span>{quantity}</span>

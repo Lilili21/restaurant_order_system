@@ -7,10 +7,10 @@ import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuCategory, MenuItem } from "@/lib/types";
 
 const categoryLabels: Record<MenuCategory, string> = {
-  starters: "Starters",
-  mains: "Main courses",
-  drinks: "Drinks",
-  desserts: "Desserts"
+  starters: "🥗 Starters",
+  mains: "🍲 Main courses",
+  drinks: "🍹 Drinks",
+  desserts: "🍰 Desserts"
 };
 
 const badgeOptions: Array<{ value: MenuBadge; label: string }> = [

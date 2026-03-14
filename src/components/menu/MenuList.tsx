@@ -8,23 +8,23 @@ type MenuListProps = {
   language: MenuLanguage;
   quantities: Record<string, number>;
   onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
-  onDecrease: (menuItemId: string) => void;
+  onDecrease: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
 };
 
 const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
   he: {
     all: "הכול",
-    starters: "מנות פתיחה",
-    mains: "עיקריות",
-    drinks: "שתייה",
-    desserts: "קינוחים"
+    starters: "🥗 מנות פתיחה",
+    mains: "🍲 עיקריות",
+    drinks: "🍹 שתייה",
+    desserts: "🍰 קינוחים"
   },
   en: {
     all: "All",
-    starters: "Starters",
-    mains: "Main courses",
-    drinks: "Drinks",
-    desserts: "Desserts"
+    starters: "🥗 Starters",
+    mains: "🍲 Main courses",
+    drinks: "🍹 Drinks",
+    desserts: "🍰 Desserts"
   }
 };
 
