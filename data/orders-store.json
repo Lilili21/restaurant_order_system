@@ -6,10 +6,10 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
-      "status": "new",
+      "status": "preparing",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T13:33:50.363Z",
-      "updatedAt": "2026-03-14T13:33:50.363Z",
+      "updatedAt": "2026-03-14T14:12:12.585Z",
       "items": [
         {
           "id": "item_1773495230363_rqggi6",
@@ -19,9 +19,18 @@
           "price": 78,
           "quantity": 1,
           "served": false
+        },
+        {
+          "id": "item_1773497532585_8ysgca",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 78
+      "total": 132
     },
     {
       "id": "ord_1773491653887",

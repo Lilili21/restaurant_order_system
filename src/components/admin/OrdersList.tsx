@@ -522,6 +522,9 @@ export function OrdersList() {
             const isStationView = !isHallView;
             const isBarView = selectedZone === "bar";
             const highlightTimestamp = order.updatedAt || order.createdAt;
+            const serveModeLabel = order.serveMode
+              ? serveModeLabels[order.serveMode]
+              : null;
             const isFreshNewOrder =
               order.kind !== "waiter_call" &&
               order.status === "new" &&
@@ -556,8 +559,8 @@ export function OrdersList() {
                         ? " · Waiter call"
                         : ""}
                     </h3>
-                    {order.kind !== "waiter_call" && isHallView ? (
-                      <p className="muted">{serveModeLabels[order.serveMode]}</p>
+                    {order.kind !== "waiter_call" && isHallView && serveModeLabel ? (
+                      <p className="muted">{serveModeLabel}</p>
                     ) : null}
                   </div>
                   <div className="order-header-meta">
