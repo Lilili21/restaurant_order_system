@@ -458,7 +458,13 @@ export function TablesOverview() {
                     Table {session.tableNumber} · ID #{session.sessionId}
                   </h2>
                   <p>
-                    Orders: {session.orderCount} · Total: {formatCurrency(session.total)}
+                    Closed at{" "}
+                    {new Date(session.closedAt).toLocaleTimeString("en-GB", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit"
+                    })}{" "}
+                    · Total: {formatCurrency(session.total)}
                   </p>
                   <details className="closed-details">
                     <summary>View orders</summary>
