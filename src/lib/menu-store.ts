@@ -1,12 +1,23 @@
 import { menuItems } from "@/lib/mock-data";
 import { getRestaurantBySlug } from "@/lib/restaurants";
-import { MenuItem, TableSession } from "@/lib/types";
+import { MenuBadge, MenuItem, TableSession } from "@/lib/types";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
+const ALLOWED_BADGES: MenuBadge[] = [
+  "chef_special",
+  "most_popular",
+  "vegan",
+  "spicy",
+  "kids_favorite",
+  "new",
+  "gluten_free",
+  "dairy_free",
+  "nut_free"
+];
 
 function cloneDefaultMenuItems() {
   return menuItems.map((item) => ({ ...item }));
@@ -27,6 +38,11 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     nameEn,
     descriptionHe,
     descriptionEn,
+    badges: Array.isArray(item.badges)
+      ? item.badges.filter((badge): badge is MenuBadge =>
+          ALLOWED_BADGES.includes(badge as MenuBadge)
+        )
+      : [],
     showImage: item.showImage ?? true,
     image: item.image?.trim() || DEFAULT_MENU_IMAGE
   };
@@ -91,6 +107,7 @@ export function updateMenuItem(
       | "showImage"
       | "category"
       | "image"
+      | "badges"
     >
   >
 ) {
@@ -145,6 +162,12 @@ export function updateMenuItem(
     menuItem.image = updates.image.trim() || DEFAULT_MENU_IMAGE;
   }
 
+  if (Array.isArray(updates.badges)) {
+    menuItem.badges = updates.badges.filter((badge): badge is MenuBadge =>
+      ALLOWED_BADGES.includes(badge)
+    );
+  }
+
   menuItem.nameHe = menuItem.nameHe?.trim() || menuItem.name?.trim() || "";
   menuItem.descriptionHe =
     menuItem.descriptionHe?.trim() || menuItem.description?.trim() || "";
@@ -171,6 +194,7 @@ export function createMenuItem(input: {
   available: boolean;
   showImage?: boolean;
   image?: string;
+  badges?: MenuBadge[];
 }) {
   const menuStore = loadMenuItems();
   const menuItem: MenuItem = {
@@ -186,7 +210,12 @@ export function createMenuItem(input: {
     price: Math.max(0, Math.round(input.price)),
     image: input.image?.trim() || DEFAULT_MENU_IMAGE,
     showImage: input.showImage ?? true,
-    available: input.available
+    available: input.available,
+    badges: Array.isArray(input.badges)
+      ? input.badges.filter((badge): badge is MenuBadge =>
+          ALLOWED_BADGES.includes(badge)
+        )
+      : []
   };
 
   menuStore.unshift(menuItem);

@@ -4,7 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
 import { formatCurrency } from "@/lib/menu";
-import { MenuCategory, MenuItem } from "@/lib/types";
+import { MenuBadge, MenuCategory, MenuItem } from "@/lib/types";
 
 const categoryLabels: Record<MenuCategory, string> = {
   starters: "Starters",
@@ -12,6 +12,18 @@ const categoryLabels: Record<MenuCategory, string> = {
   drinks: "Drinks",
   desserts: "Desserts"
 };
+
+const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
+  { value: "chef_special", label: "🔥 Chef's special" },
+  { value: "most_popular", label: "⭐ Most popular" },
+  { value: "vegan", label: "🌱 Vegan" },
+  { value: "spicy", label: "🌶️ Spicy" },
+  { value: "kids_favorite", label: "🧸 Kids favorite" },
+  { value: "new", label: "🆕 New" },
+  { value: "gluten_free", label: "🌾 Gluten free" },
+  { value: "dairy_free", label: "🥛 Dairy free" },
+  { value: "nut_free", label: "🥜 Nut free" }
+];
 
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
@@ -21,6 +33,7 @@ type EditableMenuItem = MenuItem & {
   draftPrice: string;
   draftImage: string;
   draftShowImage: boolean;
+  draftBadges: MenuBadge[];
   saving?: boolean;
 };
 
@@ -32,6 +45,7 @@ type NewMenuItemDraft = {
   price: string;
   image: string;
   showImage: boolean;
+  badges: MenuBadge[];
   category: MenuCategory;
   available: boolean;
   saving: boolean;
@@ -46,7 +60,8 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
     draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
     draftPrice: String(item.price),
     draftImage: item.image,
-    draftShowImage: item.showImage ?? true
+    draftShowImage: item.showImage ?? true,
+    draftBadges: item.badges ?? []
   };
 }
 
@@ -88,6 +103,14 @@ export function MenuEditor() {
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
+  const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
+  const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
+  const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
+    {}
+  );
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>(
+    {}
+  );
   const [newItem, setNewItem] = useState<NewMenuItemDraft>({
     nameHe: "",
     nameEn: "",
@@ -96,6 +119,7 @@ export function MenuEditor() {
     price: "",
     image: "",
     showImage: true,
+    badges: [],
     category: "starters",
     available: true,
     saving: false
@@ -199,8 +223,9 @@ export function MenuEditor() {
       | "draftPrice"
       | "draftImage"
       | "draftShowImage"
+      | "draftBadges"
       | "category",
-    value: string | boolean
+    value: string | boolean | MenuBadge[]
   ) {
     setItems((current) =>
       current.map((item) =>
@@ -211,7 +236,7 @@ export function MenuEditor() {
 
   function updateNewItem(
     field: keyof NewMenuItemDraft,
-    value: string | boolean
+    value: string | boolean | MenuBadge[]
   ) {
     setNewItem((current) => ({
       ...current,
@@ -222,6 +247,30 @@ export function MenuEditor() {
   function clearExistingImage(itemId: string) {
     updateDraft(itemId, "draftImage", "");
     setMessage("Image removed.");
+  }
+
+  function toggleNewBadge(badge: MenuBadge) {
+    setNewItem((current) => ({
+      ...current,
+      badges: current.badges.includes(badge)
+        ? current.badges.filter((value) => value !== badge)
+        : [...current.badges, badge]
+    }));
+  }
+
+  function toggleItemBadge(itemId: string, badge: MenuBadge) {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              draftBadges: item.draftBadges.includes(badge)
+                ? item.draftBadges.filter((value) => value !== badge)
+                : [...item.draftBadges, badge]
+            }
+          : item
+      )
+    );
   }
 
   function clearNewImage() {
@@ -389,6 +438,7 @@ export function MenuEditor() {
         price: Number(currentItem.draftPrice),
         image: currentItem.draftImage,
         showImage: currentItem.draftShowImage,
+        badges: currentItem.draftBadges,
         available: currentItem.available,
         category: currentItem.category
       })
@@ -444,6 +494,7 @@ export function MenuEditor() {
         price: Number(newItem.price),
         image: newItem.image,
         showImage: newItem.showImage,
+        badges: newItem.badges,
         available: newItem.available,
         category: newItem.category
       })
@@ -466,6 +517,7 @@ export function MenuEditor() {
       price: "",
       image: "",
       showImage: true,
+      badges: [],
       category: "starters",
       available: true,
       saving: false
@@ -564,6 +616,21 @@ export function MenuEditor() {
     );
   }
 
+  function getItemLanguage(itemId: string) {
+    return itemLanguages[itemId] ?? "he";
+  }
+
+  function setItemLanguage(itemId: string, language: "he" | "en") {
+    setItemLanguages((current) => ({ ...current, [itemId]: language }));
+  }
+
+  function toggleItemDescription(itemId: string) {
+    setExpandedDescriptions((current) => ({
+      ...current,
+      [itemId]: !current[itemId]
+    }));
+  }
+
   return (
     <div className="orders-layout">
       {secondaryCredentials ? (
@@ -572,7 +639,7 @@ export function MenuEditor() {
         </div>
       ) : null}
       {message ? <p className="status-message">{message}</p> : null}
-      <div className="menu-notice-control">
+      <div className="menu-notice-control menu-notice-control--inline">
         <label className="menu-notice-control__toggle">
           <input
             type="checkbox"
@@ -589,7 +656,7 @@ export function MenuEditor() {
                 : "menu-notice-control__text"
             }
           >
-            Order preparation may take longer than usual right now due to a busy kitchen.
+            Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.
           </span>
         </label>
       </div>
@@ -609,7 +676,7 @@ export function MenuEditor() {
           <span
             className={
               kitchenOpenEnabled
-                ? "menu-notice-control__text menu-notice-control__text--active"
+                ? "menu-notice-control__text menu-notice-control__text--neutral-active"
                 : "menu-notice-control__text"
             }
           >
@@ -679,26 +746,58 @@ export function MenuEditor() {
 
           <div className="menu-editor__form">
             <div className="menu-editor__top-row">
-              <input
-                className="modal-input"
-                type="text"
-                placeholder="שם המנה"
-                value={newItem.nameHe}
-                onChange={(event) => updateNewItem("nameHe", event.target.value)}
-                dir="rtl"
-              />
-              <span className="status-pill menu-editor__availability status-pill--served">
-                Available
-              </span>
+              <div className="menu-editor__language-block">
+                <div className="menu-editor__language-toggle" role="tablist" aria-label="Dish language">
+                  <button
+                    type="button"
+                    className={
+                      newItemLanguage === "he"
+                        ? "menu-editor__language-chip menu-editor__language-chip--active"
+                        : "menu-editor__language-chip"
+                    }
+                    onClick={() => setNewItemLanguage("he")}
+                  >
+                    HE
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      newItemLanguage === "en"
+                        ? "menu-editor__language-chip menu-editor__language-chip--active"
+                        : "menu-editor__language-chip"
+                    }
+                    onClick={() => setNewItemLanguage("en")}
+                  >
+                    EN
+                  </button>
+                </div>
+                <input
+                  className="modal-input"
+                  type="text"
+                  placeholder={newItemLanguage === "he" ? "שם המנה" : "Dish name"}
+                  value={newItemLanguage === "he" ? newItem.nameHe : newItem.nameEn}
+                  onChange={(event) =>
+                    updateNewItem(
+                      newItemLanguage === "he" ? "nameHe" : "nameEn",
+                      event.target.value
+                    )
+                  }
+                  dir={newItemLanguage === "he" ? "rtl" : "ltr"}
+                />
+              </div>
+              <label className="menu-editor__availability-toggle">
+                <input
+                  type="checkbox"
+                  checked={newItem.available}
+                  onChange={(event) =>
+                    updateNewItem("available", event.target.checked)
+                  }
+                />
+                <span className="status-pill menu-editor__availability status-pill--served">
+                  Available
+                </span>
+              </label>
             </div>
-
-            <input
-              className="modal-input"
-              type="text"
-              placeholder="Dish name (EN)"
-              value={newItem.nameEn}
-              onChange={(event) => updateNewItem("nameEn", event.target.value)}
-            />
 
             <select
               className="modal-input"
@@ -716,24 +815,35 @@ export function MenuEditor() {
               )}
             </select>
 
-            <textarea
-              className="modal-input menu-editor__textarea"
-              placeholder="תיאור"
-              value={newItem.descriptionHe}
-              dir="rtl"
-              onChange={(event) =>
-                updateNewItem("descriptionHe", event.target.value)
-              }
-            />
-
-            <textarea
-              className="modal-input menu-editor__textarea"
-              placeholder="Description (EN)"
-              value={newItem.descriptionEn}
-              onChange={(event) =>
-                updateNewItem("descriptionEn", event.target.value)
-              }
-            />
+            <div className="menu-editor__description-block">
+              <button
+                className="menu-editor__description-toggle"
+                type="button"
+                onClick={() => setNewDescriptionExpanded((current) => !current)}
+              >
+                {newDescriptionExpanded ? "Hide description" : "Show description"}
+              </button>
+            {newDescriptionExpanded ? (
+                <textarea
+                  className="modal-input menu-editor__textarea"
+                  placeholder={newItemLanguage === "he" ? "תיאור" : "Description"}
+                  value={
+                    newItemLanguage === "he"
+                      ? newItem.descriptionHe
+                      : newItem.descriptionEn
+                  }
+                  dir={newItemLanguage === "he" ? "rtl" : "ltr"}
+                  onChange={(event) =>
+                    updateNewItem(
+                      newItemLanguage === "he"
+                        ? "descriptionHe"
+                        : "descriptionEn",
+                      event.target.value
+                    )
+                  }
+                />
+              ) : null}
+            </div>
 
             <label className="menu-editor__toggle">
               <input
@@ -813,19 +923,19 @@ export function MenuEditor() {
                   <span className="menu-editor__price-currency">₪</span>
                 </div>
               </label>
+          </div>
 
-            <div className="menu-editor__meta">
-              <label className="menu-editor__toggle">
+          <div className="menu-editor__badges">
+            {badgeOptions.map((badge) => (
+              <label key={badge.value} className="menu-editor__badge-option">
                 <input
                   type="checkbox"
-                  checked={newItem.available}
-                  onChange={(event) =>
-                    updateNewItem("available", event.target.checked)
-                  }
+                  checked={newItem.badges.includes(badge.value)}
+                  onChange={() => toggleNewBadge(badge.value)}
                 />
-                <span>Available</span>
+                <span>{badge.label}</span>
               </label>
-            </div>
+            ))}
           </div>
 
           <div className="order-actions">
@@ -844,36 +954,69 @@ export function MenuEditor() {
         {filteredItems.map((item) => (
           <article key={item.id} className="order-card">
             <div className="menu-editor__top-row">
-              <input
-                className="modal-input"
-                type="text"
-                placeholder="שם המנה"
-                value={item.draftNameHe}
-                dir="rtl"
-                onChange={(event) =>
-                  updateDraft(item.id, "draftNameHe", event.target.value)
-                }
-              />
-              <span
-                className={`status-pill menu-editor__availability ${
-                  item.available ? "status-pill--served" : "status-pill--cancelled"
-                }`}
-              >
-                {item.available ? "Available" : "Unavailable"}
-              </span>
+              <div className="menu-editor__language-block">
+                <div className="menu-editor__language-toggle" role="tablist" aria-label="Dish language">
+                  <button
+                    type="button"
+                    className={
+                      getItemLanguage(item.id) === "he"
+                        ? "menu-editor__language-chip menu-editor__language-chip--active"
+                        : "menu-editor__language-chip"
+                    }
+                    onClick={() => setItemLanguage(item.id, "he")}
+                  >
+                    HE
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      getItemLanguage(item.id) === "en"
+                        ? "menu-editor__language-chip menu-editor__language-chip--active"
+                        : "menu-editor__language-chip"
+                    }
+                    onClick={() => setItemLanguage(item.id, "en")}
+                  >
+                    EN
+                  </button>
+                </div>
+                <input
+                  className="modal-input"
+                  type="text"
+                  placeholder={getItemLanguage(item.id) === "he" ? "שם המנה" : "Dish name"}
+                  value={
+                    getItemLanguage(item.id) === "he"
+                      ? item.draftNameHe
+                      : item.draftNameEn
+                  }
+                  dir={getItemLanguage(item.id) === "he" ? "rtl" : "ltr"}
+                  onChange={(event) =>
+                    updateDraft(
+                      item.id,
+                      getItemLanguage(item.id) === "he"
+                        ? "draftNameHe"
+                        : "draftNameEn",
+                      event.target.value
+                    )
+                  }
+                />
+              </div>
+              <label className="menu-editor__availability-toggle">
+                <input
+                  type="checkbox"
+                  checked={item.available}
+                  onChange={() => toggleAvailability(item.id)}
+                />
+                <span
+                  className={`status-pill menu-editor__availability ${
+                    item.available ? "status-pill--served" : "status-pill--cancelled"
+                  }`}
+                >
+                  {item.available ? "Available" : "Unavailable"}
+                </span>
+              </label>
             </div>
 
             <div className="menu-editor__form">
-              <input
-                className="modal-input"
-                type="text"
-                placeholder="Dish name (EN)"
-                value={item.draftNameEn}
-                onChange={(event) =>
-                  updateDraft(item.id, "draftNameEn", event.target.value)
-                }
-              />
-
               <select
                 className="modal-input"
                 value={item.category}
@@ -890,24 +1033,40 @@ export function MenuEditor() {
                 )}
               </select>
 
-              <textarea
-                className="modal-input menu-editor__textarea"
-                placeholder="תיאור"
-                value={item.draftDescriptionHe}
-                dir="rtl"
-                onChange={(event) =>
-                  updateDraft(item.id, "draftDescriptionHe", event.target.value)
-                }
-              />
-
-              <textarea
-                className="modal-input menu-editor__textarea"
-                placeholder="Description (EN)"
-                value={item.draftDescriptionEn}
-                onChange={(event) =>
-                  updateDraft(item.id, "draftDescriptionEn", event.target.value)
-                }
-              />
+              <div className="menu-editor__description-block">
+                <button
+                  className="menu-editor__description-toggle"
+                  type="button"
+                  onClick={() => toggleItemDescription(item.id)}
+                >
+                  {expandedDescriptions[item.id]
+                    ? "Hide description"
+                    : "Show description"}
+                </button>
+                {expandedDescriptions[item.id] ? (
+                  <textarea
+                    className="modal-input menu-editor__textarea"
+                    placeholder={
+                      getItemLanguage(item.id) === "he" ? "תיאור" : "Description"
+                    }
+                    value={
+                      getItemLanguage(item.id) === "he"
+                        ? item.draftDescriptionHe
+                        : item.draftDescriptionEn
+                    }
+                    dir={getItemLanguage(item.id) === "he" ? "rtl" : "ltr"}
+                    onChange={(event) =>
+                      updateDraft(
+                        item.id,
+                        getItemLanguage(item.id) === "he"
+                          ? "draftDescriptionHe"
+                          : "draftDescriptionEn",
+                        event.target.value
+                      )
+                    }
+                  />
+                ) : null}
+              </div>
 
               <label className="menu-editor__toggle">
                 <input
@@ -989,16 +1148,19 @@ export function MenuEditor() {
                 </div>
               </label>
 
-              <div className="menu-editor__meta">
-                <label className="menu-editor__toggle">
+            </div>
+
+            <div className="menu-editor__badges">
+              {badgeOptions.map((badge) => (
+                <label key={badge.value} className="menu-editor__badge-option">
                   <input
                     type="checkbox"
-                    checked={item.available}
-                    onChange={() => toggleAvailability(item.id)}
+                    checked={item.draftBadges.includes(badge.value)}
+                    onChange={() => toggleItemBadge(item.id, badge.value)}
                   />
-                  <span>Available</span>
+                  <span>{badge.label}</span>
                 </label>
-              </div>
+              ))}
             </div>
 
             <div className="order-actions">

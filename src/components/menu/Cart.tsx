@@ -48,7 +48,10 @@ const uiText = {
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
-    kitchenOpen: "המטבח פתוח",
+    kitchenOpen: "המטבח נסגר בעוד",
+    kitchenClosed: "המטבח סגור",
+    kitchenClosedAction: "לצערנו המטבח סגור",
+    waiterAvailable: "המלצר עדיין זמין עבורכם אם תצטרכו עזרה.",
     kitchenLoadWarning:
       "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
     addDish: "הוסיפו לפחות מנה אחת.",
@@ -83,7 +86,10 @@ const uiText = {
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
-    kitchenOpen: "Kitchen open",
+    kitchenOpen: "Kitchen closed in",
+    kitchenClosed: "Kitchen closed",
+    kitchenClosedAction: "Unfortunately, the kitchen is closed",
+    waiterAvailable: "A waiter is still available if you need any assistance.",
     kitchenLoadWarning:
       "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
     addDish: "Add at least one dish.",
@@ -150,8 +156,10 @@ export function Cart({
   const kitchenOpenRemainingMs = kitchenOpenUntil
     ? new Date(kitchenOpenUntil).getTime() - countdownNow
     : 0;
-  const showKitchenOpenBanner =
-    showKitchenOpen && Boolean(kitchenOpenUntil) && kitchenOpenRemainingMs > 0;
+  const hasKitchenOpenTimer = showKitchenOpen && Boolean(kitchenOpenUntil);
+  const showKitchenOpenBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs > 0;
+  const showKitchenClosedBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs <= 0;
+  const isKitchenClosed = showKitchenClosedBanner;
 
   function getMenuItemDisplayName(menuItemId: string) {
     const menuItem = menu.find((item) => item.id === menuItemId);
@@ -270,7 +278,7 @@ export function Cart({
   }, [waiterCallBlockedUntil]);
 
   useEffect(() => {
-    if (!showKitchenOpenBanner) {
+    if (!hasKitchenOpenTimer) {
       return;
     }
 
@@ -281,7 +289,7 @@ export function Cart({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [showKitchenOpenBanner]);
+  }, [hasKitchenOpenTimer]);
 
   function addItem(menuItemId: string) {
     setItems((current) => {
@@ -357,6 +365,11 @@ export function Cart({
   }
 
   function openServeModeDialog() {
+    if (isKitchenClosed) {
+      setMessage(text.kitchenClosedAction);
+      return;
+    }
+
     if (!items.length) {
       setMessage(text.addDish);
       return;
@@ -414,14 +427,8 @@ export function Cart({
   }
 
   function formatCountdown(remainingMs: number) {
-    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return [hours, minutes, seconds]
-      .map((value) => String(value).padStart(2, "0"))
-      .join(":");
+    const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60000));
+    return `${totalMinutes} min`;
   }
 
   return (
@@ -586,6 +593,14 @@ export function Cart({
                 </strong>
               </div>
             ) : null}
+            {showKitchenClosedBanner ? (
+              <div className="menu-kitchen-open menu-kitchen-open--closed">
+                <strong className="menu-kitchen-open__label">{text.kitchenClosed}</strong>
+              </div>
+            ) : null}
+            {showKitchenClosedBanner ? (
+              <p className="menu-kitchen-note">{text.waiterAvailable}</p>
+            ) : null}
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}
@@ -685,9 +700,13 @@ export function Cart({
               className="cart-submit"
               type="button"
               onClick={openServeModeDialog}
-              disabled={submitting}
+              disabled={submitting || isKitchenClosed}
             >
-              {submitting ? text.submitting : text.submit}
+              {isKitchenClosed
+                ? text.kitchenClosedAction
+                : submitting
+                  ? text.submitting
+                  : text.submit}
             </button>
 
             {message ? <p className="status-message">{message}</p> : null}

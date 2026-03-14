@@ -18,6 +18,16 @@ export type Table = {
 
 export type MenuCategory = "starters" | "mains" | "drinks" | "desserts";
 export type MenuLanguage = "he" | "en";
+export type MenuBadge =
+  | "chef_special"
+  | "most_popular"
+  | "vegan"
+  | "spicy"
+  | "kids_favorite"
+  | "new"
+  | "gluten_free"
+  | "dairy_free"
+  | "nut_free";
 
 export type MenuItem = {
   id: string;
@@ -33,6 +43,7 @@ export type MenuItem = {
   image: string;
   showImage: boolean;
   available: boolean;
+  badges?: MenuBadge[];
 };
 
 export type CartItem = {

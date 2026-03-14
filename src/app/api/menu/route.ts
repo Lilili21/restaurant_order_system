@@ -8,7 +8,7 @@ import {
   getAllMenuItems,
   updateMenuItem
 } from "@/lib/menu-store";
-import { MenuCategory } from "@/lib/types";
+import { MenuBadge, MenuCategory } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminAccess(request, "secondary");
@@ -54,6 +54,7 @@ export async function PATCH(request: NextRequest) {
       showImage?: boolean;
       category?: MenuCategory;
       image?: string;
+      badges?: MenuBadge[];
     };
 
     if (!body.id) {
@@ -71,7 +72,8 @@ export async function PATCH(request: NextRequest) {
       available: body.available,
       showImage: body.showImage,
       category: body.category,
-      image: body.image
+      image: body.image,
+      badges: body.badges
     });
 
     return NextResponse.json(menuItem);
@@ -118,6 +120,7 @@ export async function POST(request: NextRequest) {
       showImage?: boolean;
       category?: MenuCategory;
       image?: string;
+      badges?: MenuBadge[];
     };
 
     if (!body.restaurantSlug) {
@@ -148,7 +151,8 @@ export async function POST(request: NextRequest) {
       available: body.available ?? true,
       showImage: body.showImage ?? true,
       category: body.category,
-      image: body.image
+      image: body.image,
+      badges: body.badges
     });
 
     return NextResponse.json(menuItem, { status: 201 });

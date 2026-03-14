@@ -1,7 +1,18 @@
 import { formatCurrency } from "@/lib/menu";
-import { MenuItem, MenuLanguage } from "@/lib/types";
+import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
+const badgeMeta: Record<MenuBadge, string> = {
+  chef_special: "🔥",
+  most_popular: "⭐",
+  vegan: "🌱",
+  spicy: "🌶️",
+  kids_favorite: "🧸",
+  new: "🆕",
+  gluten_free: "🌾",
+  dairy_free: "🥛",
+  nut_free: "🥜"
+};
 
 type MenuItemCardProps = {
   item: MenuItem;
@@ -47,6 +58,15 @@ export function MenuItemCard({
       <div className="menu-card__body">
         <div>
           <h3>{name}</h3>
+          {item.badges?.length ? (
+            <div className="menu-card__badges" aria-label="Dish labels">
+              {item.badges.map((badge) => (
+                <span key={badge} className="menu-card__badge">
+                  {badgeMeta[badge]}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <p className="muted">{description}</p>
         </div>
         <div className="menu-card__footer">
