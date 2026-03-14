@@ -1,6 +1,29 @@
 {
   "orders": [
     {
+      "id": "ord_1773495230363",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-14T13:33:50.363Z",
+      "updatedAt": "2026-03-14T13:33:50.363Z",
+      "items": [
+        {
+          "id": "item_1773495230363_rqggi6",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 78
+    },
+    {
       "id": "ord_1773491653887",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

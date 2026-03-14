@@ -23,7 +23,6 @@ export default function AdminMenuPage() {
           </Link>
         </div>
       </section>
-
       <MenuEditor />
     </main>
   );

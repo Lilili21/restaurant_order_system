@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 
+import { TableCountControl } from "@/components/admin/TableCountControl";
 import { formatCurrency } from "@/lib/menu";
 import { MenuCategory, MenuItem } from "@/lib/types";
 
@@ -499,6 +500,11 @@ export function MenuEditor() {
 
   return (
     <div className="orders-layout">
+      {secondaryCredentials ? (
+        <div className="admin-menu-tools">
+          <TableCountControl credentials={secondaryCredentials} />
+        </div>
+      ) : null}
       {message ? <p className="status-message">{message}</p> : null}
       <div className="menu-notice-control">
         <label className="menu-notice-control__toggle">

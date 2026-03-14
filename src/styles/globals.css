@@ -261,6 +261,52 @@ button:disabled {
   color: #fffaf2;
 }
 
+.admin-table-count-trigger {
+  min-width: 132px;
+  min-height: 76px;
+  padding: 12px 20px;
+  font-size: 0.82rem;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  background: rgba(249, 242, 228, 0.98);
+  border-color: rgba(180, 83, 9, 0.12);
+  color: #6d5641;
+}
+
+.table-count-stepper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 999px;
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.table-count-stepper button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.table-count-stepper span {
+  min-width: 32px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.admin-menu-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -112px;
+  margin-right: 360px;
+  margin-bottom: 28px;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
@@ -1193,6 +1239,12 @@ textarea.modal-input {
   .admin-menu-bubble {
     width: 100%;
     min-height: 56px;
+  }
+
+  .admin-menu-tools {
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 18px;
   }
 
   .hero-card {
