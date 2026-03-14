@@ -1,15 +1,38 @@
 {
   "orders": [
     {
-      "id": "ord_1773507374516",
+      "id": "ord_1773517102316",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
       "status": "new",
       "serveMode": "all_at_once",
+      "createdAt": "2026-03-14T19:38:22.316Z",
+      "updatedAt": "2026-03-14T19:38:22.316Z",
+      "items": [
+        {
+          "id": "item_1773517102316_nwwpj5",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 4,
+          "served": false
+        }
+      ],
+      "total": 116
+    },
+    {
+      "id": "ord_1773507374516",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "preparing",
+      "serveMode": "all_at_once",
       "createdAt": "2026-03-14T16:56:14.516Z",
-      "updatedAt": "2026-03-14T16:56:14.516Z",
+      "updatedAt": "2026-03-14T17:31:19.304Z",
       "items": [
         {
           "id": "item_1773507374516_mo4v2t",
@@ -17,11 +40,11 @@
           "category": "starters",
           "name": "Tabbouleh salad",
           "price": 29,
-          "quantity": 1,
+          "quantity": 2,
           "served": false
         }
       ],
-      "total": 29
+      "total": 58
     },
     {
       "id": "ord_1773505829618",

@@ -65,7 +65,8 @@ const uiText = {
     tableOrderingHint: "📍 You are ordering from table",
     callWaiter: "Call waiter",
     welcomeTitle: "Welcome",
-    welcomeText: "Choose dishes from the menu and send your order directly from your table.",
+    welcomeText:
+      "Choose your dishes and send the order straight to the kitchen from your table.",
     welcomeOk: "OK",
     reviewOrderTitle: "Check your order",
     reviewOrderText: "Please review your order before sending it.",
@@ -189,6 +190,7 @@ export function Cart({
       `menu-language:${restaurantSlug}:${tableToken}`,
       nextLanguage
     );
+    setShowWelcomeDialog(true);
   }
 
   useEffect(() => {
