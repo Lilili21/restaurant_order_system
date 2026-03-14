@@ -653,7 +653,7 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
 
   if (unservedOrders.length > 0) {
     throw new Error(
-      "You cannot close the table until all orders are marked as served."
+      "Check that all the orders are served and change status in Orders."
     );
   }
 
