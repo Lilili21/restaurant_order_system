@@ -9,6 +9,8 @@ export async function GET() {
 
   return NextResponse.json({
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
+    kitchenOpenEnabled: settings.kitchenOpenEnabled,
+    kitchenOpenUntil: settings.kitchenOpenUntil,
     tableCount: settings.tableCount
   });
 }
@@ -35,12 +37,16 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       kitchenLoadWarningEnabled?: boolean;
+      kitchenOpenEnabled?: boolean;
+      kitchenOpenUntil?: string | null;
       tableCount?: number;
     };
 
     return NextResponse.json(
       updateMenuSettings({
         kitchenLoadWarningEnabled: body.kitchenLoadWarningEnabled,
+        kitchenOpenEnabled: body.kitchenOpenEnabled,
+        kitchenOpenUntil: body.kitchenOpenUntil,
         tableCount: body.tableCount
       })
     );

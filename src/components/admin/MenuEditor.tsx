@@ -83,6 +83,9 @@ export function MenuEditor() {
   const [message, setMessage] = useState<string | null>(null);
   const [kitchenLoadWarningEnabled, setKitchenLoadWarningEnabled] = useState(false);
   const [kitchenLoadWarningSaving, setKitchenLoadWarningSaving] = useState(false);
+  const [kitchenOpenEnabled, setKitchenOpenEnabled] = useState(false);
+  const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
+  const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [newItem, setNewItem] = useState<NewMenuItemDraft>({
@@ -134,9 +137,21 @@ export function MenuEditor() {
       if (!cancelled && settingsResponse.ok) {
         const settings = (await settingsResponse.json()) as {
           kitchenLoadWarningEnabled?: boolean;
+          kitchenOpenEnabled?: boolean;
+          kitchenOpenUntil?: string | null;
         };
 
         setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
+        setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
+        setKitchenOpenUntil(
+          settings.kitchenOpenUntil
+            ? new Date(settings.kitchenOpenUntil).toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              })
+            : ""
+        );
       }
     }
 
@@ -289,6 +304,57 @@ export function MenuEditor() {
     }
 
     setKitchenLoadWarningSaving(false);
+  }
+
+  async function saveKitchenOpenSettings(
+    nextEnabled: boolean,
+    nextTime: string
+  ) {
+    const normalizedTime = nextTime.trim();
+    let isoValue: string | null = null;
+
+    if (nextEnabled) {
+      if (!normalizedTime) {
+        setMessage("Select the kitchen open time first.");
+        return;
+      }
+
+      const [hours, minutes] = normalizedTime.split(":").map(Number);
+
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        setMessage("Invalid kitchen open time.");
+        return;
+      }
+
+      const target = new Date();
+      target.setHours(hours, minutes, 0, 0);
+      isoValue = target.toISOString();
+    }
+
+    setKitchenOpenEnabled(nextEnabled);
+    setKitchenOpenUntil(normalizedTime);
+    setKitchenOpenSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        kitchenOpenEnabled: nextEnabled,
+        kitchenOpenUntil: nextEnabled ? isoValue : null
+      })
+    });
+
+    if (!response.ok) {
+      setMessage("Failed to update kitchen open settings.");
+      setKitchenOpenSaving(false);
+      return;
+    }
+
+    setKitchenOpenSaving(false);
   }
 
   async function saveItem(itemId: string) {
@@ -525,6 +591,45 @@ export function MenuEditor() {
           >
             Order preparation may take longer than usual right now due to a busy kitchen.
           </span>
+        </label>
+      </div>
+      <div className="menu-notice-control">
+        <label className="menu-notice-control__toggle">
+          <input
+            type="checkbox"
+            checked={kitchenOpenEnabled}
+            disabled={kitchenOpenSaving}
+            onChange={(event) =>
+              void saveKitchenOpenSettings(
+                event.target.checked,
+                kitchenOpenUntil
+              )
+            }
+          />
+          <span
+            className={
+              kitchenOpenEnabled
+                ? "menu-notice-control__text menu-notice-control__text--active"
+                : "menu-notice-control__text"
+            }
+          >
+            Kitchen open
+          </span>
+        </label>
+        <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+          <span>Until</span>
+          <input
+            className="modal-input"
+            type="time"
+            value={kitchenOpenUntil}
+            disabled={kitchenOpenSaving}
+            onChange={(event) => setKitchenOpenUntil(event.target.value)}
+            onBlur={() => {
+              if (kitchenOpenEnabled) {
+                void saveKitchenOpenSettings(true, kitchenOpenUntil);
+              }
+            }}
+          />
         </label>
       </div>
       <div className="menu-editor__create">

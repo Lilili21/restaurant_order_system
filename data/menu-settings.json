@@ -1,5 +1,7 @@
 {
   "kitchenLoadWarningEnabled": false,
+  "kitchenOpenEnabled": false,
+  "kitchenOpenUntil": null,
   "tableCount": 8,
   "tableTokens": {
     "1": "tbl_UxflwK16Xm3V",

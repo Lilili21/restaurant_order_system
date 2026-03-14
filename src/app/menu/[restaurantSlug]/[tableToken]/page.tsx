@@ -33,6 +33,8 @@ export default async function MenuPage({ params }: MenuPageProps) {
         tableToken={session.table.accessToken}
         menu={session.menu}
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
+        showKitchenOpen={menuSettings.kitchenOpenEnabled}
+        kitchenOpenUntil={menuSettings.kitchenOpenUntil}
         initialSubmittedOrders={getTableSessionOrders(
           restaurantSlug,
           session.table.number

@@ -1,13 +1,36 @@
 {
   "orders": [
     {
+      "id": "ord_1773505829618",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-14T16:30:29.618Z",
+      "updatedAt": "2026-03-14T16:30:29.618Z",
+      "items": [
+        {
+          "id": "item_1773505829618_3d0ibh",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 32
+    },
+    {
       "id": "call_1773501742520",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
       "kind": "waiter_call",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-14T15:22:22.521Z",
       "updatedAt": "2026-03-14T15:22:22.521Z",
       "items": [],
@@ -20,7 +43,7 @@
       "tableNumber": 3,
       "sessionId": 1,
       "kind": "waiter_call",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-14T15:20:54.308Z",
       "updatedAt": "2026-03-14T15:20:54.308Z",
       "items": [],
@@ -32,10 +55,10 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
-      "status": "new",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T15:19:51.151Z",
-      "updatedAt": "2026-03-14T15:19:55.988Z",
+      "updatedAt": "2026-03-14T16:30:17.984Z",
       "items": [
         {
           "id": "item_1773501591151_0rjrgi",
@@ -43,11 +66,11 @@
           "category": "starters",
           "name": "Tabbouleh salad",
           "price": 29,
-          "quantity": 7,
-          "served": false
+          "quantity": 8,
+          "served": true
         }
       ],
-      "total": 203
+      "total": 232
     },
     {
       "id": "call_1773501583803",
@@ -68,7 +91,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
-      "status": "preparing",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T13:33:50.363Z",
       "updatedAt": "2026-03-14T14:12:12.585Z",
@@ -80,7 +103,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773497532585_8ysgca",
@@ -89,7 +112,7 @@
           "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 132
@@ -136,7 +159,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
-      "status": "preparing",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-13T23:36:58.500Z",
       "updatedAt": "2026-03-14T12:33:49.767Z",
@@ -148,7 +171,7 @@
           "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 5,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773446870251_gw37g6",
@@ -157,7 +180,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 223
@@ -168,7 +191,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 4,
       "sessionId": 2,
-      "status": "new",
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-13T23:00:06.530Z",
       "updatedAt": "2026-03-13T23:02:34.280Z",
@@ -180,7 +203,7 @@
           "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 2,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773442806530_qg5nhh",
@@ -189,7 +212,7 @@
           "name": "פסטה",
           "price": 10,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 68
@@ -485,7 +508,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 2,
       "sessionId": 2,
-      "status": "preparing",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-11T18:43:42.381Z",
       "items": [
@@ -513,7 +536,7 @@
           "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": false,
+          "served": true,
           "category": "mains"
         },
         {
@@ -522,7 +545,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false,
+          "served": true,
           "category": "mains"
         }
       ],

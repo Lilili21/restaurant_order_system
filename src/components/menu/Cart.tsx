@@ -13,6 +13,8 @@ type CartProps = {
   tableToken: string;
   menu: MenuItem[];
   showKitchenLoadWarning: boolean;
+  showKitchenOpen: boolean;
+  kitchenOpenUntil: string | null;
   initialSubmittedOrders: Order[];
 };
 
@@ -46,6 +48,7 @@ const uiText = {
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
+    kitchenOpen: "המטבח פתוח",
     kitchenLoadWarning:
       "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
     addDish: "הוסיפו לפחות מנה אחת.",
@@ -80,6 +83,7 @@ const uiText = {
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
+    kitchenOpen: "Kitchen open",
     kitchenLoadWarning:
       "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
     addDish: "Add at least one dish.",
@@ -96,6 +100,8 @@ export function Cart({
   tableToken,
   menu,
   showKitchenLoadWarning,
+  showKitchenOpen,
+  kitchenOpenUntil,
   initialSubmittedOrders
 }: CartProps) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -114,6 +120,7 @@ export function Cart({
     initialSubmittedOrders[0]?.sessionId ?? 1
   );
   const [waiterCallBlockedUntil, setWaiterCallBlockedUntil] = useState(0);
+  const [countdownNow, setCountdownNow] = useState(Date.now());
 
   const detailedItems = useMemo(() => {
     return items
@@ -140,6 +147,11 @@ export function Cart({
   );
   const waiterCallDisabled = waiterCallBlockedUntil > Date.now();
   const text = uiText[language];
+  const kitchenOpenRemainingMs = kitchenOpenUntil
+    ? new Date(kitchenOpenUntil).getTime() - countdownNow
+    : 0;
+  const showKitchenOpenBanner =
+    showKitchenOpen && Boolean(kitchenOpenUntil) && kitchenOpenRemainingMs > 0;
 
   function getMenuItemDisplayName(menuItemId: string) {
     const menuItem = menu.find((item) => item.id === menuItemId);
@@ -256,6 +268,20 @@ export function Cart({
       window.clearTimeout(timeoutId);
     };
   }, [waiterCallBlockedUntil]);
+
+  useEffect(() => {
+    if (!showKitchenOpenBanner) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCountdownNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [showKitchenOpenBanner]);
 
   function addItem(menuItemId: string) {
     setItems((current) => {
@@ -385,6 +411,17 @@ export function Cart({
       hour: "2-digit",
       minute: "2-digit"
     })}`;
+  }
+
+  function formatCountdown(remainingMs: number) {
+    const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+      .map((value) => String(value).padStart(2, "0"))
+      .join(":");
   }
 
   return (
@@ -541,6 +578,14 @@ export function Cart({
             <p className="lead">
               {text.tableOrderingHint} {tableNumber}
             </p>
+            {showKitchenOpenBanner ? (
+              <div className="menu-kitchen-open">
+                <span className="menu-kitchen-open__label">{text.kitchenOpen}</span>
+                <strong className="menu-kitchen-open__timer">
+                  {formatCountdown(kitchenOpenRemainingMs)}
+                </strong>
+              </div>
+            ) : null}
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}

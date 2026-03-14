@@ -4,6 +4,8 @@ import path from "node:path";
 
 export type MenuSettings = {
   kitchenLoadWarningEnabled: boolean;
+  kitchenOpenEnabled: boolean;
+  kitchenOpenUntil: string | null;
   tableCount: number;
   tableTokens: Record<string, string>;
 };
@@ -13,6 +15,8 @@ const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
 
 const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
+  kitchenOpenEnabled: false,
+  kitchenOpenUntil: null,
   tableCount: 8,
   tableTokens: {}
 };
@@ -54,8 +58,16 @@ function normalizeSettings(
     }
   }
 
+  const kitchenOpenUntil =
+    typeof settings?.kitchenOpenUntil === "string" &&
+    settings.kitchenOpenUntil.trim()
+      ? settings.kitchenOpenUntil
+      : null;
+
   return {
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
+    kitchenOpenEnabled: Boolean(settings?.kitchenOpenEnabled),
+    kitchenOpenUntil,
     tableCount,
     tableTokens
   };

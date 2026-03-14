@@ -930,6 +930,7 @@ textarea.modal-input {
 
 .menu-notice-control {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
   padding: 18px 22px;
@@ -974,6 +975,31 @@ textarea.modal-input {
 .menu-settings-panel__field span {
   color: var(--text);
   font-weight: 700;
+}
+
+.menu-settings-panel__field--compact {
+  min-width: 160px;
+}
+
+.menu-kitchen-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 1px solid var(--border);
+}
+
+.menu-kitchen-open__label {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.menu-kitchen-open__timer {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .table-links-panel {
