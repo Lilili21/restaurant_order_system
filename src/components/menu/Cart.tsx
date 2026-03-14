@@ -909,9 +909,27 @@ export function Cart({
                 }
               >
                 <summary className="submitted-orders__summary">
-                  <div>
+                  <div className="submitted-orders__summary-copy">
                     <h2>{text.currentOrders}</h2>
                   </div>
+                  <span
+                    className="submitted-orders__chevron"
+                    aria-hidden="true"
+                  >
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M5 7.5L10 12.5L15 7.5"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
                 </summary>
                 <div className="submitted-orders__content">
                   <div className="submitted-orders-total">
