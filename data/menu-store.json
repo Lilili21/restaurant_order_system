@@ -12,7 +12,18 @@
     "nameEn": "Omelette 5",
     "descriptionHe": "חביתה אוורירית.",
     "descriptionEn": "Fluffy omelette.",
-    "showImage": true
+    "showImage": true,
+    "badges": [
+      "chef_special",
+      "kids_favorite",
+      "nut_free",
+      "most_popular",
+      "new",
+      "vegan",
+      "gluten_free",
+      "spicy",
+      "dairy_free"
+    ]
   },
   {
     "id": "m1",
@@ -27,7 +38,8 @@
     "nameEn": "Hummus with pita",
     "descriptionHe": "חומוס קלאסי, שמן זית ופיתה חמה.",
     "descriptionEn": "Classic hummus, olive oil and warm pita.",
-    "showImage": true
+    "showImage": true,
+    "badges": []
   },
   {
     "id": "m2",
@@ -42,7 +54,8 @@
     "nameEn": "Tabbouleh salad",
     "descriptionHe": "בורגול, הרבה ירק, לימון, עגבניות ונענע.",
     "descriptionEn": "Bulgur, lots of greens, lemon, tomatoes and mint.",
-    "showImage": false
+    "showImage": false,
+    "badges": []
   },
   {
     "id": "m3",
@@ -57,7 +70,8 @@
     "nameEn": "Shawarma plate",
     "descriptionHe": "עוף, תפוחי אדמה, חמוצים, טחינה וסלט טרי.",
     "descriptionEn": "Chicken, potatoes, pickles, tahini and fresh salad.",
-    "showImage": true
+    "showImage": true,
+    "badges": []
   },
   {
     "id": "m4",
@@ -72,7 +86,8 @@
     "nameEn": "Salmon fillet",
     "descriptionHe": "מוגש עם בורגול ורוטב לימון.",
     "descriptionEn": "Served with bulgur and lemon sauce.",
-    "showImage": true
+    "showImage": true,
+    "badges": []
   },
   {
     "id": "m5",
@@ -87,7 +102,8 @@
     "nameEn": "Mint lemonade",
     "descriptionHe": "לימונדה ביתית בלי סירופים.",
     "descriptionEn": "Homemade lemonade without syrups.",
-    "showImage": true
+    "showImage": true,
+    "badges": []
   },
   {
     "id": "m6",
@@ -102,6 +118,7 @@
     "nameEn": "Kanafeh",
     "descriptionHe": "קינוח חם עם גבינה, פיסטוקים וסירופ.",
     "descriptionEn": "Warm dessert with cheese, pistachios and syrup.",
-    "showImage": true
+    "showImage": true,
+    "badges": []
   }
 ]

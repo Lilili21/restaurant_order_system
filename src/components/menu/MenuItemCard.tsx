@@ -4,17 +4,24 @@ import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
-const badgeMeta: Record<MenuBadge, string> = {
-  chef_special: "🔥",
-  most_popular: "⭐",
-  vegan: "🌱",
-  spicy: "🌶️",
-  kids_favorite: "🧸",
-  new: "🆕",
-  gluten_free: "🌾",
-  dairy_free: "🥛",
-  nut_free: "🥜"
+const badgeMeta: Record<MenuBadge, { icon: string; label: string }> = {
+  chef_special: { icon: "🔥", label: "Chef's special" },
+  most_popular: { icon: "⭐", label: "Most popular" },
+  vegan: { icon: "🌱", label: "Vegan" },
+  spicy: { icon: "🌶️", label: "Spicy" },
+  kids_favorite: { icon: "🧸", label: "Kids favorite" },
+  new: { icon: "🆕", label: "New" },
+  gluten_free: { icon: "🌾", label: "Gluten free" },
+  dairy_free: { icon: "🥛", label: "Dairy free" },
+  nut_free: { icon: "🥜", label: "Nut free" }
 };
+
+const imageBadgeSet = new Set<MenuBadge>([
+  "chef_special",
+  "most_popular",
+  "new",
+  "kids_favorite"
+]);
 
 type MenuItemCardProps = {
   item: MenuItem;
@@ -40,6 +47,8 @@ export function MenuItemCard({
     language === "he"
       ? item.descriptionHe || item.description
       : item.descriptionEn || item.descriptionHe || item.description;
+  const imageBadges = (item.badges ?? []).filter((badge) => imageBadgeSet.has(badge));
+  const detailBadges = (item.badges ?? []).filter((badge) => !imageBadgeSet.has(badge));
 
   function handleAdd(event: MouseEvent<HTMLButtonElement>) {
     onAdd(item.id, event.currentTarget);
@@ -53,6 +62,15 @@ export function MenuItemCard({
     <article className="menu-card">
       {item.showImage ? (
         <div className="menu-card__image-wrap">
+          {imageBadges.length ? (
+            <div className="menu-card__image-badges" aria-label="Dish highlights">
+              {imageBadges.map((badge) => (
+                <span key={badge} className="menu-card__image-badge">
+                  {badgeMeta[badge].icon}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <img
             className="menu-card__image"
             src={item.image || DEFAULT_MENU_IMAGE}
@@ -68,11 +86,16 @@ export function MenuItemCard({
       <div className="menu-card__body">
         <div>
           <h3>{name}</h3>
-          {item.badges?.length ? (
+          {detailBadges.length ? (
             <div className="menu-card__badges" aria-label="Dish labels">
-              {item.badges.map((badge) => (
+              {detailBadges.map((badge) => (
                 <span key={badge} className="menu-card__badge">
-                  {badgeMeta[badge]}
+                  <span className="menu-card__badge-icon" aria-hidden="true">
+                    {badgeMeta[badge].icon}
+                  </span>
+                  <span className="menu-card__badge-label">
+                    {badgeMeta[badge].label}
+                  </span>
                 </span>
               ))}
             </div>
