@@ -33,6 +33,31 @@ function cloneInitialOrders() {
   }));
 }
 
+function normalizeOrderItemForAdmin(item: OrderItem): OrderItem {
+  const menuItem = getMenuItemById(item.menuItemId);
+
+  return {
+    ...item,
+    category: item.category ?? menuItem?.category,
+    name: menuItem?.nameEn || item.name,
+    price: menuItem?.price ?? item.price
+  };
+}
+
+function normalizePersistedOrder(order: Order): Order {
+  if (order.kind === "waiter_call") {
+    return order;
+  }
+
+  const items = order.items.map(normalizeOrderItemForAdmin);
+
+  return {
+    ...order,
+    items,
+    total: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  };
+}
+
 function createDefaultTableSessions() {
   const sessions = new Map<string, number>();
 
@@ -63,12 +88,21 @@ function loadState(): OrdersPersistence {
     const parsed = JSON.parse(raw) as Partial<OrdersPersistence>;
 
     return {
-      orders: Array.isArray(parsed.orders) ? parsed.orders : cloneInitialOrders(),
+      orders: Array.isArray(parsed.orders)
+        ? parsed.orders.map((order) => normalizePersistedOrder(order as Order))
+        : cloneInitialOrders(),
       currentTableSessions: Array.isArray(parsed.currentTableSessions)
         ? parsed.currentTableSessions
         : [...createDefaultTableSessions().entries()],
       closedTableSummaries: Array.isArray(parsed.closedTableSummaries)
-        ? parsed.closedTableSummaries
+        ? parsed.closedTableSummaries.map((summary) => ({
+            ...summary,
+            orders: Array.isArray(summary.orders)
+              ? summary.orders.map((order) =>
+                  normalizePersistedOrder(order as Order)
+                )
+              : []
+          }))
         : []
     };
   } catch {
@@ -163,7 +197,7 @@ function createOrderItem(cartItem: CartItem): OrderItem {
     id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     menuItemId: menuItem.id,
     category: menuItem.category,
-    name: menuItem.name,
+    name: menuItem.nameEn || menuItem.name,
     price: menuItem.price,
     quantity: cartItem.quantity,
     note: cartItem.note?.trim() || undefined,
@@ -197,10 +231,7 @@ function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
 }
 
 function normalizeOrderState(order: Order) {
-  order.items = order.items.map((item) => ({
-    ...item,
-    category: item.category ?? getMenuItemById(item.menuItemId)?.category
-  }));
+  order.items = order.items.map(normalizeOrderItemForAdmin);
 
   if (order.kind === "waiter_call") {
     order.total = 0;

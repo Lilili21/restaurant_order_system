@@ -1,6 +1,70 @@
 {
   "orders": [
     {
+      "id": "ord_1773445018500",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-13T23:36:58.500Z",
+      "updatedAt": "2026-03-14T00:07:50.251Z",
+      "items": [
+        {
+          "id": "item_1773445018500_zfzhef",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 3,
+          "served": false
+        },
+        {
+          "id": "item_1773446870251_gw37g6",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 165
+    },
+    {
+      "id": "ord_1773442806530",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 2,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-13T23:00:06.530Z",
+      "updatedAt": "2026-03-13T23:02:34.280Z",
+      "items": [
+        {
+          "id": "item_1773442806530_gbc2pm",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773442806530_qg5nhh",
+          "menuItemId": "m_1773266225497",
+          "category": "starters",
+          "name": "פסטה",
+          "price": 10,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 68
+    },
+    {
       "id": "ord_1773411112995",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -15,7 +79,7 @@
           "id": "item_1773411112995_4on5gp",
           "menuItemId": "m4",
           "category": "mains",
-          "name": "פילה סלמון",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 2,
           "served": true
@@ -24,7 +88,7 @@
           "id": "item_1773411112995_y8au0v",
           "menuItemId": "m5",
           "category": "drinks",
-          "name": "לימונדה עם נענע",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
           "served": true
@@ -47,7 +111,7 @@
           "id": "item_1773399413009_xxjm9b",
           "menuItemId": "m5",
           "category": "drinks",
-          "name": "לימונדה עם נענע",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 2,
           "served": false
@@ -56,7 +120,7 @@
           "id": "item_1773399413009_6h3gsr",
           "menuItemId": "m1",
           "category": "drinks",
-          "name": "חומוס עם פיתה",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
           "served": false
@@ -65,7 +129,7 @@
           "id": "item_1773399413010_5idg5y",
           "menuItemId": "m4",
           "category": "mains",
-          "name": "פילה סלמון",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
           "served": false
@@ -87,10 +151,11 @@
         {
           "id": "item_1773354905076_pf1eqi",
           "menuItemId": "m5",
-          "name": "לימונדה עם נענע",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 3,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 54
@@ -116,10 +181,11 @@
         {
           "id": "item_1773270792567_yf700r",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         }
       ],
       "total": 39
@@ -137,26 +203,29 @@
         {
           "id": "item_1773267187492_tu32yu",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 8,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773267248214_phaswd",
           "menuItemId": "m_1773255842139",
-          "name": "омлет5",
+          "name": "Omelette 5",
           "price": 100,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "desserts"
         },
         {
           "id": "item_1773267248215_3vz20q",
           "menuItemId": "m6",
-          "name": "Кнафе",
+          "name": "Kanafeh",
           "price": 32,
           "quantity": 4,
-          "served": false
+          "served": false,
+          "category": "desserts"
         },
         {
           "id": "item_1773267408926_444w5z",
@@ -169,26 +238,29 @@
         {
           "id": "item_1773267563142_4d32ux",
           "menuItemId": "m4",
-          "name": "Филе лосося",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "mains"
         },
         {
           "id": "item_1773267576140_87g89k",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "item_1773267823241_g2rgm4",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 3,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 688,
@@ -219,26 +291,29 @@
         {
           "id": "item_1773256216333_rc7e3l",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 2,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773258058837_fpwx2s",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 2,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773258062482_70j7e3",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 124
@@ -256,18 +331,20 @@
         {
           "id": "item_1773255588984_yz6tl5",
           "menuItemId": "m3",
-          "name": "Шаурма на тарелке",
+          "name": "Shawarma plate",
           "price": 54,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "mains"
         },
         {
           "id": "item_1773256135694_6geci6",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "starters"
         }
       ],
       "total": 166
@@ -285,34 +362,38 @@
         {
           "id": "item_1773254622381_o7ga8t",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773255567785_1vzsmr",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773255567785_0gyi1i",
           "menuItemId": "m3",
-          "name": "Шаурма на тарелке",
+          "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "mains"
         },
         {
           "id": "item_1773255567785_0do7lf",
           "menuItemId": "m4",
-          "name": "Филе лосося",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "mains"
         }
       ],
       "total": 185
@@ -342,18 +423,20 @@
         {
           "id": "item_1773253327328_dee7r7",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773253327328_hrec4o",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 106
@@ -371,10 +454,11 @@
         {
           "id": "item_1773253299916_caqt20",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         }
       ],
       "total": 29
@@ -392,18 +476,20 @@
         {
           "id": "item_1773253275916_7ehufi",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773253275916_1ahxb6",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -421,18 +507,20 @@
         {
           "id": "item_1773253162182_kgwh4r",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773253162182_jcc4ps",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -450,18 +538,20 @@
         {
           "id": "item_1773253122116_6mle13",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773253122116_c3e9y0",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -479,10 +569,11 @@
         {
           "id": "item_1773252862599_xh5hjv",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -500,50 +591,56 @@
         {
           "id": "item_1773252808911_vdfnak",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "item_1773252808911_axs22b",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773252808911_v02h1t",
           "menuItemId": "m3",
-          "name": "Шаурма на тарелке",
+          "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "mains"
         },
         {
           "id": "item_1773252808911_qigx7l",
           "menuItemId": "m4",
-          "name": "Филе лосося",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "mains"
         },
         {
           "id": "item_1773252808911_2cnwfy",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "item_1773252808911_81d2hi",
           "menuItemId": "m6",
-          "name": "Кнафе",
+          "name": "Kanafeh",
           "price": 32,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "desserts"
         }
       ],
       "total": 259
@@ -561,26 +658,29 @@
         {
           "id": "item_1773252600460_4ml9q0",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 7,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773252607776_bx6pbw",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 2,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773252703158_tn7djw",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 269
@@ -598,18 +698,20 @@
         {
           "id": "item_1773247954844_8vvdiq",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 3,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773252511393_qqod6f",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 2,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 135
@@ -627,10 +729,11 @@
         {
           "id": "item_1773247950100_2qmz5e",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         }
       ],
       "total": 29
@@ -648,10 +751,11 @@
         {
           "id": "item_1773247625906_dn9i92",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -669,18 +773,20 @@
         {
           "id": "item_1773247609423_cypxwn",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773247609423_ye32vl",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         }
       ],
       "total": 53
@@ -698,10 +804,11 @@
         {
           "id": "item_1773247583084_b5xau3",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         }
       ],
       "total": 29
@@ -719,18 +826,20 @@
         {
           "id": "item_1773247551009_p839h3",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773247551009_bqqr78",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -748,10 +857,11 @@
         {
           "id": "item_1773247480463_6dniq6",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -769,10 +879,11 @@
         {
           "id": "item_1773247446834_01wyqy",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -790,10 +901,11 @@
         {
           "id": "item_1773247396984_0jk9q6",
           "menuItemId": "m3",
-          "name": "Шаурма на тарелке",
+          "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "mains"
         }
       ],
       "total": 54
@@ -811,18 +923,20 @@
         {
           "id": "item_1773247378551_3p8oi3",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773247378551_qre8jc",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -852,10 +966,11 @@
         {
           "id": "item_1773247052751_terwib",
           "menuItemId": "m4",
-          "name": "Филе лосося",
+          "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "mains"
         }
       ],
       "total": 78
@@ -873,26 +988,29 @@
         {
           "id": "item_1773247047118_a9ha3d",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773247047118_2qroc4",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773247047118_kx2exw",
           "menuItemId": "m3",
-          "name": "Шаурма на тарелке",
+          "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "mains"
         }
       ],
       "total": 107
@@ -910,18 +1028,20 @@
         {
           "id": "item_1773247034330_tb9tny",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         },
         {
           "id": "item_1773247034330_jfjtmj",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         }
       ],
       "total": 53
@@ -939,10 +1059,11 @@
         {
           "id": "item_1773246544680_tj03pr",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -960,18 +1081,20 @@
         {
           "id": "item_1773246424906_rtkoeh",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "starters"
         },
         {
           "id": "item_1773246424906_f8at0u",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -989,10 +1112,11 @@
         {
           "id": "item_1773246402871_dmpb7p",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": true
+          "served": true,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -1010,18 +1134,20 @@
         {
           "id": "item_1773246344286_o5dn5u",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "item_1773246344286_h4wmnb",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "starters"
         }
       ],
       "total": 82
@@ -1039,10 +1165,11 @@
         {
           "id": "item_1773246082231_561gr2",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 24
@@ -1060,18 +1187,20 @@
         {
           "id": "item_1773246056324_yh4nt3",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773246056324_j5xk0q",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -1089,18 +1218,20 @@
         {
           "id": "item_1773245759842_81273j",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773245759842_vaca83",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -1130,18 +1261,20 @@
         {
           "id": "item_1773245736316_4cg032",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         },
         {
           "id": "item_1773245736316_zsy2qz",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 53
@@ -1159,18 +1292,20 @@
         {
           "id": "item_1773245282584_ywfegl",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "item_1773245282584_l15l8i",
           "menuItemId": "m2",
-          "name": "Салат табуле",
+          "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "starters"
         }
       ],
       "total": 53
@@ -1188,18 +1323,20 @@
         {
           "id": "item_1773245277391_hb9ygo",
           "menuItemId": "m6",
-          "name": "Кнафе",
+          "name": "Kanafeh",
           "price": 32,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "desserts"
         },
         {
           "id": "item_1773245277391_0s6fcs",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         }
       ],
       "total": 50
@@ -1218,27 +1355,30 @@
         {
           "id": "ord_demo_1_item_1",
           "menuItemId": "m1",
-          "name": "Хумус с питой",
+          "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "ord_demo_1_item_2",
           "menuItemId": "m5",
-          "name": "Лимонад с мятой",
+          "name": "Mint lemonade",
           "price": 18,
           "quantity": 2,
-          "served": false
+          "served": false,
+          "category": "drinks"
         },
         {
           "id": "ord_demo_1_item_3",
           "menuItemId": "m6",
-          "name": "Кнафе",
+          "name": "Kanafeh",
           "price": 32,
           "quantity": 1,
           "note": "Разделить на две ложки",
-          "served": false
+          "served": false,
+          "category": "desserts"
         }
       ]
     }
@@ -1351,26 +1491,29 @@
             {
               "id": "item_1773252600460_4ml9q0",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 7,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773252607776_bx6pbw",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 2,
-              "served": true
+              "served": true,
+              "category": "drinks"
             },
             {
               "id": "item_1773252703158_tn7djw",
               "menuItemId": "m5",
-              "name": "Лимонад с мятой",
+              "name": "Mint lemonade",
               "price": 18,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 269
@@ -1416,26 +1559,29 @@
             {
               "id": "item_1773247047118_a9ha3d",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773247047118_2qroc4",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             },
             {
               "id": "item_1773247047118_kx2exw",
               "menuItemId": "m3",
-              "name": "Шаурма на тарелке",
+              "name": "Shawarma plate",
               "price": 54,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "mains"
             }
           ],
           "total": 107
@@ -1453,18 +1599,20 @@
             {
               "id": "item_1773247034330_tb9tny",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             },
             {
               "id": "item_1773247034330_jfjtmj",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             }
           ],
           "total": 53
@@ -1514,18 +1662,20 @@
             {
               "id": "item_1773247954844_8vvdiq",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 3,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773252511393_qqod6f",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 2,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 135
@@ -1543,10 +1693,11 @@
             {
               "id": "item_1773247950100_2qmz5e",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             }
           ],
           "total": 29
@@ -1564,10 +1715,11 @@
             {
               "id": "item_1773247625906_dn9i92",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1585,18 +1737,20 @@
             {
               "id": "item_1773247609423_cypxwn",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             },
             {
               "id": "item_1773247609423_ye32vl",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             }
           ],
           "total": 53
@@ -1614,10 +1768,11 @@
             {
               "id": "item_1773247583084_b5xau3",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             }
           ],
           "total": 29
@@ -1635,18 +1790,20 @@
             {
               "id": "item_1773247551009_p839h3",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773247551009_bqqr78",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 53
@@ -1664,10 +1821,11 @@
             {
               "id": "item_1773247480463_6dniq6",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1685,10 +1843,11 @@
             {
               "id": "item_1773247446834_01wyqy",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1706,10 +1865,11 @@
             {
               "id": "item_1773247396984_0jk9q6",
               "menuItemId": "m3",
-              "name": "Шаурма на тарелке",
+              "name": "Shawarma plate",
               "price": 54,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "mains"
             }
           ],
           "total": 54
@@ -1727,18 +1887,20 @@
             {
               "id": "item_1773247378551_3p8oi3",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773247378551_qre8jc",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 53
@@ -1756,10 +1918,11 @@
             {
               "id": "item_1773247052751_terwib",
               "menuItemId": "m4",
-              "name": "Филе лосося",
+              "name": "Salmon fillet",
               "price": 78,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "mains"
             }
           ],
           "total": 78
@@ -1777,10 +1940,11 @@
             {
               "id": "item_1773246544680_tj03pr",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1798,10 +1962,11 @@
             {
               "id": "item_1773246402871_dmpb7p",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1819,18 +1984,20 @@
             {
               "id": "item_1773246344286_o5dn5u",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "drinks"
             },
             {
               "id": "item_1773246344286_h4wmnb",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 2,
-              "served": false
+              "served": false,
+              "category": "starters"
             }
           ],
           "total": 82
@@ -1848,10 +2015,11 @@
             {
               "id": "item_1773246082231_561gr2",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "drinks"
             }
           ],
           "total": 24
@@ -1869,18 +2037,20 @@
             {
               "id": "item_1773246056324_yh4nt3",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "starters"
             },
             {
               "id": "item_1773246056324_j5xk0q",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "drinks"
             }
           ],
           "total": 53
@@ -1898,18 +2068,20 @@
             {
               "id": "item_1773245759842_81273j",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "starters"
             },
             {
               "id": "item_1773245759842_vaca83",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "drinks"
             }
           ],
           "total": 53
@@ -1939,18 +2111,20 @@
             {
               "id": "item_1773245736316_4cg032",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "starters"
             },
             {
               "id": "item_1773245736316_zsy2qz",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": false
+              "served": false,
+              "category": "drinks"
             }
           ],
           "total": 53
@@ -1982,18 +2156,20 @@
             {
               "id": "item_1773246424906_rtkoeh",
               "menuItemId": "m2",
-              "name": "Салат табуле",
+              "name": "Tabbouleh salad",
               "price": 29,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "starters"
             },
             {
               "id": "item_1773246424906_f8at0u",
               "menuItemId": "m1",
-              "name": "Хумус с питой",
+              "name": "Hummus with pita",
               "price": 24,
               "quantity": 1,
-              "served": true
+              "served": true,
+              "category": "drinks"
             }
           ],
           "total": 53

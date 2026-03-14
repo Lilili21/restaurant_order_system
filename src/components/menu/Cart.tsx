@@ -20,34 +20,32 @@ const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
 
 const uiText = {
   he: {
-    table: "Table",
-    callWaiter: "Call waiter",
-    reviewOrderTitle: "Review your order",
-    reviewOrderText: "Please check your order before sending it.",
-    reviewOrderOk: "OK",
-    reviewOrderChange: "Edit",
-    serveModeTitle: "How should we serve your order?",
-    serveModeText: "Choose the serving option that works best for you.",
-    serveAll: "Serve everything together",
-    serveAsReady: "Serve as ready",
-    newOrder: "New order",
-    emptyCart: "It is empty for now. Add dishes from the menu.",
-    total: "Total",
-    submit: "Send order",
-    submitting: "Sending...",
-    sent: "Sent",
-    currentOrders: "Current orders",
-    totalOrders: "Total amount",
-    sentStatus: "Sent",
-    thankYou: "Thanks",
-    orderSent: "Your order has been sent. We are cooking with love.",
-    waiterCalled: "Waiter has been called",
+    table: "שולחן",
+    callWaiter: "קרא למלצר",
+    reviewOrderTitle: "בדקו את ההזמנה שלכם",
+    reviewOrderText: "נא לעבור על ההזמנה לפני השליחה.",
+    reviewOrderOk: "אישור",
+    reviewOrderChange: "עריכה",
+    serveModeTitle: "איך להגיש את ההזמנה?",
+    serveModeText: "בחרו את אופן ההגשה המתאים לכם.",
+    serveAll: "להגיש הכול יחד",
+    serveAsReady: "להגיש לפי המוכן",
+    newOrder: "הזמנה חדשה",
+    emptyCart: "הסל עדיין ריק. הוסיפו מנות מהתפריט.",
+    total: "סה\"כ",
+    submit: "שלח הזמנה",
+    submitting: "שולח...",
+    currentOrders: "הזמנות נוכחיות",
+    totalOrders: "סכום כולל",
+    thankYou: "תודה",
+    orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
+    waiterCalled: "המלצר הוזמן",
     kitchenLoadWarning:
-      "Order preparation may take longer than usual right now due to a busy kitchen.",
-    addDish: "Add at least one dish.",
-    submitError: "Failed to send the order",
-    waiterError: "Failed to call the waiter",
-    close: "Close dialog"
+      "ייתכן שזמן הכנת ההזמנה יהיה ארוך מהרגיל עקב עומס במטבח.",
+    addDish: "הוסיפו לפחות מנה אחת.",
+    submitError: "לא ניתן היה לשלוח את ההזמנה",
+    waiterError: "לא ניתן היה לקרוא למלצר",
+    close: "סגור חלון"
   },
   en: {
     table: "Table",
@@ -65,10 +63,8 @@ const uiText = {
     total: "Total",
     submit: "Send order",
     submitting: "Sending...",
-    sent: "Sent",
     currentOrders: "Current orders",
     totalOrders: "Total amount",
-    sentStatus: "Sent",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
@@ -131,6 +127,18 @@ export function Cart({
   );
   const waiterCallDisabled = waiterCallBlockedUntil > Date.now();
   const text = uiText[language];
+
+  function getMenuItemDisplayName(menuItemId: string) {
+    const menuItem = menu.find((item) => item.id === menuItemId);
+
+    if (!menuItem) {
+      return "";
+    }
+
+    return language === "he"
+      ? menuItem.nameHe || menuItem.name
+      : menuItem.nameEn || menuItem.nameHe || menuItem.name;
+  }
 
   useEffect(() => {
     const savedLanguage = window.localStorage.getItem(
@@ -356,8 +364,7 @@ export function Cart({
 
   function formatOrderLabel(timestamp: string) {
     const locale = language === "he" ? "he-IL" : "en-US";
-    const prefix =
-      "Order";
+    const prefix = language === "he" ? "הזמנה" : "Order";
 
     return `${prefix} · ${new Date(timestamp).toLocaleTimeString(locale, {
       hour12: false,
@@ -397,7 +404,7 @@ export function Cart({
       {showReviewDialog ? (
         <div className="modal-backdrop" role="presentation">
           <div
-            className="modal-card"
+            className="modal-card modal-card--review"
             role="dialog"
             aria-modal="true"
             aria-labelledby="review-order-dialog-title"
@@ -408,10 +415,7 @@ export function Cart({
               {detailedItems.map(({ cartItem, menuItem }) => (
                 <div key={menuItem.id} className="table-order-item">
                   <span>
-                    {language === "he"
-                      ? menuItem.nameHe || menuItem.name
-                      : menuItem.nameEn || menuItem.nameHe || menuItem.name}{" "}
-                    x {cartItem.quantity}
+                    {getMenuItemDisplayName(menuItem.id)} x {cartItem.quantity}
                   </span>
                   <strong>
                     {formatCurrency(menuItem.price * cartItem.quantity)}
@@ -555,11 +559,7 @@ export function Cart({
                 {detailedItems.map(({ cartItem, menuItem }) => (
                   <div className="cart-row" key={menuItem.id}>
                     <div>
-                      <strong>
-                        {language === "he"
-                          ? menuItem.nameHe || menuItem.name
-                          : menuItem.nameEn || menuItem.nameHe || menuItem.name}
-                      </strong>
+                      <strong>{getMenuItemDisplayName(menuItem.id)}</strong>
                       <p className="muted">{formatCurrency(menuItem.price)}</p>
                     </div>
                     <div className="quantity-box">
@@ -608,7 +608,6 @@ export function Cart({
               >
                 <summary className="submitted-orders__summary">
                   <div>
-                    <p className="eyebrow">{text.sent}</p>
                     <h2>{text.currentOrders}</h2>
                   </div>
                 </summary>
@@ -625,13 +624,13 @@ export function Cart({
                             {formatOrderLabel(order.updatedAt || order.createdAt)}
                           </strong>
                         </div>
-                        <span className="status-pill status-pill--new">{text.sentStatus}</span>
                       </div>
                       <div className="table-order-items">
                         {order.items.map((item) => (
                           <div key={item.id} className="table-order-item">
                             <span>
-                              {item.quantity} x {item.name}
+                              {item.quantity} x{" "}
+                              {getMenuItemDisplayName(item.menuItemId) || item.name}
                             </span>
                             <strong>{formatCurrency(item.price * item.quantity)}</strong>
                           </div>

@@ -1,6 +1,6 @@
 {
-  "kitchenLoadWarningEnabled": false,
-  "tableCount": 5,
+  "kitchenLoadWarningEnabled": true,
+  "tableCount": 8,
   "tableTokens": {
     "1": "tbl_UxflwK16Xm3V",
     "2": "tbl_rJ3w5MG_F-zH",

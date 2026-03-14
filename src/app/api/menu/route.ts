@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
-import { createMenuItem, getAllMenuItems, updateMenuItem } from "@/lib/menu-store";
+import {
+  createMenuItem,
+  deleteMenuItem,
+  getAllMenuItems,
+  updateMenuItem
+} from "@/lib/menu-store";
 import { MenuCategory } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -122,6 +127,31 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(menuItem, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message: error instanceof Error ? error.message : "Unknown error"
+      },
+      { status: 400 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const unauthorized = await requireAdminAccess(request, "secondary");
+
+  if (unauthorized) {
+    return unauthorized;
+  }
+
+  try {
+    const body = (await request.json()) as { id?: string };
+
+    if (!body.id) {
+      throw new Error("id is required");
+    }
+
+    return NextResponse.json(deleteMenuItem(body.id));
   } catch (error) {
     return NextResponse.json(
       {

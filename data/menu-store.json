@@ -1,20 +1,5 @@
 [
   {
-    "id": "m_1773266225497",
-    "restaurantSlug": "olive-bistro",
-    "category": "starters",
-    "name": "פסטה",
-    "description": "",
-    "price": 10,
-    "image": "/images/default-menu-item.svg",
-    "available": true,
-    "nameHe": "פסטה",
-    "nameEn": "Pasta",
-    "descriptionHe": "",
-    "descriptionEn": "",
-    "showImage": false
-  },
-  {
     "id": "m_1773255842139",
     "restaurantSlug": "olive-bistro",
     "category": "desserts",

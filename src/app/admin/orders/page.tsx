@@ -8,9 +8,6 @@ export default function AdminOrdersPage() {
       <section className="hero hero--compact">
         <div>
           <h1>Incoming orders</h1>
-          <p className="muted">
-            This page polls the API every 4 seconds and shows active incoming orders.
-          </p>
         </div>
         <div className="admin-nav" aria-label="Admin navigation">
           <div className="admin-switch">

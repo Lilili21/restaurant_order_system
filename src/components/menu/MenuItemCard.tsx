@@ -18,6 +18,7 @@ export function MenuItemCard({
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
+  const addLabel = language === "he" ? "הוסף" : "Add";
   const name =
     language === "he"
       ? item.nameHe || item.name
@@ -62,7 +63,7 @@ export function MenuItemCard({
             </div>
           ) : (
             <button type="button" onClick={() => onAdd(item.id)}>
-              Add
+              {addLabel}
             </button>
           )}
         </div>

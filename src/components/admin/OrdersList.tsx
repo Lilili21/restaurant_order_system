@@ -14,11 +14,6 @@ const statusLabels = {
   cancelled: "Cancelled"
 } as const;
 
-const serveModeLabels = {
-  all_at_once: "Serve everything together",
-  as_ready: "Serve as ready"
-} as const;
-
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -444,14 +439,6 @@ export function OrdersList() {
                         ? " · Waiter call"
                         : ""}
                     </h3>
-                    {order.kind === "waiter_call" ? null : (
-                      <p className="muted">
-                        Session #{order.sessionId}
-                        {isHallView && order.serveMode
-                          ? ` · ${serveModeLabels[order.serveMode]}`
-                          : ""}
-                      </p>
-                    )}
                   </div>
                   <div className="order-header-meta">
                     {order.kind === "waiter_call" ? null : isStationView ? null : (
@@ -459,9 +446,12 @@ export function OrdersList() {
                         {statusLabels[order.status]}
                       </span>
                     )}
-                    <span className="muted">
-                      {new Date(order.createdAt).toLocaleTimeString("en-GB")}
-                    </span>
+                    <div className="order-time">
+                      <span className="order-time__label">Order time</span>
+                      <span className="order-time__value">
+                        {new Date(order.createdAt).toLocaleTimeString("en-GB")}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -473,9 +463,12 @@ export function OrdersList() {
                       <div key={item.id} className="order-row">
                         <div className="order-item-main">
                           {isStationView ? (
-                            <span>
-                              {item.quantity} x {item.name}
-                            </span>
+                            <div className="order-item-line">
+                              <span className="order-item-name">{item.name}</span>
+                              <span className="order-item-qty">
+                                {item.quantity} pcs
+                              </span>
+                            </div>
                           ) : (
                             <label className="order-item-check">
                               <input
@@ -485,13 +478,8 @@ export function OrdersList() {
                                   toggleOrderItem(order.id, item.id, event.target.checked)
                                 }
                               />
-                              <span>
-                                {item.quantity} x {item.name}
-                              </span>
+                              <span className="order-item-name">{item.name}</span>
                             </label>
-                          )}
-                          {isStationView ? null : (
-                            <strong>{formatCurrency(item.price * item.quantity)}</strong>
                           )}
                         </div>
                         {isStationView ? null : (
@@ -523,16 +511,6 @@ export function OrdersList() {
                     ))}
                   </div>
                 )}
-
-                <div className="order-card__footer">
-                  {isStationView ? null : (
-                    <strong>
-                      {order.kind === "waiter_call"
-                        ? "Priority"
-                        : formatCurrency(visibleTotal)}
-                    </strong>
-                  )}
-                </div>
 
                 <div className="order-actions">
                   {isHallView && order.kind === "waiter_call" ? (

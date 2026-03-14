@@ -194,6 +194,18 @@ export function createMenuItem(input: {
   return normalizeMenuItem(menuItem);
 }
 
+export function deleteMenuItem(menuItemId: string) {
+  const menuStore = loadMenuItems();
+  const nextMenuStore = menuStore.filter((item) => item.id !== menuItemId);
+
+  if (nextMenuStore.length === menuStore.length) {
+    throw new Error("Menu item not found");
+  }
+
+  persistMenuItemsWith(nextMenuStore);
+  return { ok: true };
+}
+
 export function getTableSession(
   restaurantSlug: string,
   tableRef: number | string

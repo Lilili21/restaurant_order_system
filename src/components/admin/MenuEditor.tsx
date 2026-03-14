@@ -406,6 +406,26 @@ export function MenuEditor() {
     setMessage(`Added: ${createdItem.name}`);
   }
 
+  async function removeItem(itemId: string) {
+    const response = await fetch("/api/menu", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({ id: itemId })
+    });
+
+    if (!response.ok) {
+      setMessage("Failed to delete the menu item.");
+      return;
+    }
+
+    setItems((current) => current.filter((item) => item.id !== itemId));
+    setMessage("Dish deleted.");
+  }
+
   if (!isAuthorized && authOpen) {
     return (
       <div className="modal-backdrop" role="presentation">
@@ -507,7 +527,7 @@ export function MenuEditor() {
           type="button"
           onClick={() => setShowCreateForm((current) => !current)}
         >
-          {showCreateForm ? "Hide form" : "Add dish"}
+          {showCreateForm ? "Hide form" : "Add new dish"}
         </button>
       </div>
       <div className="orders-filter">
@@ -544,7 +564,7 @@ export function MenuEditor() {
       <div className="orders-grid">
         {showCreateForm ? (
         <article className="order-card">
-          <h3>Add dish</h3>
+          <h3>Add new dish</h3>
 
           <div className="menu-editor__form">
             <div className="menu-editor__top-row">
@@ -664,16 +684,24 @@ export function MenuEditor() {
               </div>
             ) : null}
 
-            <label className="menu-editor__field">
-              <span>Price</span>
-              <input
-                className="modal-input"
-                type="number"
-                min="0"
-                value={newItem.price}
-                onChange={(event) => updateNewItem("price", event.target.value)}
-              />
-            </label>
+              <label className="menu-editor__field">
+                <span>Price</span>
+                <div className="menu-editor__price-input">
+                  <input
+                    className="modal-input"
+                    type="text"
+                    inputMode="numeric"
+                    value={newItem.price}
+                    onChange={(event) =>
+                      updateNewItem(
+                        "price",
+                        event.target.value.replace(/[^\d]/g, "")
+                      )
+                    }
+                  />
+                  <span className="menu-editor__price-currency">₪</span>
+                </div>
+              </label>
 
             <div className="menu-editor__meta">
               <label className="menu-editor__toggle">
@@ -686,7 +714,6 @@ export function MenuEditor() {
                 />
                 <span>Available</span>
               </label>
-              <strong>{formatCurrency(Number(newItem.price) || 0)}</strong>
             </div>
           </div>
 
@@ -833,15 +860,22 @@ export function MenuEditor() {
 
               <label className="menu-editor__field">
                 <span>Price</span>
-                <input
-                  className="modal-input"
-                  type="number"
-                  min="0"
-                  value={item.draftPrice}
-                  onChange={(event) =>
-                    updateDraft(item.id, "draftPrice", event.target.value)
-                  }
-                />
+                <div className="menu-editor__price-input">
+                  <input
+                    className="modal-input"
+                    type="text"
+                    inputMode="numeric"
+                    value={item.draftPrice}
+                    onChange={(event) =>
+                      updateDraft(
+                        item.id,
+                        "draftPrice",
+                        event.target.value.replace(/[^\d]/g, "")
+                      )
+                    }
+                  />
+                  <span className="menu-editor__price-currency">₪</span>
+                </div>
               </label>
 
               <div className="menu-editor__meta">
@@ -853,11 +887,17 @@ export function MenuEditor() {
                   />
                   <span>Available</span>
                 </label>
-                <strong>{formatCurrency(Number(item.draftPrice) || 0)}</strong>
               </div>
             </div>
 
             <div className="order-actions">
+              <button
+                className="button-danger"
+                type="button"
+                onClick={() => void removeItem(item.id)}
+              >
+                Delete
+              </button>
               <button
                 className="button-success"
                 type="button"

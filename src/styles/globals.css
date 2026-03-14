@@ -429,6 +429,15 @@ button:disabled {
   text-align: left;
 }
 
+.modal-card--review {
+  text-align: left;
+}
+
+.modal-card--review h2,
+.modal-card--review > p {
+  text-align: center;
+}
+
 .modal-card--form h2 {
   padding-right: 48px;
 }
@@ -478,6 +487,11 @@ button:disabled {
   display: flex;
   justify-content: center;
   gap: 10px;
+}
+
+.modal-card--review .table-order-items,
+.modal-card--review .cart-summary {
+  text-align: left;
 }
 
 .modal-actions button {
@@ -533,6 +547,35 @@ textarea.modal-input {
 .menu-editor__field {
   display: grid;
   gap: 8px;
+}
+
+.menu-editor__price-input {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+  padding: 0 18px;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: #fffdf7;
+}
+
+.menu-editor__price-input .modal-input {
+  flex: 0 0 auto;
+  width: 120px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: right;
+}
+
+.menu-editor__price-currency {
+  color: var(--muted);
+  font-weight: 700;
+  flex: 0 0 auto;
 }
 
 .menu-editor__field span {
@@ -662,7 +705,47 @@ textarea.modal-input {
 .order-header-meta {
   display: grid;
   justify-items: end;
-  gap: 8px;
+  gap: 6px;
+  text-align: right;
+  min-width: 140px;
+}
+
+.order-time {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.order-time__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.order-time__value {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.order-item-line,
+.order-item-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.order-item-name {
+  min-width: 0;
+}
+
+.order-item-qty {
+  color: var(--muted);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .orders-filter {

@@ -8,10 +8,6 @@ export default function AdminTablesPage() {
       <section className="hero hero--compact">
         <div>
           <h1>Orders by table</h1>
-          <p className="muted">
-            Orders are grouped by table here. After you close a table, the next
-            session opens automatically with a new ID.
-          </p>
         </div>
         <div className="admin-nav" aria-label="Admin navigation">
           <div className="admin-switch">

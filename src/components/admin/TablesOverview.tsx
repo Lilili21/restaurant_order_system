@@ -379,10 +379,8 @@ export function TablesOverview() {
                 >
                   <div className="order-card__header">
                     <div>
-                      <p className="eyebrow">{table.restaurantName}</p>
                       <h3>Table {table.tableNumber}</h3>
                     </div>
-                    <span className="session-badge">ID #{table.currentSessionId}</span>
                   </div>
 
                   <div className="table-summary">
@@ -434,7 +432,6 @@ export function TablesOverview() {
 
         <section className="closed-sessions">
           <div className="section-header">
-            <p className="eyebrow">History</p>
             <h2>Closed tables</h2>
           </div>
 
@@ -457,7 +454,6 @@ export function TablesOverview() {
                   key={`${session.restaurantSlug}_${session.tableNumber}_${session.sessionId}`}
                   className="info-card"
                 >
-                  <p className="eyebrow">{session.restaurantName}</p>
                   <h2>
                     Table {session.tableNumber} · ID #{session.sessionId}
                   </h2>
@@ -469,10 +465,6 @@ export function TablesOverview() {
                     <div className="closed-details__content">
                       {session.orders.map((order) => (
                         <div key={order.id} className="closed-order">
-                          <p className="muted">
-                            Status: {order.status} ·{" "}
-                            {new Date(order.createdAt).toLocaleTimeString("en-GB")}
-                          </p>
                           <div className="table-order-items">
                             {order.items.map((item) => (
                               <div key={item.id} className="table-order-item">
