@@ -20,8 +20,13 @@ const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
 
 const uiText = {
   he: {
+    restaurantHeader: "Olive Bistro",
     table: "שולחן",
+    tableOrderingHint: "📍 אתם מזמינים משולחן מספר",
     callWaiter: "קרא למלצר",
+    welcomeTitle: "ברוכים הבאים",
+    welcomeText: "בחרו מנות מהתפריט ושלחו את ההזמנה ישירות מהשולחן שלכם.",
+    welcomeOk: "אישור",
     reviewOrderTitle: "בדקו את ההזמנה שלכם",
     reviewOrderText: "נא לעבור על ההזמנה לפני השליחה.",
     reviewOrderOk: "אישור",
@@ -42,15 +47,20 @@ const uiText = {
     waiterCalled: "המלצר הוזמן",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenLoadWarning:
-      "ייתכן שזמן הכנת ההזמנה יהיה ארוך מהרגיל עקב עומס במטבח.",
+      "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
     addDish: "הוסיפו לפחות מנה אחת.",
     submitError: "לא ניתן היה לשלוח את ההזמנה",
     waiterError: "לא ניתן היה לקרוא למלצר",
     close: "סגור חלון"
   },
   en: {
+    restaurantHeader: "Olive Bistro",
     table: "Table",
+    tableOrderingHint: "📍 You are ordering from table",
     callWaiter: "Call waiter",
+    welcomeTitle: "Welcome",
+    welcomeText: "Choose dishes from the menu and send your order directly from your table.",
+    welcomeOk: "OK",
     reviewOrderTitle: "Check your order",
     reviewOrderText: "Please review your order before sending it.",
     reviewOrderOk: "OK",
@@ -71,7 +81,7 @@ const uiText = {
     waiterCalled: "Waiter has been called",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenLoadWarning:
-      "Order preparation may take longer than usual right now due to a busy kitchen.",
+      "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
     addDish: "Add at least one dish.",
     submitError: "Failed to send the order",
     waiterError: "Failed to call the waiter",
@@ -92,6 +102,7 @@ export function Cart({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
+  const [showWelcomeDialog, setShowWelcomeDialog] = useState(true);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [showServeModeDialog, setShowServeModeDialog] = useState(false);
   const [language, setLanguage] = useState<MenuLanguage>("he");
@@ -404,6 +415,27 @@ export function Cart({
         </div>
       ) : null}
 
+      {showWelcomeDialog ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="welcome-dialog-title"
+          >
+            <h2 id="welcome-dialog-title">{text.welcomeTitle}</h2>
+            <p>{text.welcomeText}</p>
+            <button
+              className="button-success"
+              type="button"
+              onClick={() => setShowWelcomeDialog(false)}
+            >
+              {text.welcomeOk}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {showReviewDialog ? (
         <div className="modal-backdrop" role="presentation">
           <div
@@ -494,18 +526,32 @@ export function Cart({
         </div>
       ) : null}
 
-      <div className="page-shell">
+      <div
+        className={
+          language === "he" ? "page-shell menu-page menu-page--rtl" : "page-shell menu-page"
+        }
+        dir={language === "he" ? "rtl" : "ltr"}
+      >
         <section className="hero">
           <div>
+            <h1>{text.restaurantHeader || restaurantName}</h1>
             <p className="eyebrow">
               {text.table} {tableNumber}
             </p>
-            <h1>{restaurantName}</h1>
+            <p className="lead">
+              {text.tableOrderingHint} {tableNumber}
+            </p>
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}
           </div>
-          <div className="menu-action-card menu-action-card--stacked">
+          <div
+            className={
+              language === "he"
+                ? "menu-action-card menu-action-card--stacked menu-action-card--rtl"
+                : "menu-action-card menu-action-card--stacked"
+            }
+          >
             <div className="language-toggle" role="group" aria-label="Language">
               <button
                 className={
