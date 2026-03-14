@@ -6,7 +6,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 3,
-      "status": "preparing",
+      "status": "cancelled",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T12:34:13.887Z",
       "updatedAt": "2026-03-14T12:36:22.119Z",
@@ -17,11 +17,11 @@
           "category": "starters",
           "name": "Tabbouleh salad",
           "price": 29,
-          "quantity": 2,
+          "quantity": 1,
           "served": false
         }
       ],
-      "total": 58
+      "total": 29
     },
     {
       "id": "call_1773491349645",

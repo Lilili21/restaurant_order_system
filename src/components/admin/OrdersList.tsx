@@ -25,7 +25,9 @@ export function OrdersList() {
   const [loading, setLoading] = useState(true);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">("hall");
-  const [cancelAuthOrderId, setCancelAuthOrderId] = useState<string | null>(null);
+  const [authOrder, setAuthOrder] = useState<Order | null>(null);
+  const [editOrder, setEditOrder] = useState<Order | null>(null);
+  const [editedQuantities, setEditedQuantities] = useState<Record<string, number>>({});
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -190,21 +192,57 @@ export function OrdersList() {
     });
   }
 
-  function requestCancel(orderId: string) {
-    setCancelAuthOrderId(orderId);
+  function requestEditOrderAuth(order: Order) {
+    setAuthOrder(order);
     setLogin("");
     setPassword("");
     setAuthError(null);
   }
 
-  function closeCancelAuthDialog() {
-    setCancelAuthOrderId(null);
+  function openEditOrderDialog(order: Order) {
+    setEditOrder(order);
+    setEditedQuantities(
+      Object.fromEntries(order.items.map((item) => [item.id, item.quantity]))
+    );
+  }
+
+  function closeEditOrderDialog() {
+    setEditOrder(null);
+    setEditedQuantities({});
+  }
+
+  function changeEditedQuantity(orderItemId: string, delta: number) {
+    setEditedQuantities((current) => ({
+      ...current,
+      [orderItemId]: Math.max(0, (current[orderItemId] ?? 0) + delta)
+    }));
+  }
+
+  async function saveEditedOrder() {
+    if (!editOrder) {
+      return;
+    }
+
+    for (const item of editOrder.items) {
+      const nextQuantity = editedQuantities[item.id] ?? item.quantity;
+      const quantityDelta = nextQuantity - item.quantity;
+
+      if (quantityDelta !== 0) {
+        await changeOrderItemQuantity(editOrder.id, item.id, quantityDelta);
+      }
+    }
+
+    closeEditOrderDialog();
+  }
+
+  function closeAuthDialog() {
+    setAuthOrder(null);
     setLogin("");
     setPassword("");
     setAuthError(null);
   }
 
-  async function submitCancelAuth() {
+  async function submitEditAuth() {
     const response = await fetch("/api/admin-auth", {
       method: "POST",
       headers: {
@@ -224,11 +262,11 @@ export function OrdersList() {
       return;
     }
 
-    const orderId = cancelAuthOrderId;
-    closeCancelAuthDialog();
+    const order = authOrder;
+    closeAuthDialog();
 
-    if (orderId) {
-      await changeStatus(orderId, "cancelled");
+    if (order) {
+      openEditOrderDialog(order);
     }
   }
 
@@ -267,15 +305,81 @@ export function OrdersList() {
 
   return (
     <>
-      {cancelAuthOrderId ? (
+      {editOrder ? (
         <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card modal-card--form"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="cancel-auth-title"
+            aria-labelledby="edit-order-title"
           >
-            <h2 id="cancel-auth-title">Confirm cancellation</h2>
+            <h2 id="edit-order-title">Change/cancel order</h2>
+            <div className="modal-form">
+              {editOrder.items.map((item) => (
+                <div key={item.id} className="order-edit-row">
+                  <span className="order-item-name">{item.name}</span>
+                  <div className="order-item-stepper">
+                    <button
+                      className="button-neutral"
+                      type="button"
+                      onClick={() => changeEditedQuantity(item.id, -1)}
+                    >
+                      -
+                    </button>
+                    <span>{editedQuantities[item.id] ?? item.quantity}</span>
+                    <button
+                      className="button-neutral"
+                      type="button"
+                      onClick={() => changeEditedQuantity(item.id, 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="button-danger"
+                type="button"
+                aria-label="Close"
+                onClick={closeEditOrderDialog}
+              >
+                ✕
+              </button>
+              <button
+                className="button-danger"
+                type="button"
+                onClick={() => {
+                  const orderId = editOrder.id;
+                  closeEditOrderDialog();
+                  void changeStatus(orderId, "cancelled");
+                }}
+              >
+                Cancel order
+              </button>
+              <button
+                className="button-success"
+                type="button"
+                aria-label="Save"
+                onClick={() => void saveEditedOrder()}
+              >
+                ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {authOrder ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card modal-card--form"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-auth-title"
+          >
+            <h2 id="edit-auth-title">Change/cancel order</h2>
             <div className="modal-form">
               <input
                 className="modal-input"
@@ -298,7 +402,7 @@ export function OrdersList() {
                 className="button-danger"
                 type="button"
                 aria-label="Close"
-                onClick={closeCancelAuthDialog}
+                onClick={closeAuthDialog}
               >
                 ✕
               </button>
@@ -306,7 +410,7 @@ export function OrdersList() {
                 className="button-success"
                 type="button"
                 aria-label="Confirm"
-                onClick={() => void submitCancelAuth()}
+                onClick={() => void submitEditAuth()}
               >
                 ✓
               </button>
@@ -495,27 +599,7 @@ export function OrdersList() {
                         </div>
                         {isStationView ? null : (
                           <div className="order-item-actions">
-                            <div className="order-item-stepper">
-                              <button
-                                className="button-neutral"
-                                type="button"
-                                onClick={() =>
-                                  changeOrderItemQuantity(order.id, item.id, -1)
-                                }
-                              >
-                                -
-                              </button>
-                              <span>{item.quantity}</span>
-                              <button
-                                className="button-neutral"
-                                type="button"
-                                onClick={() =>
-                                  changeOrderItemQuantity(order.id, item.id, 1)
-                                }
-                              >
-                                +
-                              </button>
-                            </div>
+                            <span className="order-item-qty">{item.quantity} pcs</span>
                           </div>
                         )}
                       </div>
@@ -551,9 +635,9 @@ export function OrdersList() {
                       <button
                         className="button-danger"
                         type="button"
-                        onClick={() => requestCancel(order.id)}
+                        onClick={() => requestEditOrderAuth(order)}
                       >
-                        Cancel
+                        Change/cancel order
                       </button>
                     </>
                   )}

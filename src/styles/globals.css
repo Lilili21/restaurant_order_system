@@ -923,6 +923,13 @@ textarea.modal-input {
   justify-content: flex-end;
 }
 
+.order-edit-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
 .order-item-stepper {
   display: inline-flex;
   align-items: center;
