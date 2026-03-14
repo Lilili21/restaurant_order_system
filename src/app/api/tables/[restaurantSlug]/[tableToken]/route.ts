@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getCurrentTableSessionId, getTableSessionOrders } from "@/lib/orders";
+import {
+  getCurrentTableSessionId,
+  getTableSessionOrders,
+  getTableSessionServiceRequests
+} from "@/lib/orders";
 import { getTableSession } from "@/lib/restaurants";
 
 type TableRouteProps = {
@@ -24,6 +28,10 @@ export async function GET(_: Request, { params }: TableRouteProps) {
       restaurantSlug,
       session.table.number
     ),
-    submittedOrders: getTableSessionOrders(restaurantSlug, session.table.number)
+    submittedOrders: getTableSessionOrders(restaurantSlug, session.table.number),
+    activeServiceRequests: getTableSessionServiceRequests(
+      restaurantSlug,
+      session.table.number
+    ).map((order) => order.kind)
   });
 }

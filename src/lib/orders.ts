@@ -398,6 +398,34 @@ export function getTableSessionOrders(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+export function getTableSessionServiceRequests(
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  const state = readRuntimeState();
+  const { sessionId, created } = ensureCurrentSessionId(
+    state,
+    restaurantSlug,
+    tableNumber
+  );
+
+  if (created) {
+    persistState(state);
+  }
+
+  return state.ordersStore
+    .filter(
+      (order) =>
+        order.restaurantSlug === restaurantSlug &&
+        order.tableNumber === tableNumber &&
+        order.sessionId === sessionId &&
+        order.status !== "cancelled" &&
+        order.status !== "served" &&
+        (order.kind === "waiter_call" || order.kind === "bill_request")
+    )
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 export function createOrder(input: {
   restaurantSlug: string;
   tableNumber: number;

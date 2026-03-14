@@ -41,7 +41,7 @@ const categoryFlightIcons: Record<MenuCategory, string> = {
   desserts: "🍰"
 };
 
-const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
+const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 
 const uiText = {
   he: {
@@ -71,7 +71,7 @@ const uiText = {
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
-    billRequested: "בקשת החשבון נשלחה",
+    billRequested: "המלצר יביא את החשבון לשולחן שלכם בקרוב.\nתודה שסעדתם אצלנו!",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenOpen: "המטבח נסגר בעוד",
     kitchenClosed: "המטבח סגור",
@@ -114,7 +114,7 @@ const uiText = {
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
-    billRequested: "Bill request has been sent",
+    billRequested: "A waiter will bring your bill shortly.\nThank you for dining with us!",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
@@ -157,7 +157,8 @@ export function Cart({
   const [currentSessionId, setCurrentSessionId] = useState(
     initialSubmittedOrders[0]?.sessionId ?? 1
   );
-  const [waiterCallBlockedUntil, setWaiterCallBlockedUntil] = useState(0);
+  const [hasActiveServiceRequest, setHasActiveServiceRequest] = useState(false);
+  const [serviceRequestBlockedUntil, setServiceRequestBlockedUntil] = useState(0);
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const [orderJumpExpanded, setOrderJumpExpanded] = useState(false);
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
@@ -186,7 +187,8 @@ export function Cart({
     (sum, order) => sum + order.total,
     0
   );
-  const waiterCallDisabled = waiterCallBlockedUntil > Date.now();
+  const serviceRequestDisabled =
+    hasActiveServiceRequest || serviceRequestBlockedUntil > Date.now();
   const text = uiText[language];
   const kitchenOpenRemainingMs = kitchenOpenUntil
     ? new Date(kitchenOpenUntil).getTime() - countdownNow
@@ -249,13 +251,21 @@ export function Cart({
       const data = (await response.json()) as {
         currentSessionId?: number;
         submittedOrders?: Order[];
+        activeServiceRequests?: Array<Order["kind"]>;
       };
 
       if (!cancelled) {
         const nextSessionId = data.currentSessionId ?? currentSessionId;
         const nextOrders = data.submittedOrders ?? [];
+        const hasActiveServiceRequests = (data.activeServiceRequests ?? []).some(
+          (kind) => kind === "waiter_call" || kind === "bill_request"
+        );
 
         setCurrentSessionId(nextSessionId);
+        setHasActiveServiceRequest(hasActiveServiceRequests);
+        if (!hasActiveServiceRequests) {
+          setServiceRequestBlockedUntil(0);
+        }
         setSubmittedOrders((current) => {
           if (nextSessionId !== currentSessionId) {
             return nextOrders;
@@ -290,28 +300,28 @@ export function Cart({
   }, [restaurantSlug, tableToken, currentSessionId]);
 
   useEffect(() => {
-    const storageKey = `waiter-call:${restaurantSlug}:${tableToken}`;
+    const storageKey = `service-request:${restaurantSlug}:${tableToken}`;
     const savedValue = window.localStorage.getItem(storageKey);
     const savedTimestamp = savedValue ? Number(savedValue) : 0;
 
     if (savedTimestamp > Date.now()) {
-      setWaiterCallBlockedUntil(savedTimestamp);
+      setServiceRequestBlockedUntil(savedTimestamp);
     }
   }, [restaurantSlug, tableToken]);
 
   useEffect(() => {
-    if (!waiterCallBlockedUntil || waiterCallBlockedUntil <= Date.now()) {
+    if (!serviceRequestBlockedUntil || serviceRequestBlockedUntil <= Date.now()) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setWaiterCallBlockedUntil(0);
-    }, waiterCallBlockedUntil - Date.now());
+      setServiceRequestBlockedUntil(0);
+    }, serviceRequestBlockedUntil - Date.now());
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [waiterCallBlockedUntil]);
+  }, [serviceRequestBlockedUntil]);
 
   useEffect(() => {
     if (!hasKitchenOpenTimer) {
@@ -464,7 +474,7 @@ export function Cart({
   async function callWaiter() {
     setMessage(null);
 
-    if (waiterCallDisabled) {
+    if (serviceRequestDisabled) {
       setDialogMessage(text.waiterAlreadyCalled);
       return;
     }
@@ -486,10 +496,11 @@ export function Cart({
         throw new Error(text.waiterError);
       }
 
-      const blockedUntil = Date.now() + WAITER_CALL_COOLDOWN_MS;
-      const storageKey = `waiter-call:${restaurantSlug}:${tableToken}`;
+      const blockedUntil = Date.now() + SERVICE_REQUEST_COOLDOWN_MS;
+      const storageKey = `service-request:${restaurantSlug}:${tableToken}`;
       window.localStorage.setItem(storageKey, String(blockedUntil));
-      setWaiterCallBlockedUntil(blockedUntil);
+      setHasActiveServiceRequest(true);
+      setServiceRequestBlockedUntil(blockedUntil);
       setDialogMessage(text.waiterCalled);
     } catch (error) {
       setDialogMessage(
@@ -500,6 +511,11 @@ export function Cart({
 
   async function requestBill() {
     setMessage(null);
+
+    if (serviceRequestDisabled) {
+      setDialogMessage(text.waiterAlreadyCalled);
+      return;
+    }
 
     try {
       const response = await fetch("/api/orders", {
@@ -518,6 +534,11 @@ export function Cart({
         throw new Error(text.billError);
       }
 
+      const blockedUntil = Date.now() + SERVICE_REQUEST_COOLDOWN_MS;
+      const storageKey = `service-request:${restaurantSlug}:${tableToken}`;
+      window.localStorage.setItem(storageKey, String(blockedUntil));
+      setHasActiveServiceRequest(true);
+      setServiceRequestBlockedUntil(blockedUntil);
       setDialogMessage(text.billRequested);
     } catch (error) {
       setDialogMessage(error instanceof Error ? error.message : text.billError);
@@ -764,9 +785,6 @@ export function Cart({
                 </button>
               </div>
             </div>
-            <p className="eyebrow">
-              {text.table} {tableNumber}
-            </p>
             <p className="lead">
               {text.tableOrderingHint} {tableNumber}
             </p>
@@ -802,7 +820,7 @@ export function Cart({
                 className="button-danger button-danger--call"
                 type="button"
                 onClick={callWaiter}
-                disabled={waiterCallDisabled}
+                disabled={serviceRequestDisabled}
               >
                 {text.callWaiter}
               </button>
@@ -810,6 +828,7 @@ export function Cart({
                 className="button-neutral button-neutral--bill"
                 type="button"
                 onClick={requestBill}
+                disabled={serviceRequestDisabled}
               >
                 {text.requestBill}
               </button>
