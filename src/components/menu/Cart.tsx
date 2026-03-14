@@ -40,6 +40,7 @@ const uiText = {
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
+    waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenLoadWarning:
       "ייתכן שזמן הכנת ההזמנה יהיה ארוך מהרגיל עקב עומס במטבח.",
     addDish: "הוסיפו לפחות מנה אחת.",
@@ -68,6 +69,7 @@ const uiText = {
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
+    waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenLoadWarning:
       "Order preparation may take longer than usual right now due to a busy kitchen.",
     addDish: "Add at least one dish.",
@@ -330,6 +332,7 @@ export function Cart({
     setMessage(null);
 
     if (waiterCallDisabled) {
+      setDialogMessage(text.waiterAlreadyCalled);
       return;
     }
 

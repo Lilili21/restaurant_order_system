@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
+import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   changeOrderItemQuantity,
   createOrder,
@@ -29,6 +30,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const clientId = getRequestClientId(request);
+    const action = body.type === "waiter_call" ? "waiter-call" : "create-order";
+    const limited = applyRateLimit({
+      id: `orders:${action}:${clientId}`,
+      maxRequests: body.type === "waiter_call" ? 8 : 20,
+      windowMs: 60 * 1000,
+      message:
+        body.type === "waiter_call"
+          ? "Too many waiter calls. Please try again later."
+          : "Too many order requests. Please try again later."
+    });
+
+    if (limited) {
+      return limited;
+    }
+
     const order =
       body.type === "waiter_call"
         ? createWaiterCall(body)
@@ -45,6 +62,18 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const clientId = getRequestClientId(request);
+  const limited = applyRateLimit({
+    id: `orders:patch:${clientId}`,
+    maxRequests: 120,
+    windowMs: 60 * 1000,
+    message: "Too many order updates. Please try again later."
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const unauthorized = await requireAdminAccess(request, "admin");
 
   if (unauthorized) {

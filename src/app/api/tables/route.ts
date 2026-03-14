@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
+import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   closeTable,
   getClosedTableSummaries,
@@ -24,6 +25,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const clientId = getRequestClientId(request);
+  const limited = applyRateLimit({
+    id: `tables:patch:${clientId}`,
+    maxRequests: 40,
+    windowMs: 60 * 1000,
+    message: "Too many table actions. Please try again later."
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const unauthorized = await requireAdminAccess(request, "admin");
 
   if (unauthorized) {

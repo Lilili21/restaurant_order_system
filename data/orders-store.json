@@ -1,6 +1,68 @@
 {
   "orders": [
     {
+      "id": "call_1773501742520",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "new",
+      "createdAt": "2026-03-14T15:22:22.521Z",
+      "updatedAt": "2026-03-14T15:22:22.521Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1773501654308",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "kind": "waiter_call",
+      "status": "new",
+      "createdAt": "2026-03-14T15:20:54.308Z",
+      "updatedAt": "2026-03-14T15:20:54.308Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773501591151",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-14T15:19:51.151Z",
+      "updatedAt": "2026-03-14T15:19:55.988Z",
+      "items": [
+        {
+          "id": "item_1773501591151_0rjrgi",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 7,
+          "served": false
+        }
+      ],
+      "total": 203
+    },
+    {
+      "id": "call_1773501583803",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-14T15:19:43.803Z",
+      "updatedAt": "2026-03-14T15:19:43.803Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "ord_1773495230363",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -62,7 +124,7 @@
       "tableNumber": 1,
       "sessionId": 3,
       "kind": "waiter_call",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-14T12:29:09.645Z",
       "updatedAt": "2026-03-14T12:29:09.645Z",
       "items": [],

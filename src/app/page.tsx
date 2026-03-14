@@ -10,6 +10,11 @@ export default function HomePage() {
     return null;
   }
 
+  const tableLinks = restaurant.tables.map((table) => ({
+    tableNumber: table.number,
+    href: `/menu/${restaurant.slug}/${table.accessToken}`
+  }));
+
   return (
     <main className="page-shell">
       <section className="hero">
@@ -34,7 +39,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <TableLinksPanel restaurantSlug={restaurant.slug} />
+      <TableLinksPanel tableLinks={tableLinks} />
     </main>
   );
 }

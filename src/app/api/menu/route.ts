@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
+import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   createMenuItem,
   deleteMenuItem,
@@ -21,6 +22,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const clientId = getRequestClientId(request);
+  const limited = applyRateLimit({
+    id: `menu:patch:${clientId}`,
+    maxRequests: 40,
+    windowMs: 60 * 1000,
+    message: "Too many menu updates. Please try again later."
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const unauthorized = await requireAdminAccess(request, "secondary");
 
   if (unauthorized) {
@@ -73,6 +86,18 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const clientId = getRequestClientId(request);
+  const limited = applyRateLimit({
+    id: `menu:post:${clientId}`,
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    message: "Too many menu create requests. Please try again later."
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const unauthorized = await requireAdminAccess(request, "secondary");
 
   if (unauthorized) {
@@ -138,6 +163,18 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const clientId = getRequestClientId(request);
+  const limited = applyRateLimit({
+    id: `menu:delete:${clientId}`,
+    maxRequests: 20,
+    windowMs: 60 * 1000,
+    message: "Too many menu delete requests. Please try again later."
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const unauthorized = await requireAdminAccess(request, "secondary");
 
   if (unauthorized) {

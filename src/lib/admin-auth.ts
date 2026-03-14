@@ -34,6 +34,34 @@ export function verifyAdminCredentials(
   return login === configured.login && password === configured.password;
 }
 
+function isSafeMethod(method: string) {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS";
+}
+
+export function requireSameOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+  const expectedOrigin = request.nextUrl.origin;
+
+  if (origin && origin !== expectedOrigin) {
+    return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+  }
+
+  if (!origin && referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+
+      if (refererOrigin !== expectedOrigin) {
+        return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+    }
+  }
+
+  return null;
+}
+
 export async function hasAdminAccess(scope: AdminAuthScope) {
   if (scope === "secondary") {
     return false;
@@ -94,6 +122,14 @@ export async function requireAdminAccess(
     }
 
     return null;
+  }
+
+  if (!isSafeMethod(request.method)) {
+    const originError = requireSameOrigin(request);
+
+    if (originError) {
+      return originError;
+    }
   }
 
   const hasAccess = request.cookies.get(getCookieName(scope))?.value === "true";
