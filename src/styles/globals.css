@@ -1107,7 +1107,12 @@ textarea.modal-input {
   justify-content: flex-start;
 }
 
-.table-summary,
+.table-summary {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
 .table-order-row {
   flex-direction: column;
   gap: 4px;
