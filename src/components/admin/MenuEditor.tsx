@@ -30,6 +30,7 @@ type EditableMenuItem = MenuItem & {
   draftNameEn: string;
   draftDescriptionHe: string;
   draftDescriptionEn: string;
+  draftCategory: MenuCategory;
   draftPrice: string;
   draftImage: string;
   draftShowImage: boolean;
@@ -58,6 +59,7 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
     draftNameEn: item.nameEn || item.nameHe || item.name,
     draftDescriptionHe: item.descriptionHe || item.description,
     draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
+    draftCategory: item.category,
     draftPrice: String(item.price),
     draftImage: item.image,
     draftShowImage: item.showImage ?? true,
@@ -222,6 +224,7 @@ export function MenuEditor() {
       | "draftNameEn"
       | "draftDescriptionHe"
       | "draftDescriptionEn"
+      | "draftCategory"
       | "draftPrice"
       | "draftImage"
       | "draftShowImage"
@@ -442,7 +445,7 @@ export function MenuEditor() {
         showImage: currentItem.draftShowImage,
         badges: currentItem.draftBadges,
         available: currentItem.available,
-        category: currentItem.category
+        category: currentItem.draftCategory
       })
     });
 
@@ -1045,9 +1048,13 @@ export function MenuEditor() {
             <div className="menu-editor__form">
               <select
                 className="modal-input"
-                value={item.category}
+                value={item.draftCategory}
                 onChange={(event) =>
-                  updateDraft(item.id, "category", event.target.value)
+                  updateDraft(
+                    item.id,
+                    "draftCategory",
+                    event.target.value as MenuCategory
+                  )
                 }
               >
                 {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(

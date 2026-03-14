@@ -2,7 +2,7 @@
   {
     "id": "m_1773255842139",
     "restaurantSlug": "olive-bistro",
-    "category": "desserts",
+    "category": "starters",
     "name": "חביתה 5",
     "description": "חביתה אוורירית.",
     "price": 100,
@@ -15,20 +15,13 @@
     "showImage": true,
     "badges": [
       "chef_special",
-      "kids_favorite",
-      "nut_free",
-      "most_popular",
-      "new",
-      "vegan",
-      "gluten_free",
-      "spicy",
-      "dairy_free"
+      "vegan"
     ]
   },
   {
     "id": "m1",
     "restaurantSlug": "olive-bistro",
-    "category": "drinks",
+    "category": "starters",
     "name": "חומוס עם פיתה",
     "description": "חומוס קלאסי, שמן זית ופיתה חמה.",
     "price": 24,
@@ -39,7 +32,10 @@
     "descriptionHe": "חומוס קלאסי, שמן זית ופיתה חמה.",
     "descriptionEn": "Classic hummus, olive oil and warm pita.",
     "showImage": true,
-    "badges": []
+    "badges": [
+      "most_popular",
+      "spicy"
+    ]
   },
   {
     "id": "m2",
@@ -55,7 +51,10 @@
     "descriptionHe": "בורגול, הרבה ירק, לימון, עגבניות ונענע.",
     "descriptionEn": "Bulgur, lots of greens, lemon, tomatoes and mint.",
     "showImage": false,
-    "badges": []
+    "badges": [
+      "new",
+      "gluten_free"
+    ]
   },
   {
     "id": "m3",
@@ -71,7 +70,10 @@
     "descriptionHe": "עוף, תפוחי אדמה, חמוצים, טחינה וסלט טרי.",
     "descriptionEn": "Chicken, potatoes, pickles, tahini and fresh salad.",
     "showImage": true,
-    "badges": []
+    "badges": [
+      "kids_favorite",
+      "dairy_free"
+    ]
   },
   {
     "id": "m4",
@@ -87,7 +89,9 @@
     "descriptionHe": "מוגש עם בורגול ורוטב לימון.",
     "descriptionEn": "Served with bulgur and lemon sauce.",
     "showImage": true,
-    "badges": []
+    "badges": [
+      "nut_free"
+    ]
   },
   {
     "id": "m5",

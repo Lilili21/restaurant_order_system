@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin-auth";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   changeOrderItemQuantity,
+  createBillRequest,
   createOrder,
   createWaiterCall,
   getOrders,
@@ -31,15 +32,23 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const clientId = getRequestClientId(request);
-    const action = body.type === "waiter_call" ? "waiter-call" : "create-order";
+    const action =
+      body.type === "waiter_call"
+        ? "waiter-call"
+        : body.type === "bill_request"
+          ? "bill-request"
+          : "create-order";
     const limited = applyRateLimit({
       id: `orders:${action}:${clientId}`,
-      maxRequests: body.type === "waiter_call" ? 8 : 20,
+      maxRequests:
+        body.type === "waiter_call" || body.type === "bill_request" ? 8 : 20,
       windowMs: 60 * 1000,
       message:
         body.type === "waiter_call"
           ? "Too many waiter calls. Please try again later."
-          : "Too many order requests. Please try again later."
+          : body.type === "bill_request"
+            ? "Too many bill requests. Please try again later."
+            : "Too many order requests. Please try again later."
     });
 
     if (limited) {
@@ -49,6 +58,8 @@ export async function POST(request: NextRequest) {
     const order =
       body.type === "waiter_call"
         ? createWaiterCall(body)
+        : body.type === "bill_request"
+          ? createBillRequest(body)
         : createOrder(body);
     return NextResponse.json(order, { status: 201 });
   } catch (error) {

@@ -56,25 +56,25 @@ export function OrdersList() {
 
   function mergeOrdersWithStoredWaiterCalls(nextOrders: Order[]) {
     const storedCalls = readStoredWaiterCalls();
-    const nextWaiterCalls = nextOrders.filter(
-      (order) => order.kind === "waiter_call"
+    const nextAlertCalls = nextOrders.filter(
+      (order) => order.kind === "waiter_call" || order.kind === "bill_request"
     );
-    const mergedWaiterCallsMap = new Map<string, Order>();
+    const mergedAlertCallsMap = new Map<string, Order>();
 
-    [...storedCalls, ...nextWaiterCalls].forEach((order) => {
+    [...storedCalls, ...nextAlertCalls].forEach((order) => {
       if (order.status !== "served" && order.status !== "cancelled") {
-        mergedWaiterCallsMap.set(order.id, order);
+        mergedAlertCallsMap.set(order.id, order);
       }
     });
 
-    const mergedWaiterCalls = [...mergedWaiterCallsMap.values()];
-    writeStoredWaiterCalls(mergedWaiterCalls);
+    const mergedAlertCalls = [...mergedAlertCallsMap.values()];
+    writeStoredWaiterCalls(mergedAlertCalls);
 
     const nonWaiterOrders = nextOrders.filter(
-      (order) => order.kind !== "waiter_call"
+      (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
     );
 
-    return [...mergedWaiterCalls, ...nonWaiterOrders].sort((left, right) =>
+    return [...mergedAlertCalls, ...nonWaiterOrders].sort((left, right) =>
       right.createdAt.localeCompare(left.createdAt)
     );
   }
@@ -123,7 +123,8 @@ export function OrdersList() {
     const updatedOrder = (await response.json()) as Order;
     setOrders((current) => {
       if (
-        updatedOrder.kind === "waiter_call" &&
+        (updatedOrder.kind === "waiter_call" ||
+          updatedOrder.kind === "bill_request") &&
         (updatedOrder.status === "served" || updatedOrder.status === "cancelled")
       ) {
         writeStoredWaiterCalls(
@@ -288,8 +289,10 @@ export function OrdersList() {
       ? true
       : selectedZone === "bar"
         ? order.kind !== "waiter_call" &&
+          order.kind !== "bill_request" &&
           order.items.some((item) => item.category === "drinks")
         : order.kind !== "waiter_call" &&
+          order.kind !== "bill_request" &&
           order.items.some((item) => item.category !== "drinks"))
   );
 
@@ -553,6 +556,7 @@ export function OrdersList() {
               : null;
             const isFreshNewOrder =
               order.kind !== "waiter_call" &&
+              order.kind !== "bill_request" &&
               order.status === "new" &&
               Date.now() - new Date(highlightTimestamp).getTime() < NEW_HIGHLIGHT_MS;
             const visibleItems =
@@ -572,6 +576,8 @@ export function OrdersList() {
                 className={
                   order.kind === "waiter_call"
                     ? "order-card order-card--alert"
+                    : order.kind === "bill_request"
+                      ? "order-card order-card--notice"
                     : isFreshNewOrder
                       ? "order-card order-card--fresh-new"
                     : "order-card"
@@ -583,9 +589,14 @@ export function OrdersList() {
                       Table {order.tableNumber}
                       {isHallView && order.kind === "waiter_call"
                         ? " · Waiter call"
+                        : isHallView && order.kind === "bill_request"
+                          ? " · Bill request"
                         : ""}
                     </h3>
-                    {order.kind !== "waiter_call" && isHallView && serveModeLabel ? (
+                    {order.kind !== "waiter_call" &&
+                    order.kind !== "bill_request" &&
+                    isHallView &&
+                    serveModeLabel ? (
                       <p className="muted">{serveModeLabel}</p>
                     ) : null}
                   </div>
@@ -601,6 +612,8 @@ export function OrdersList() {
 
                 {order.kind === "waiter_call" ? (
                   <p className="order-callout">A guest is asking for staff at the table.</p>
+                ) : order.kind === "bill_request" ? (
+                  <p className="order-callout">A guest is asking for the bill.</p>
                 ) : (
                   <div className="order-items">
                     {visibleItems.map((item) => (
@@ -637,7 +650,8 @@ export function OrdersList() {
                 )}
 
                 <div className="order-actions">
-                  {isHallView && order.kind === "waiter_call" ? (
+                  {isHallView &&
+                  (order.kind === "waiter_call" || order.kind === "bill_request") ? (
                     <button
                       className="button-success"
                       type="button"

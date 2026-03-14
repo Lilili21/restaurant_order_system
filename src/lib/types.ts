@@ -73,7 +73,7 @@ export type Order = {
   restaurantName: string;
   tableNumber: number;
   sessionId: number;
-  kind?: "order" | "waiter_call";
+  kind?: "order" | "waiter_call" | "bill_request";
   serveMode?: ServeMode;
   status: OrderStatus;
   createdAt: string;

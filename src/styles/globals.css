@@ -87,6 +87,10 @@ button:disabled {
   justify-self: end;
 }
 
+.menu-page--rtl .menu-hero-header {
+  flex-direction: row-reverse;
+}
+
 .menu-page--rtl .menu-action-card {
   justify-self: start;
 }
@@ -152,6 +156,18 @@ button:disabled {
   font-size: clamp(2.3rem, 5vw, 4.6rem);
   max-width: 11ch;
   margin-bottom: 14px;
+}
+
+.menu-hero-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.menu-hero-header .language-toggle {
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .lead,
@@ -226,6 +242,13 @@ button:disabled {
 
 .menu-action-card--rtl {
   align-items: flex-start;
+}
+
+.menu-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
 }
 
 .language-toggle {
@@ -589,9 +612,11 @@ button:disabled {
 
 .modal-card__ack {
   min-width: 108px;
-  font-size: 0.8rem;
-  text-transform: lowercase;
-  letter-spacing: 0.04em;
+  min-height: 54px;
+  font-size: 1.12rem;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .modal-card__close {
@@ -971,6 +996,11 @@ textarea.modal-input {
   border-color: rgba(180, 35, 24, 0.35);
 }
 
+.order-card--notice {
+  background: rgba(196, 220, 228, 0.3);
+  border-color: rgba(113, 151, 164, 0.35);
+}
+
 .order-card--fresh-new {
   background: rgba(244, 194, 214, 0.28);
   border-color: rgba(214, 126, 163, 0.38);
@@ -1329,13 +1359,13 @@ textarea.modal-input {
 }
 
 .button-success {
-  background: linear-gradient(135deg, #2f855a 0%, #256c4b 100%);
+  background: linear-gradient(135deg, #6f7d47 0%, #5d6a3c 100%);
   color: #fffaf2;
-  border: 1px solid #1d5a3f;
+  border: 1px solid #4e5a31;
 }
 
 .button-success:hover {
-  background: linear-gradient(135deg, #2a774f 0%, #1d5a3f 100%);
+  background: linear-gradient(135deg, #667340 0%, #4e5a31 100%);
 }
 
 .button-danger {
@@ -1349,12 +1379,24 @@ textarea.modal-input {
 }
 
 .button-danger--call {
-  width: 100%;
   min-height: 54px;
   padding: 0 22px;
   font-weight: 700;
   box-shadow: 0 16px 36px rgba(180, 35, 24, 0.24);
-  flex-shrink: 0;
+}
+
+.button-neutral--bill {
+  min-height: 54px;
+  padding: 0 22px;
+  font-weight: 700;
+  background: rgba(230, 224, 203, 0.96);
+  border-color: rgba(141, 111, 73, 0.22);
+  color: #6d5234;
+  box-shadow: 0 16px 36px rgba(141, 111, 73, 0.14);
+}
+
+.button-neutral--bill:hover {
+  background: rgba(223, 214, 190, 0.98);
 }
 
 .order-jump-button {
@@ -1652,5 +1694,14 @@ textarea.modal-input {
 
   .hero-card {
     display: flex;
+  }
+
+  .menu-hero-header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .menu-hero-header .language-toggle {
+    margin-top: 8px;
   }
 }

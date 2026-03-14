@@ -49,6 +49,7 @@ const uiText = {
     table: "שולחן",
     tableOrderingHint: "📍 אתם מזמינים משולחן מספר",
     callWaiter: "קרא למלצר",
+    requestBill: "בקש חשבון",
     welcomeTitle: "ברוכים הבאים",
     welcomeText: "בחרו מנות מהתפריט ושלחו את ההזמנה ישירות מהשולחן שלכם.",
     welcomeOk: "אישור",
@@ -70,6 +71,7 @@ const uiText = {
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
+    billRequested: "בקשת החשבון נשלחה",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenOpen: "המטבח נסגר בעוד",
     kitchenClosed: "המטבח סגור",
@@ -80,6 +82,7 @@ const uiText = {
     addDish: "הוסיפו לפחות מנה אחת.",
     submitError: "לא ניתן היה לשלוח את ההזמנה",
     waiterError: "לא ניתן היה לקרוא למלצר",
+    billError: "לא ניתן היה לבקש חשבון",
     close: "סגור חלון",
     jumpToOrder: "Orders"
   },
@@ -88,6 +91,7 @@ const uiText = {
     table: "Table",
     tableOrderingHint: "📍 You are ordering from table",
     callWaiter: "Call waiter",
+    requestBill: "Request bill",
     welcomeTitle: "Welcome",
     welcomeText:
       "Choose your dishes and send the order straight to the kitchen from your table.",
@@ -103,13 +107,14 @@ const uiText = {
     newOrder: "New order",
     emptyCart: "It is empty for now. Add dishes from the menu.",
     total: "Total",
-    submit: "Send order",
+    submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
     totalOrders: "Total amount",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
+    billRequested: "Bill request has been sent",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
@@ -120,6 +125,7 @@ const uiText = {
     addDish: "Add at least one dish.",
     submitError: "Failed to send the order",
     waiterError: "Failed to call the waiter",
+    billError: "Failed to request the bill",
     close: "Close dialog",
     jumpToOrder: "Orders"
   }
@@ -492,6 +498,32 @@ export function Cart({
     }
   }
 
+  async function requestBill() {
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          type: "bill_request",
+          restaurantSlug,
+          tableNumber
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(text.billError);
+      }
+
+      setDialogMessage(text.billRequested);
+    } catch (error) {
+      setDialogMessage(error instanceof Error ? error.message : text.billError);
+    }
+  }
+
   function formatOrderLabel(timestamp: string) {
     const locale = language === "he" ? "he-IL" : "en-US";
     const prefix = language === "he" ? "הזמנה" : "Order";
@@ -705,7 +737,33 @@ export function Cart({
       >
         <section className="hero">
           <div>
-            <h1>{text.restaurantHeader || restaurantName}</h1>
+            <div className="menu-hero-header">
+              <h1>{text.restaurantHeader || restaurantName}</h1>
+              <div className="language-toggle" role="group" aria-label="Language">
+                <button
+                  className={
+                    language === "he"
+                      ? "language-toggle__button language-toggle__button--active"
+                      : "language-toggle__button"
+                  }
+                  type="button"
+                  onClick={() => setNextLanguage("he")}
+                >
+                  HE
+                </button>
+                <button
+                  className={
+                    language === "en"
+                      ? "language-toggle__button language-toggle__button--active"
+                      : "language-toggle__button"
+                  }
+                  type="button"
+                  onClick={() => setNextLanguage("en")}
+                >
+                  EN
+                </button>
+              </div>
+            </div>
             <p className="eyebrow">
               {text.table} {tableNumber}
             </p>
@@ -739,38 +797,23 @@ export function Cart({
                 : "menu-action-card menu-action-card--stacked"
             }
           >
-            <div className="language-toggle" role="group" aria-label="Language">
+            <div className="menu-action-buttons">
               <button
-                className={
-                  language === "he"
-                    ? "language-toggle__button language-toggle__button--active"
-                    : "language-toggle__button"
-                }
+                className="button-danger button-danger--call"
                 type="button"
-                onClick={() => setNextLanguage("he")}
+                onClick={callWaiter}
+                disabled={waiterCallDisabled}
               >
-                HE
+                {text.callWaiter}
               </button>
               <button
-                className={
-                  language === "en"
-                    ? "language-toggle__button language-toggle__button--active"
-                    : "language-toggle__button"
-                }
+                className="button-neutral button-neutral--bill"
                 type="button"
-                onClick={() => setNextLanguage("en")}
+                onClick={requestBill}
               >
-                EN
+                {text.requestBill}
               </button>
             </div>
-            <button
-              className="button-danger button-danger--call"
-              type="button"
-              onClick={callWaiter}
-              disabled={waiterCallDisabled}
-            >
-              {text.callWaiter}
-            </button>
           </div>
         </section>
 

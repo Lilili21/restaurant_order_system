@@ -46,7 +46,7 @@ function normalizeOrderItemForAdmin(item: OrderItem): OrderItem {
 }
 
 function normalizePersistedOrder(order: Order): Order {
-  if (order.kind === "waiter_call") {
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
     return order;
   }
 
@@ -234,7 +234,7 @@ function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
 function normalizeOrderState(order: Order) {
   order.items = order.items.map(normalizeOrderItemForAdmin);
 
-  if (order.kind === "waiter_call") {
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
     order.total = 0;
     return order;
   }
@@ -325,6 +325,51 @@ export function createWaiterCall(input: {
   return waiterCall;
 }
 
+export function createBillRequest(input: {
+  restaurantSlug: string;
+  tableNumber: number;
+}) {
+  const state = readRuntimeState();
+  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const tableExists = restaurant.tables.some(
+    (table) => table.number === input.tableNumber
+  );
+
+  if (!tableExists) {
+    throw new Error("Table not found");
+  }
+
+  const { sessionId } = ensureCurrentSessionId(
+    state,
+    input.restaurantSlug,
+    input.tableNumber
+  );
+
+  const billRequest: Order = {
+    id: `bill_${Date.now()}`,
+    restaurantSlug: restaurant.slug,
+    restaurantName: restaurant.name,
+    tableNumber: input.tableNumber,
+    sessionId,
+    kind: "bill_request",
+    status: "new",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    items: [],
+    total: 0
+  };
+
+  state.ordersStore.unshift(billRequest);
+  persistState(state);
+
+  return billRequest;
+}
+
 export function getTableSessionOrders(
   restaurantSlug: string,
   tableNumber: number
@@ -347,7 +392,8 @@ export function getTableSessionOrders(
         order.tableNumber === tableNumber &&
         order.sessionId === sessionId &&
         order.status !== "cancelled" &&
-        order.kind !== "waiter_call"
+        order.kind !== "waiter_call" &&
+        order.kind !== "bill_request"
     )
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
@@ -393,6 +439,7 @@ export function createOrder(input: {
       order.tableNumber === input.tableNumber &&
       order.sessionId === sessionId &&
       order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
       order.status === "new"
   );
 
@@ -598,7 +645,9 @@ export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
         const visibleOrders = sessionOrders.filter(
           (order) =>
-            order.status !== "cancelled" && order.kind !== "waiter_call"
+            order.status !== "cancelled" &&
+            order.kind !== "waiter_call" &&
+            order.kind !== "bill_request"
         );
 
         return {
@@ -648,7 +697,11 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
   );
 
   const unservedOrders = orders.filter(
-    (order) => order.status !== "served" && order.status !== "cancelled"
+    (order) =>
+      order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
+      order.status !== "served" &&
+      order.status !== "cancelled"
   );
 
   if (unservedOrders.length > 0) {
@@ -726,6 +779,7 @@ export function moveTableOrders(
       order.tableNumber === fromTableNumber &&
       order.sessionId === fromSessionId &&
       order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
       order.status !== "cancelled"
   );
 
