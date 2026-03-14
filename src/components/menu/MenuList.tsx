@@ -7,7 +7,7 @@ type MenuListProps = {
   items: MenuItem[];
   language: MenuLanguage;
   quantities: Record<string, number>;
-  onAdd: (menuItemId: string) => void;
+  onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
   onDecrease: (menuItemId: string) => void;
 };
 

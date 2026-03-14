@@ -1,3 +1,5 @@
+import { MouseEvent } from "react";
+
 import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 
@@ -18,7 +20,7 @@ type MenuItemCardProps = {
   item: MenuItem;
   language: MenuLanguage;
   quantity: number;
-  onAdd: (menuItemId: string) => void;
+  onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
   onDecrease: (menuItemId: string) => void;
 };
 
@@ -38,6 +40,10 @@ export function MenuItemCard({
     language === "he"
       ? item.descriptionHe || item.description
       : item.descriptionEn || item.descriptionHe || item.description;
+
+  function handleAdd(event: MouseEvent<HTMLButtonElement>) {
+    onAdd(item.id, event.currentTarget);
+  }
 
   return (
     <article className="menu-card">
@@ -77,12 +83,12 @@ export function MenuItemCard({
                 -
               </button>
               <span>{quantity}</span>
-              <button type="button" onClick={() => onAdd(item.id)}>
+              <button type="button" onClick={handleAdd}>
                 +
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => onAdd(item.id)}>
+            <button type="button" onClick={handleAdd}>
               {addLabel}
             </button>
           )}

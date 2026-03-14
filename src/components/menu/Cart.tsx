@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
@@ -16,6 +16,14 @@ type CartProps = {
   showKitchenOpen: boolean;
   kitchenOpenUntil: string | null;
   initialSubmittedOrders: Order[];
+};
+
+type FlyingOrderItem = {
+  id: number;
+  startX: number;
+  startY: number;
+  deltaX: number;
+  deltaY: number;
 };
 
 const WAITER_CALL_COOLDOWN_MS = 2 * 60 * 1000;
@@ -57,7 +65,8 @@ const uiText = {
     addDish: "הוסיפו לפחות מנה אחת.",
     submitError: "לא ניתן היה לשלוח את ההזמנה",
     waiterError: "לא ניתן היה לקרוא למלצר",
-    close: "סגור חלון"
+    close: "סגור חלון",
+    jumpToOrder: "Orders"
   },
   en: {
     restaurantHeader: "Olive Bistro",
@@ -96,7 +105,8 @@ const uiText = {
     addDish: "Add at least one dish.",
     submitError: "Failed to send the order",
     waiterError: "Failed to call the waiter",
-    close: "Close dialog"
+    close: "Close dialog",
+    jumpToOrder: "Orders"
   }
 } as const;
 
@@ -128,6 +138,9 @@ export function Cart({
   );
   const [waiterCallBlockedUntil, setWaiterCallBlockedUntil] = useState(0);
   const [countdownNow, setCountdownNow] = useState(Date.now());
+  const [orderJumpExpanded, setOrderJumpExpanded] = useState(false);
+  const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
+  const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const detailedItems = useMemo(() => {
     return items
@@ -293,7 +306,39 @@ export function Cart({
     };
   }, [hasKitchenOpenTimer]);
 
-  function addItem(menuItemId: string) {
+  function animateAddToOrder(sourceElement?: HTMLElement | null) {
+    const targetElement = orderJumpButtonRef.current;
+
+    if (!sourceElement || !targetElement) {
+      return;
+    }
+
+    const sourceRect = sourceElement.getBoundingClientRect();
+    const targetRect = targetElement.getBoundingClientRect();
+    const startX = sourceRect.left + sourceRect.width / 2;
+    const startY = sourceRect.top + sourceRect.height / 2;
+    const endX = targetRect.left + targetRect.width / 2;
+    const endY = targetRect.top + targetRect.height / 2;
+    const id = Date.now() + Math.random();
+
+    setFlyingOrderItems((current) => [
+      ...current,
+      {
+        id,
+        startX,
+        startY,
+        deltaX: endX - startX,
+        deltaY: endY - startY
+      }
+    ]);
+
+    window.setTimeout(() => {
+      setFlyingOrderItems((current) => current.filter((item) => item.id !== id));
+    }, 720);
+  }
+
+  function addItem(menuItemId: string, sourceElement?: HTMLElement | null) {
+    animateAddToOrder(sourceElement);
     setItems((current) => {
       const existing = current.find((item) => item.menuItemId === menuItemId);
 
@@ -431,6 +476,21 @@ export function Cart({
   function formatCountdown(remainingMs: number) {
     const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60000));
     return `${totalMinutes} min`;
+  }
+
+  function scrollToOrder() {
+    const target = document.getElementById("new-order-panel");
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function handleOrderJump() {
+    if (!orderJumpExpanded) {
+      setOrderJumpExpanded(true);
+      return;
+    }
+
+    scrollToOrder();
+    setOrderJumpExpanded(false);
   }
 
   return (
@@ -572,6 +632,41 @@ export function Cart({
         </div>
       ) : null}
 
+      <button
+        ref={orderJumpButtonRef}
+        className={
+          [
+            "order-jump-button",
+            orderJumpExpanded ? "order-jump-button--expanded" : "",
+            language === "he" ? "order-jump-button--rtl" : ""
+          ]
+            .filter(Boolean)
+            .join(" ")
+        }
+        type="button"
+        aria-label={text.jumpToOrder}
+        onClick={handleOrderJump}
+      >
+        <span aria-hidden="true">🍽</span>
+        {orderJumpExpanded ? (
+          <span className="order-jump-button__label">{text.jumpToOrder}</span>
+        ) : null}
+      </button>
+      {flyingOrderItems.map((item) => {
+        const style = {
+          left: `${item.startX}px`,
+          top: `${item.startY}px`,
+          "--fly-x": `${item.deltaX}px`,
+          "--fly-y": `${item.deltaY}px`
+        } as CSSProperties;
+
+        return (
+          <span key={item.id} className="flying-order-item" style={style}>
+            ✦
+          </span>
+        );
+      })}
+
       <div
         className={
           language === "he" ? "page-shell menu-page menu-page--rtl" : "page-shell menu-page"
@@ -658,7 +753,7 @@ export function Cart({
             onDecrease={(menuItemId) => changeQuantity(menuItemId, -1)}
           />
 
-          <aside className="cart-panel">
+          <aside id="new-order-panel" className="cart-panel">
             <div className="section-header">
               <h2>{text.newOrder}</h2>
             </div>
