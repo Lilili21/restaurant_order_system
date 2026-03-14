@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/menu";
 import { Order, OrderStatus } from "@/lib/types";
 
 const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
+const NEW_HIGHLIGHT_MS = 2 * 60 * 1000;
 
 const statusLabels = {
   new: "New",
@@ -416,6 +417,11 @@ export function OrdersList() {
             const isHallView = selectedZone === "hall";
             const isStationView = !isHallView;
             const isBarView = selectedZone === "bar";
+            const highlightTimestamp = order.updatedAt || order.createdAt;
+            const isFreshNewOrder =
+              order.kind !== "waiter_call" &&
+              order.status === "new" &&
+              Date.now() - new Date(highlightTimestamp).getTime() < NEW_HIGHLIGHT_MS;
             const visibleItems =
               isHallView
                 ? order.items
@@ -433,6 +439,8 @@ export function OrdersList() {
                 className={
                   order.kind === "waiter_call"
                     ? "order-card order-card--alert"
+                    : isFreshNewOrder
+                      ? "order-card order-card--fresh-new"
                     : "order-card"
                 }
               >
@@ -449,11 +457,6 @@ export function OrdersList() {
                     ) : null}
                   </div>
                   <div className="order-header-meta">
-                    {order.kind === "waiter_call" ? null : isStationView ? null : (
-                      <span className={`status-pill status-pill--${order.status}`}>
-                        {statusLabels[order.status]}
-                      </span>
-                    )}
                     <div className="order-time">
                       <span className="order-time__label">Order time</span>
                       <span className="order-time__value">

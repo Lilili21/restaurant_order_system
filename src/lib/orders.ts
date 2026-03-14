@@ -21,6 +21,7 @@ type OrdersPersistence = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
+const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
@@ -250,10 +251,13 @@ function normalizeOrderState(order: Order) {
 
   const allItemsServed = order.items.every((item) => item.served);
   const someItemsServed = order.items.some((item) => item.served);
+  const shouldAutoPrepare =
+    order.status === "new" &&
+    Date.now() - new Date(order.createdAt).getTime() >= AUTO_PREPARING_DELAY_MS;
 
   if (allItemsServed) {
     order.status = "served";
-  } else if (someItemsServed || order.status === "preparing") {
+  } else if (someItemsServed || order.status === "preparing" || shouldAutoPrepare) {
     order.status = "preparing";
   } else if (order.status !== "cancelled") {
     order.status = "new";
