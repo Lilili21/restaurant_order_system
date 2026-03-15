@@ -407,6 +407,18 @@ export function Cart({
     );
   }
 
+  async function getResponseErrorMessage(
+    response: Response,
+    fallbackMessage: string
+  ) {
+    try {
+      const data = (await response.json()) as { message?: string };
+      return data.message || fallbackMessage;
+    } catch {
+      return fallbackMessage;
+    }
+  }
+
   function decreaseItem(menuItemId: string, sourceElement?: HTMLElement | null) {
     animateOrderMovement(menuItemId, "from-order", sourceElement);
     changeQuantity(menuItemId, -1);
@@ -433,7 +445,7 @@ export function Cart({
       });
 
       if (!response.ok) {
-        throw new Error(text.submitError);
+        throw new Error(await getResponseErrorMessage(response, text.submitError));
       }
 
       const order = (await response.json()) as Order;
@@ -493,7 +505,7 @@ export function Cart({
       });
 
       if (!response.ok) {
-        throw new Error(text.waiterError);
+        throw new Error(await getResponseErrorMessage(response, text.waiterError));
       }
 
       const blockedUntil = Date.now() + SERVICE_REQUEST_COOLDOWN_MS;
@@ -531,7 +543,7 @@ export function Cart({
       });
 
       if (!response.ok) {
-        throw new Error(text.billError);
+        throw new Error(await getResponseErrorMessage(response, text.billError));
       }
 
       const blockedUntil = Date.now() + SERVICE_REQUEST_COOLDOWN_MS;
