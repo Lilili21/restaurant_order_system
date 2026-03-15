@@ -17,8 +17,8 @@ type MenuPageProps = {
 
 export default async function MenuPage({ params }: MenuPageProps) {
   const { restaurantSlug, tableToken } = await params;
-  const session = getTableSession(restaurantSlug, tableToken);
-  const menuSettings = getMenuSettings();
+  const session = await getTableSession(restaurantSlug, tableToken);
+  const menuSettings = await getMenuSettings();
 
   if (!session) {
     notFound();
@@ -35,7 +35,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
         showKitchenOpen={menuSettings.kitchenOpenEnabled}
         kitchenOpenUntil={menuSettings.kitchenOpenUntil}
-        initialSubmittedOrders={getTableSessionOrders(
+        initialSubmittedOrders={await getTableSessionOrders(
           restaurantSlug,
           session.table.number
         )}

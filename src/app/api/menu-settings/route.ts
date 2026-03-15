@@ -5,7 +5,7 @@ import { getMenuSettings, updateMenuSettings } from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 
 export async function GET() {
-  const settings = getMenuSettings();
+  const settings = await getMenuSettings();
 
   return NextResponse.json({
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest) {
     };
 
     return NextResponse.json(
-      updateMenuSettings({
+      await updateMenuSettings({
         kitchenLoadWarningEnabled: body.kitchenLoadWarningEnabled,
         kitchenOpenEnabled: body.kitchenOpenEnabled,
         kitchenOpenUntil: body.kitchenOpenUntil,

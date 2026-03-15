@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   }
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
-  return NextResponse.json(getAllMenuItems(restaurantSlug ?? undefined));
+  return NextResponse.json(await getAllMenuItems(restaurantSlug ?? undefined));
 }
 
 export async function PATCH(request: NextRequest) {
@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest) {
       throw new Error("id is required");
     }
 
-    const menuItem = updateMenuItem(body.id, {
+    const menuItem = await updateMenuItem(body.id, {
       name: body.name,
       description: body.description,
       nameHe: body.nameHe,
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       throw new Error("category is required");
     }
 
-    const menuItem = createMenuItem({
+    const menuItem = await createMenuItem({
       restaurantSlug: body.restaurantSlug,
       name: body.name,
       description: body.description ?? "",
@@ -192,7 +192,7 @@ export async function DELETE(request: NextRequest) {
       throw new Error("id is required");
     }
 
-    return NextResponse.json(deleteMenuItem(body.id));
+    return NextResponse.json(await deleteMenuItem(body.id));
   } catch (error) {
     return NextResponse.json(
       {

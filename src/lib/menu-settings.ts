@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type MenuSettings = {
   kitchenLoadWarningEnabled: boolean;
@@ -12,6 +13,7 @@ export type MenuSettings = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
+const MENU_SETTINGS_KEY = "menu-settings";
 
 const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
@@ -81,10 +83,32 @@ function persistMenuSettings(settings: MenuSettings) {
   writeFileSync(MENU_SETTINGS_PATH, JSON.stringify(settings, null, 2), "utf8");
 }
 
-export function getMenuSettings() {
+async function persistMenuSettingsAsync(settings: MenuSettings) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    persistMenuSettings(settings);
+    return;
+  }
+
+  const { error } = await supabase.from("app_state").upsert(
+    {
+      key: MENU_SETTINGS_KEY,
+      value: settings,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "key" }
+  );
+
+  if (error) {
+    throw new Error(`Supabase persist failed: ${error.message}`);
+  }
+}
+
+function getMenuSettingsSync() {
   if (!existsSync(MENU_SETTINGS_PATH)) {
     persistMenuSettings(DEFAULT_SETTINGS);
-    return getMenuSettings();
+    return getMenuSettingsSync();
   }
 
   try {
@@ -99,19 +123,46 @@ export function getMenuSettings() {
     return normalized;
   } catch {
     persistMenuSettings(DEFAULT_SETTINGS);
-    return getMenuSettings();
+    return getMenuSettingsSync();
   }
 }
 
-export function updateMenuSettings(
+export async function getMenuSettings() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return getMenuSettingsSync();
+  }
+
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", MENU_SETTINGS_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase load failed: ${error.message}`);
+  }
+
+  if (!data?.value) {
+    const normalized = normalizeSettings(DEFAULT_SETTINGS);
+    await persistMenuSettingsAsync(normalized);
+    return normalized;
+  }
+
+  const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
+  return normalized;
+}
+
+export async function updateMenuSettings(
   updates: Partial<MenuSettings>
-): MenuSettings {
-  const current = getMenuSettings();
+): Promise<MenuSettings> {
+  const current = await getMenuSettings();
   const next = normalizeSettings({
     ...current,
     ...updates
   });
 
-  persistMenuSettings(next);
+  await persistMenuSettingsAsync(next);
   return next;
 }

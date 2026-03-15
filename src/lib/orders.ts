@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
 import { getMenuItemById } from "@/lib/menu-store";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -22,6 +23,7 @@ type OrdersPersistence = {
 const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
 const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
+const ORDERS_STATE_KEY = "orders-state";
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
@@ -34,8 +36,8 @@ function cloneInitialOrders() {
   }));
 }
 
-function normalizeOrderItemForAdmin(item: OrderItem): OrderItem {
-  const menuItem = getMenuItemById(item.menuItemId);
+async function normalizeOrderItemForAdmin(item: OrderItem): Promise<OrderItem> {
+  const menuItem = await getMenuItemById(item.menuItemId);
 
   return {
     ...item,
@@ -45,12 +47,12 @@ function normalizeOrderItemForAdmin(item: OrderItem): OrderItem {
   };
 }
 
-function normalizePersistedOrder(order: Order): Order {
+async function normalizePersistedOrder(order: Order): Promise<Order> {
   if (order.kind === "waiter_call" || order.kind === "bill_request") {
     return order;
   }
 
-  const items = order.items.map(normalizeOrderItemForAdmin);
+  const items = await Promise.all(order.items.map(normalizeOrderItemForAdmin));
 
   return {
     ...order,
@@ -90,20 +92,13 @@ function loadState(): OrdersPersistence {
 
     return {
       orders: Array.isArray(parsed.orders)
-        ? parsed.orders.map((order) => normalizePersistedOrder(order as Order))
+        ? (parsed.orders as Order[])
         : cloneInitialOrders(),
       currentTableSessions: Array.isArray(parsed.currentTableSessions)
         ? parsed.currentTableSessions
         : [...createDefaultTableSessions().entries()],
       closedTableSummaries: Array.isArray(parsed.closedTableSummaries)
-        ? parsed.closedTableSummaries.map((summary) => ({
-            ...summary,
-            orders: Array.isArray(summary.orders)
-              ? summary.orders.map((order) =>
-                  normalizePersistedOrder(order as Order)
-                )
-              : []
-          }))
+        ? (parsed.closedTableSummaries as ClosedTableSummary[])
         : []
     };
   } catch {
@@ -119,6 +114,69 @@ type RuntimeState = {
 
 function readRuntimeState(): RuntimeState {
   const persistedState = loadState();
+
+  return {
+    ordersStore: persistedState.orders,
+    currentTableSessions: new Map<string, number>(
+      persistedState.currentTableSessions
+    ),
+    closedTableSummaries: persistedState.closedTableSummaries
+  };
+}
+
+async function loadStateAsync(): Promise<OrdersPersistence> {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return loadState();
+  }
+
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", ORDERS_STATE_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase load failed: ${error.message}`);
+  }
+
+  if (!data?.value) {
+    return getDefaultState();
+  }
+
+  const parsed = data.value as OrdersPersistence;
+  const orders = Array.isArray(parsed.orders)
+    ? await Promise.all(
+        parsed.orders.map((order) => normalizePersistedOrder(order as Order))
+      )
+    : cloneInitialOrders();
+  const closedTableSummaries = Array.isArray(parsed.closedTableSummaries)
+    ? await Promise.all(
+        parsed.closedTableSummaries.map(async (summary) => ({
+          ...summary,
+          orders: Array.isArray(summary.orders)
+            ? await Promise.all(
+                summary.orders.map((order) =>
+                  normalizePersistedOrder(order as Order)
+                )
+              )
+            : []
+        }))
+      )
+    : [];
+
+  return {
+    orders,
+    currentTableSessions: Array.isArray(parsed.currentTableSessions)
+      ? parsed.currentTableSessions
+      : [...createDefaultTableSessions().entries()],
+    closedTableSummaries
+  };
+}
+
+async function readRuntimeStateAsync(): Promise<RuntimeState> {
+  const persistedState = await loadStateAsync();
 
   return {
     ordersStore: persistedState.orders,
@@ -149,6 +207,34 @@ function persistState(state: RuntimeState) {
   );
 }
 
+async function persistStateAsync(state: RuntimeState) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    persistState(state);
+    return;
+  }
+
+  const payload = {
+    orders: state.ordersStore,
+    currentTableSessions: [...state.currentTableSessions.entries()],
+    closedTableSummaries: state.closedTableSummaries
+  } satisfies OrdersPersistence;
+
+  const { error } = await supabase.from("app_state").upsert(
+    {
+      key: ORDERS_STATE_KEY,
+      value: payload,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "key" }
+  );
+
+  if (error) {
+    throw new Error(`Supabase persist failed: ${error.message}`);
+  }
+}
+
 function ensureCurrentSessionId(
   state: RuntimeState,
   restaurantSlug: string,
@@ -165,11 +251,11 @@ function ensureCurrentSessionId(
   return { sessionId: 1, created: true };
 }
 
-export function getCurrentTableSessionId(
+export async function getCurrentTableSessionId(
   restaurantSlug: string,
   tableNumber: number
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const { sessionId, created } = ensureCurrentSessionId(
     state,
     restaurantSlug,
@@ -177,7 +263,7 @@ export function getCurrentTableSessionId(
   );
 
   if (created) {
-    persistState(state);
+    await persistStateAsync(state);
   }
 
   return sessionId;
@@ -187,8 +273,8 @@ if (!existsSync(ORDERS_STORE_PATH)) {
   persistState(readRuntimeState());
 }
 
-function createOrderItem(cartItem: CartItem): OrderItem {
-  const menuItem = getMenuItemById(cartItem.menuItemId);
+async function createOrderItem(cartItem: CartItem): Promise<OrderItem> {
+  const menuItem = await getMenuItemById(cartItem.menuItemId);
 
   if (!menuItem) {
     throw new Error(`Menu item ${cartItem.menuItemId} not found`);
@@ -206,7 +292,7 @@ function createOrderItem(cartItem: CartItem): OrderItem {
   };
 }
 
-function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
+async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
   const mergedItems = [...order.items];
   const now = new Date().toISOString();
 
@@ -231,8 +317,8 @@ function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
   return normalizeOrderState(order);
 }
 
-function normalizeOrderState(order: Order) {
-  order.items = order.items.map(normalizeOrderItemForAdmin);
+async function normalizeOrderState(order: Order) {
+  order.items = await Promise.all(order.items.map(normalizeOrderItemForAdmin));
 
   if (order.kind === "waiter_call" || order.kind === "bill_request") {
     order.total = 0;
@@ -266,8 +352,8 @@ function normalizeOrderState(order: Order) {
   return order;
 }
 
-export function getOrders(restaurantSlug?: string) {
-  const { ordersStore } = readRuntimeState();
+export async function getOrders(restaurantSlug?: string) {
+  const { ordersStore } = await readRuntimeStateAsync();
 
   return ordersStore
     .filter((order) => {
@@ -280,12 +366,12 @@ export function getOrders(restaurantSlug?: string) {
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function createWaiterCall(input: {
+export async function createWaiterCall(input: {
   restaurantSlug: string;
   tableNumber: number;
 }) {
-  const state = readRuntimeState();
-  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+  const state = await readRuntimeStateAsync();
+  const restaurant = await getRestaurantBySlug(input.restaurantSlug);
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
@@ -320,17 +406,17 @@ export function createWaiterCall(input: {
   };
 
   state.ordersStore.unshift(waiterCall);
-  persistState(state);
+  await persistStateAsync(state);
 
   return waiterCall;
 }
 
-export function createBillRequest(input: {
+export async function createBillRequest(input: {
   restaurantSlug: string;
   tableNumber: number;
 }) {
-  const state = readRuntimeState();
-  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+  const state = await readRuntimeStateAsync();
+  const restaurant = await getRestaurantBySlug(input.restaurantSlug);
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
@@ -365,16 +451,16 @@ export function createBillRequest(input: {
   };
 
   state.ordersStore.unshift(billRequest);
-  persistState(state);
+  await persistStateAsync(state);
 
   return billRequest;
 }
 
-export function getTableSessionOrders(
+export async function getTableSessionOrders(
   restaurantSlug: string,
   tableNumber: number
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const { sessionId, created } = ensureCurrentSessionId(
     state,
     restaurantSlug,
@@ -382,7 +468,7 @@ export function getTableSessionOrders(
   );
 
   if (created) {
-    persistState(state);
+    await persistStateAsync(state);
   }
 
   return state.ordersStore
@@ -398,11 +484,11 @@ export function getTableSessionOrders(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function getTableSessionServiceRequests(
+export async function getTableSessionServiceRequests(
   restaurantSlug: string,
   tableNumber: number
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const { sessionId, created } = ensureCurrentSessionId(
     state,
     restaurantSlug,
@@ -410,7 +496,7 @@ export function getTableSessionServiceRequests(
   );
 
   if (created) {
-    persistState(state);
+    await persistStateAsync(state);
   }
 
   return state.ordersStore
@@ -426,14 +512,14 @@ export function getTableSessionServiceRequests(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export function createOrder(input: {
+export async function createOrder(input: {
   restaurantSlug: string;
   tableNumber: number;
   items: CartItem[];
   serveMode?: ServeMode;
 }) {
-  const state = readRuntimeState();
-  const restaurant = getRestaurantBySlug(input.restaurantSlug);
+  const state = await readRuntimeStateAsync();
+  const restaurant = await getRestaurantBySlug(input.restaurantSlug);
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
@@ -451,7 +537,7 @@ export function createOrder(input: {
     throw new Error("Order must contain at least one item");
   }
 
-  const items = input.items.map(createOrderItem);
+  const items = await Promise.all(input.items.map(createOrderItem));
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
@@ -472,13 +558,13 @@ export function createOrder(input: {
   );
 
   if (existingNewOrder) {
-    const mergedOrder = mergeOrderItems(existingNewOrder, items);
+    const mergedOrder = await mergeOrderItems(existingNewOrder, items);
 
     if (input.serveMode) {
       mergedOrder.serveMode = input.serveMode;
     }
 
-    persistState(state);
+    await persistStateAsync(state);
     return mergedOrder;
   }
 
@@ -497,13 +583,13 @@ export function createOrder(input: {
   };
 
   state.ordersStore.unshift(order);
-  persistState(state);
+  await persistStateAsync(state);
 
   return order;
 }
 
-export function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const state = readRuntimeState();
+export async function updateOrderStatus(orderId: string, status: OrderStatus) {
+  const state = await readRuntimeStateAsync();
   const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
@@ -526,18 +612,18 @@ export function updateOrderStatus(orderId: string, status: OrderStatus) {
     }));
   }
 
-  const normalizedOrder = normalizeOrderState(order);
-  persistState(state);
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
 
   return normalizedOrder;
 }
 
-export function updateOrderItemServed(
+export async function updateOrderItemServed(
   orderId: string,
   orderItemId: string,
   served: boolean
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
@@ -555,18 +641,18 @@ export function updateOrderItemServed(
   }
 
   orderItem.served = served;
-  const normalizedOrder = normalizeOrderState(order);
-  persistState(state);
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
 
   return normalizedOrder;
 }
 
-export function removeOrderItem(
+export async function removeOrderItem(
   orderId: string,
   orderItemId: string,
   removeQuantity: number
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
@@ -598,18 +684,18 @@ export function removeOrderItem(
     )
     .filter((item) => item.quantity > 0);
 
-  const normalizedOrder = normalizeOrderState(order);
-  persistState(state);
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
 
   return normalizedOrder;
 }
 
-export function changeOrderItemQuantity(
+export async function changeOrderItemQuantity(
   orderId: string,
   orderItemId: string,
   delta: number
 ) {
-  const state = readRuntimeState();
+  const state = await readRuntimeStateAsync();
   const order = state.ordersStore.find((item) => item.id === orderId);
 
   if (!order) {
@@ -637,17 +723,19 @@ export function changeOrderItemQuantity(
     )
     .filter((item) => item.quantity > 0);
 
-  const normalizedOrder = normalizeOrderState(order);
-  persistState(state);
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
 
   return normalizedOrder;
 }
 
-export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
-  const state = readRuntimeState();
+export async function getTableOverviews(
+  restaurantSlug?: string
+): Promise<TableOverview[]> {
+  const state = await readRuntimeStateAsync();
   let shouldPersist = false;
 
-  const overviews = getRestaurants()
+  const overviews = (await getRestaurants())
     .filter((restaurant) =>
       restaurantSlug ? restaurant.slug === restaurantSlug : true
     )
@@ -694,15 +782,15 @@ export function getTableOverviews(restaurantSlug?: string): TableOverview[] {
     .sort((left, right) => left.tableNumber - right.tableNumber);
 
   if (shouldPersist) {
-    persistState(state);
+    await persistStateAsync(state);
   }
 
   return overviews;
 }
 
-export function closeTable(restaurantSlug: string, tableNumber: number) {
-  const state = readRuntimeState();
-  const restaurant = getRestaurantBySlug(restaurantSlug);
+export async function closeTable(restaurantSlug: string, tableNumber: number) {
+  const state = await readRuntimeStateAsync();
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
@@ -758,18 +846,18 @@ export function closeTable(restaurantSlug: string, tableNumber: number) {
     createTableKey(restaurantSlug, tableNumber),
     sessionId + 1
   );
-  persistState(state);
+  await persistStateAsync(state);
 
   return summary;
 }
 
-export function moveTableOrders(
+export async function moveTableOrders(
   restaurantSlug: string,
   fromTableNumber: number,
   toTableNumber: number
 ) {
-  const state = readRuntimeState();
-  const restaurant = getRestaurantBySlug(restaurantSlug);
+  const state = await readRuntimeStateAsync();
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
@@ -825,7 +913,7 @@ export function moveTableOrders(
       : order
   );
 
-  persistState(state);
+  await persistStateAsync(state);
 
   return {
     restaurantSlug,
@@ -835,8 +923,8 @@ export function moveTableOrders(
   };
 }
 
-export function getClosedTableSummaries(restaurantSlug?: string) {
-  const { closedTableSummaries } = readRuntimeState();
+export async function getClosedTableSummaries(restaurantSlug?: string) {
+  const { closedTableSummaries } = await readRuntimeStateAsync();
 
   return closedTableSummaries.filter((summary) =>
     restaurantSlug ? summary.restaurantSlug === restaurantSlug : true

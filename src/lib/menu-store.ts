@@ -1,11 +1,13 @@
 import { menuItems } from "@/lib/mock-data";
 import { getRestaurantBySlug } from "@/lib/restaurants";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { MenuBadge, MenuItem, TableSession } from "@/lib/types";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
+const MENU_STORE_KEY = "menu-store";
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
 const ALLOWED_BADGES: MenuBadge[] = [
   "chef_special",
@@ -73,25 +75,77 @@ function persistMenuItemsWith(items: MenuItem[]) {
   writeFileSync(MENU_STORE_PATH, JSON.stringify(items, null, 2), "utf8");
 }
 
+async function loadMenuItemsAsync() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return loadMenuItems();
+  }
+
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", MENU_STORE_KEY)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Supabase load failed: ${error.message}`);
+  }
+
+  if (!data?.value) {
+    const defaults = cloneDefaultMenuItems();
+    await persistMenuItemsAsync(defaults);
+    return defaults;
+  }
+
+  const parsed = data.value as MenuItem[];
+
+  return Array.isArray(parsed)
+    ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
+    : cloneDefaultMenuItems();
+}
+
+async function persistMenuItemsAsync(items: MenuItem[]) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    persistMenuItemsWith(items);
+    return;
+  }
+
+  const { error } = await supabase.from("app_state").upsert(
+    {
+      key: MENU_STORE_KEY,
+      value: items,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "key" }
+  );
+
+  if (error) {
+    throw new Error(`Supabase persist failed: ${error.message}`);
+  }
+}
+
 if (!existsSync(MENU_STORE_PATH)) {
   persistMenuItemsWith(cloneDefaultMenuItems());
 }
 
-export function getAllMenuItems(restaurantSlug?: string) {
-  return loadMenuItems().filter((item) =>
+export async function getAllMenuItems(restaurantSlug?: string) {
+  return (await loadMenuItemsAsync()).filter((item) =>
     restaurantSlug ? item.restaurantSlug === restaurantSlug : true
   );
 }
 
-export function getAvailableMenuByRestaurant(restaurantSlug: string) {
-  return getAllMenuItems(restaurantSlug).filter((item) => item.available);
+export async function getAvailableMenuByRestaurant(restaurantSlug: string) {
+  return (await getAllMenuItems(restaurantSlug)).filter((item) => item.available);
 }
 
-export function getMenuItemById(menuItemId: string) {
-  return loadMenuItems().find((item) => item.id === menuItemId) ?? null;
+export async function getMenuItemById(menuItemId: string) {
+  return (await loadMenuItemsAsync()).find((item) => item.id === menuItemId) ?? null;
 }
 
-export function updateMenuItem(
+export async function updateMenuItem(
   menuItemId: string,
   updates: Partial<
     Pick<
@@ -111,7 +165,7 @@ export function updateMenuItem(
     >
   >
 ) {
-  const menuStore = loadMenuItems();
+  const menuStore = await loadMenuItemsAsync();
   const menuItem = menuStore.find((item) => item.id === menuItemId);
 
   if (!menuItem) {
@@ -177,11 +231,11 @@ export function updateMenuItem(
   menuItem.name = menuItem.nameHe;
   menuItem.description = menuItem.descriptionHe;
 
-  persistMenuItemsWith(menuStore);
+  await persistMenuItemsAsync(menuStore);
   return normalizeMenuItem(menuItem);
 }
 
-export function createMenuItem(input: {
+export async function createMenuItem(input: {
   restaurantSlug: string;
   category: MenuItem["category"];
   name: string;
@@ -196,7 +250,7 @@ export function createMenuItem(input: {
   image?: string;
   badges?: MenuBadge[];
 }) {
-  const menuStore = loadMenuItems();
+  const menuStore = await loadMenuItemsAsync();
   const menuItem: MenuItem = {
     id: `m_${Date.now()}`,
     restaurantSlug: input.restaurantSlug,
@@ -219,27 +273,27 @@ export function createMenuItem(input: {
   };
 
   menuStore.unshift(menuItem);
-  persistMenuItemsWith(menuStore);
+  await persistMenuItemsAsync(menuStore);
   return normalizeMenuItem(menuItem);
 }
 
-export function deleteMenuItem(menuItemId: string) {
-  const menuStore = loadMenuItems();
+export async function deleteMenuItem(menuItemId: string) {
+  const menuStore = await loadMenuItemsAsync();
   const nextMenuStore = menuStore.filter((item) => item.id !== menuItemId);
 
   if (nextMenuStore.length === menuStore.length) {
     throw new Error("Menu item not found");
   }
 
-  persistMenuItemsWith(nextMenuStore);
+  await persistMenuItemsAsync(nextMenuStore);
   return { ok: true };
 }
 
-export function getTableSession(
+export async function getTableSession(
   restaurantSlug: string,
   tableRef: number | string
-): TableSession | null {
-  const restaurant = getRestaurantBySlug(restaurantSlug);
+): Promise<TableSession | null> {
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
     return null;
@@ -258,6 +312,6 @@ export function getTableSession(
   return {
     restaurant,
     table,
-    menu: getAvailableMenuByRestaurant(restaurantSlug)
+    menu: await getAvailableMenuByRestaurant(restaurantSlug)
   };
 }

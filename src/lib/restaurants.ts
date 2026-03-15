@@ -1,10 +1,10 @@
 import { restaurants } from "@/lib/mock-data";
 import { getMenuSettings } from "@/lib/menu-settings";
 import { MenuItem, TableSession } from "@/lib/types";
-import { getMenuByRestaurant } from "@/lib/menu";
+import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
 
-export function getRestaurants() {
-  const settings = getMenuSettings();
+export async function getRestaurants() {
+  const settings = await getMenuSettings();
 
   return restaurants.map((restaurant) => ({
     ...restaurant,
@@ -25,15 +25,15 @@ export function getRestaurants() {
   }));
 }
 
-export function getRestaurantBySlug(slug: string) {
-  return getRestaurants().find((restaurant) => restaurant.slug === slug) ?? null;
+export async function getRestaurantBySlug(slug: string) {
+  return (await getRestaurants()).find((restaurant) => restaurant.slug === slug) ?? null;
 }
 
-export function getTableSession(
+export async function getTableSession(
   restaurantSlug: string,
   tableRef: number | string
-): TableSession | null {
-  const restaurant = getRestaurantBySlug(restaurantSlug);
+): Promise<TableSession | null> {
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
     return null;
@@ -52,6 +52,6 @@ export function getTableSession(
   return {
     restaurant,
     table,
-    menu: getMenuByRestaurant(restaurantSlug) as MenuItem[]
+    menu: (await getAvailableMenuByRestaurant(restaurantSlug)) as MenuItem[]
   };
 }

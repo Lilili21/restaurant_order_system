@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
   const sessionId = request.nextUrl.searchParams.get("sessionId");
-  const orders = getOrders(restaurantSlug ?? undefined).filter((order) =>
+  const orders = (await getOrders(restaurantSlug ?? undefined)).filter((order) =>
     sessionId ? order.sessionId === Number(sessionId) : true
   );
   return NextResponse.json(orders);
@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
 
     const order =
       body.type === "waiter_call"
-        ? createWaiterCall(body)
+        ? await createWaiterCall(body)
         : body.type === "bill_request"
-          ? createBillRequest(body)
-        : createOrder(body);
+          ? await createBillRequest(body)
+        : await createOrder(body);
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     return NextResponse.json(
@@ -107,15 +107,15 @@ export async function PATCH(request: NextRequest) {
     const order =
       typeof body.orderItemId === "string" &&
       typeof body.quantityDelta === "number"
-        ? changeOrderItemQuantity(
+        ? await changeOrderItemQuantity(
             body.orderId,
             body.orderItemId,
             body.quantityDelta
           )
         : typeof body.orderItemId === "string" && typeof body.served === "boolean"
-        ? updateOrderItemServed(body.orderId, body.orderItemId, body.served)
+        ? await updateOrderItemServed(body.orderId, body.orderItemId, body.served)
         : body.status
-          ? updateOrderStatus(body.orderId, body.status)
+          ? await updateOrderStatus(body.orderId, body.status)
           : (() => {
               throw new Error(
                 "status or order item update payload is required"

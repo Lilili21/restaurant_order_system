@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
 
   return NextResponse.json({
-    tables: getTableOverviews(restaurantSlug ?? undefined),
-    closedSessions: getClosedTableSummaries(restaurantSlug ?? undefined)
+    tables: await getTableOverviews(restaurantSlug ?? undefined),
+    closedSessions: await getClosedTableSummaries(restaurantSlug ?? undefined)
   });
 }
 
@@ -61,7 +61,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       return NextResponse.json(
-        moveTableOrders(
+        await moveTableOrders(
           body.restaurantSlug,
           body.tableNumber,
           body.targetTableNumber
@@ -69,7 +69,9 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(closeTable(body.restaurantSlug, body.tableNumber));
+    return NextResponse.json(
+      await closeTable(body.restaurantSlug, body.tableNumber)
+    );
   } catch (error) {
     return NextResponse.json(
       {

@@ -19,20 +19,20 @@ describe("orders", () => {
   it("merges repeated new orders into the same table session order", async () => {
     const { createOrder, getTableSessionOrders } = await import("@/lib/orders");
 
-    const first = createOrder({
+    const first = await createOrder({
       restaurantSlug: "olive-bistro",
       tableNumber: 1,
       items: [{ menuItemId: "m1", quantity: 1 }],
       serveMode: "all_at_once"
     });
-    const merged = createOrder({
+    const merged = await createOrder({
       restaurantSlug: "olive-bistro",
       tableNumber: 1,
       items: [{ menuItemId: "m1", quantity: 2 }],
       serveMode: "as_ready"
     });
 
-    const orders = getTableSessionOrders("olive-bistro", 1);
+    const orders = await getTableSessionOrders("olive-bistro", 1);
 
     expect(merged.id).toBe(first.id);
     expect(orders).toHaveLength(1);
@@ -45,7 +45,7 @@ describe("orders", () => {
   it("updates item served state and transitions order status", async () => {
     const { createOrder, updateOrderItemServed } = await import("@/lib/orders");
 
-    const order = createOrder({
+    const order = await createOrder({
       restaurantSlug: "olive-bistro",
       tableNumber: 2,
       items: [
@@ -54,8 +54,8 @@ describe("orders", () => {
       ]
     });
 
-    const preparing = updateOrderItemServed(order.id, order.items[0].id, true);
-    const served = updateOrderItemServed(order.id, order.items[1].id, true);
+    const preparing = await updateOrderItemServed(order.id, order.items[0].id, true);
+    const served = await updateOrderItemServed(order.id, order.items[1].id, true);
 
     expect(preparing.status).toBe("preparing");
     expect(served.status).toBe("served");
@@ -66,35 +66,37 @@ describe("orders", () => {
     const { closeTable, createOrder, getCurrentTableSessionId, updateOrderStatus } =
       await import("@/lib/orders");
 
-    const order = createOrder({
+    const order = await createOrder({
       restaurantSlug: "olive-bistro",
       tableNumber: 3,
       items: [{ menuItemId: "m4", quantity: 1 }]
     });
 
-    expect(() => closeTable("olive-bistro", 3)).toThrow(
-      "You cannot close the table until all orders are marked as served."
+    await expect(closeTable("olive-bistro", 3)).rejects.toThrow(
+      "Check that all the orders are served and change status in Orders."
     );
 
-    updateOrderStatus(order.id, "served");
-    const summary = closeTable("olive-bistro", 3);
+    await updateOrderStatus(order.id, "served");
+    const summary = await closeTable("olive-bistro", 3);
 
     expect(summary.tableNumber).toBe(3);
     expect(summary.orderIds).toContain(order.id);
-    expect(getCurrentTableSessionId("olive-bistro", 3)).toBe(order.sessionId + 1);
+    await expect(getCurrentTableSessionId("olive-bistro", 3)).resolves.toBe(
+      order.sessionId + 1
+    );
   });
 
   it("moves active orders to a target table current session", async () => {
     const { createOrder, getTableOverviews, moveTableOrders } = await import("@/lib/orders");
 
-    const order = createOrder({
+    const order = await createOrder({
       restaurantSlug: "olive-bistro",
       tableNumber: 4,
       items: [{ menuItemId: "m5", quantity: 2 }]
     });
 
-    const result = moveTableOrders("olive-bistro", 4, 5);
-    const tables = getTableOverviews("olive-bistro");
+    const result = await moveTableOrders("olive-bistro", 4, 5);
+    const tables = await getTableOverviews("olive-bistro");
     const target = tables.find((table) => table.tableNumber === 5);
 
     expect(result.movedOrders).toBe(1);

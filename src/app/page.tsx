@@ -3,8 +3,8 @@ import Link from "next/link";
 import { TableLinksPanel } from "@/components/home/TableLinksPanel";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
-export default function HomePage() {
-  const restaurant = getRestaurantBySlug("olive-bistro");
+export default async function HomePage() {
+  const restaurant = await getRestaurantBySlug("olive-bistro");
 
   if (!restaurant) {
     return null;

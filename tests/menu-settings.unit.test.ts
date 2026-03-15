@@ -22,7 +22,7 @@ describe("menu-settings", () => {
   it("creates default settings with tokens for all tables", async () => {
     const { getMenuSettings } = await import("@/lib/menu-settings");
 
-    const settings = getMenuSettings();
+    const settings = await getMenuSettings();
 
     expect(settings.tableCount).toBe(8);
     expect(settings.kitchenLoadWarningEnabled).toBe(false);
@@ -43,7 +43,7 @@ describe("menu-settings", () => {
 
     const { updateMenuSettings } = await import("@/lib/menu-settings");
 
-    const settings = updateMenuSettings({ tableCount: 4 });
+    const settings = await updateMenuSettings({ tableCount: 4 });
 
     expect(settings.tableCount).toBe(4);
     expect(settings.tableTokens["1"]).toBe("tbl_fixed_a");
@@ -64,7 +64,7 @@ describe("menu-settings", () => {
 
     const { getMenuSettings } = await import("@/lib/menu-settings");
 
-    const settings = getMenuSettings();
+    const settings = await getMenuSettings();
     const persisted = JSON.parse(
       readFileSync(path.join(workspace, "data/menu-settings.json"), "utf8")
     ) as { tableCount: number; tableTokens: Record<string, string> };

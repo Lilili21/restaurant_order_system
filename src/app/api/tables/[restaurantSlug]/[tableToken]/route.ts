@@ -16,7 +16,7 @@ type TableRouteProps = {
 
 export async function GET(_: Request, { params }: TableRouteProps) {
   const { restaurantSlug, tableToken } = await params;
-  const session = getTableSession(restaurantSlug, tableToken);
+  const session = await getTableSession(restaurantSlug, tableToken);
 
   if (!session) {
     return NextResponse.json({ message: "Table not found" }, { status: 404 });
@@ -24,14 +24,17 @@ export async function GET(_: Request, { params }: TableRouteProps) {
 
   return NextResponse.json({
     ...session,
-    currentSessionId: getCurrentTableSessionId(
+    currentSessionId: await getCurrentTableSessionId(
       restaurantSlug,
       session.table.number
     ),
-    submittedOrders: getTableSessionOrders(restaurantSlug, session.table.number),
-    activeServiceRequests: getTableSessionServiceRequests(
+    submittedOrders: await getTableSessionOrders(
       restaurantSlug,
       session.table.number
-    ).map((order) => order.kind)
+    ),
+    activeServiceRequests: (await getTableSessionServiceRequests(
+      restaurantSlug,
+      session.table.number
+    )).map((order) => order.kind)
   });
 }
