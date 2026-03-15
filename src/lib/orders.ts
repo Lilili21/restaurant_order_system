@@ -131,48 +131,52 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
     return loadState();
   }
 
-  const { data, error } = await supabase
-    .from("app_state")
-    .select("value")
-    .eq("key", ORDERS_STATE_KEY)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("app_state")
+      .select("value")
+      .eq("key", ORDERS_STATE_KEY)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Supabase load failed: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(error.message);
+    }
 
-  if (!data?.value) {
-    return getDefaultState();
-  }
+    if (!data?.value) {
+      return getDefaultState();
+    }
 
-  const parsed = data.value as OrdersPersistence;
-  const orders = Array.isArray(parsed.orders)
-    ? await Promise.all(
-        parsed.orders.map((order) => normalizePersistedOrder(order as Order))
-      )
-    : cloneInitialOrders();
-  const closedTableSummaries = Array.isArray(parsed.closedTableSummaries)
-    ? await Promise.all(
-        parsed.closedTableSummaries.map(async (summary) => ({
-          ...summary,
-          orders: Array.isArray(summary.orders)
-            ? await Promise.all(
-                summary.orders.map((order) =>
-                  normalizePersistedOrder(order as Order)
+    const parsed = data.value as OrdersPersistence;
+    const orders = Array.isArray(parsed.orders)
+      ? await Promise.all(
+          parsed.orders.map((order) => normalizePersistedOrder(order as Order))
+        )
+      : cloneInitialOrders();
+    const closedTableSummaries = Array.isArray(parsed.closedTableSummaries)
+      ? await Promise.all(
+          parsed.closedTableSummaries.map(async (summary) => ({
+            ...summary,
+            orders: Array.isArray(summary.orders)
+              ? await Promise.all(
+                  summary.orders.map((order) =>
+                    normalizePersistedOrder(order as Order)
+                  )
                 )
-              )
-            : []
-        }))
-      )
-    : [];
+              : []
+          }))
+        )
+      : [];
 
-  return {
-    orders,
-    currentTableSessions: Array.isArray(parsed.currentTableSessions)
-      ? parsed.currentTableSessions
-      : [...createDefaultTableSessions().entries()],
-    closedTableSummaries
-  };
+    return {
+      orders,
+      currentTableSessions: Array.isArray(parsed.currentTableSessions)
+        ? parsed.currentTableSessions
+        : [...createDefaultTableSessions().entries()],
+      closedTableSummaries
+    };
+  } catch {
+    return loadState();
+  }
 }
 
 async function readRuntimeStateAsync(): Promise<RuntimeState> {

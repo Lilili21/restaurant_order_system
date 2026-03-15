@@ -82,27 +82,31 @@ async function loadMenuItemsAsync() {
     return loadMenuItems();
   }
 
-  const { data, error } = await supabase
-    .from("app_state")
-    .select("value")
-    .eq("key", MENU_STORE_KEY)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("app_state")
+      .select("value")
+      .eq("key", MENU_STORE_KEY)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Supabase load failed: ${error.message}`);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data?.value) {
+      const defaults = cloneDefaultMenuItems();
+      await persistMenuItemsAsync(defaults);
+      return defaults;
+    }
+
+    const parsed = data.value as MenuItem[];
+
+    return Array.isArray(parsed)
+      ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
+      : cloneDefaultMenuItems();
+  } catch {
+    return loadMenuItems();
   }
-
-  if (!data?.value) {
-    const defaults = cloneDefaultMenuItems();
-    await persistMenuItemsAsync(defaults);
-    return defaults;
-  }
-
-  const parsed = data.value as MenuItem[];
-
-  return Array.isArray(parsed)
-    ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
-    : cloneDefaultMenuItems();
 }
 
 async function persistMenuItemsAsync(items: MenuItem[]) {

@@ -134,24 +134,28 @@ export async function getMenuSettings() {
     return getMenuSettingsSync();
   }
 
-  const { data, error } = await supabase
-    .from("app_state")
-    .select("value")
-    .eq("key", MENU_SETTINGS_KEY)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from("app_state")
+      .select("value")
+      .eq("key", MENU_SETTINGS_KEY)
+      .maybeSingle();
 
-  if (error) {
-    throw new Error(`Supabase load failed: ${error.message}`);
-  }
+    if (error) {
+      throw new Error(error.message);
+    }
 
-  if (!data?.value) {
-    const normalized = normalizeSettings(DEFAULT_SETTINGS);
-    await persistMenuSettingsAsync(normalized);
+    if (!data?.value) {
+      const normalized = normalizeSettings(DEFAULT_SETTINGS);
+      await persistMenuSettingsAsync(normalized);
+      return normalized;
+    }
+
+    const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
     return normalized;
+  } catch {
+    return getMenuSettingsSync();
   }
-
-  const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
-  return normalized;
 }
 
 export async function updateMenuSettings(
