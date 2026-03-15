@@ -375,7 +375,7 @@ export function Cart({
 
     window.setTimeout(() => {
       setFlyingOrderItems((current) => current.filter((item) => item.id !== id));
-    }, 1150);
+    }, 1320);
   }
 
   function addItem(menuItemId: string, sourceElement?: HTMLElement | null) {

@@ -1,6 +1,84 @@
 {
   "orders": [
     {
+      "id": "bill_1773601673105",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-15T19:07:53.105Z",
+      "updatedAt": "2026-03-15T19:07:53.105Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1773601645911",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-15T19:07:25.911Z",
+      "updatedAt": "2026-03-15T19:07:25.911Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1773601605370",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-15T19:06:45.370Z",
+      "updatedAt": "2026-03-15T19:06:45.370Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "bill_1773601151429",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "bill_request",
+      "status": "served",
+      "createdAt": "2026-03-15T18:59:11.429Z",
+      "updatedAt": "2026-03-15T18:59:11.429Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1773601130708",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "waiter_call",
+      "status": "served",
+      "createdAt": "2026-03-15T18:58:50.708Z",
+      "updatedAt": "2026-03-15T18:58:50.708Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "bill_1773600944707",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "kind": "bill_request",
+      "status": "served",
+      "createdAt": "2026-03-15T18:55:44.707Z",
+      "updatedAt": "2026-03-15T18:55:44.707Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "bill_1773529519310",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -136,7 +214,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 4,
-      "status": "new",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T22:51:11.709Z",
       "updatedAt": "2026-03-14T22:51:27.455Z",
@@ -148,7 +226,7 @@
           "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773528687453_96veof",
@@ -157,7 +235,7 @@
           "name": "Omelette 5",
           "price": 100,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 124
@@ -308,7 +386,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 4,
-      "status": "preparing",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-14T20:14:27.930Z",
       "updatedAt": "2026-03-14T22:00:43.724Z",
@@ -320,7 +398,7 @@
           "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773519267930_b8rr5l",
@@ -329,7 +407,7 @@
           "name": "Kanafeh",
           "price": 32,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773525643724_hs59dp",
@@ -338,7 +416,7 @@
           "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 85
@@ -644,7 +722,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 3,
       "sessionId": 1,
-      "status": "new",
+      "status": "served",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-13T10:56:53.010Z",
       "updatedAt": "2026-03-13T10:56:53.010Z",
@@ -656,7 +734,7 @@
           "name": "Mint lemonade",
           "price": 18,
           "quantity": 2,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773399413009_6h3gsr",
@@ -665,7 +743,7 @@
           "name": "Hummus with pita",
           "price": 24,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773399413010_5idg5y",
@@ -674,7 +752,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 138
