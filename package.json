@@ -6,7 +6,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "dev": "NEXT_DIST_DIR=.next-dev22 next dev --turbo --port 3010",
+    "dev": "next dev --turbo --port 3010",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

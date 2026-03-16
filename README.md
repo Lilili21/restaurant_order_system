@@ -22,7 +22,7 @@ If you are on `v25.x`, `Next.js` may fail with a white screen or `Internal Serve
 
 If `node -v` shows `v25.x`, switch to `node@22`.
 
-With Homebrew:
+**macOS (Homebrew):**
 
 ```bash
 brew install node@22
@@ -32,10 +32,44 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 node -v
 ```
 
+**macOS / Linux (nvm):**
+
+```bash
+nvm install 22
+nvm use 22
+node -v
+```
+
+**Windows (nvm-windows):**
+
+```powershell
+nvm install 22
+nvm use 22
+node -v
+```
+
+**Windows (fnm):**
+
+```powershell
+fnm install 22
+fnm use 22
+node -v
+```
+
 Then:
+
+**macOS / Linux:**
 
 ```bash
 cp .env.example .env.local
+npm install
+npm run dev
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Copy-Item .env.example .env.local
 npm install
 npm run dev
 ```
