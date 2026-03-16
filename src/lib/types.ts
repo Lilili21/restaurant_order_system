@@ -16,7 +16,27 @@ export type Table = {
   qrCodeValue: string;
 };
 
-export type MenuCategory = "starters" | "mains" | "drinks" | "desserts";
+export type MenuCategory =
+  | "starters"
+  | "mains"
+  | "drinks"
+  | "draft"
+  | "bottled"
+  | "fluids"
+  | "fuel"
+  | "whiskey"
+  | "vodka"
+  | "rum"
+  | "cognac"
+  | "gin"
+  | "tequila"
+  | "absent"
+  | "ouzo"
+  | "likers"
+  | "two_component_mixture"
+  | "dot4"
+  | "non_alcoholic_drinks"
+  | "desserts";
 export type MenuLanguage = "he" | "en";
 export type MenuBadge =
   | "chef_special"

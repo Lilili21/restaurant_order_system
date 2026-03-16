@@ -17,6 +17,22 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     starters: "🥗 מנות פתיחה",
     mains: "🍲 עיקריות",
     drinks: "🍹 שתייה",
+    fluids: "🍹 Fluids",
+    draft: "🍺 Draft",
+    bottled: "🍾 Bottled",
+    fuel: "⛽ Fuel",
+    whiskey: "🥃 Whiskey",
+    vodka: "🍸 Vodka",
+    rum: "🥃 Rum",
+    cognac: "🥃 Cognac",
+    gin: "🍸 GIN",
+    tequila: "🍸 Tequila",
+    absent: "🍸 Absent",
+    ouzo: "🍸 Ouzo",
+    likers: "🍷 Likers",
+    two_component_mixture: "🧪 2 component mixture",
+    dot4: "🛢 DOT 4",
+    non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
     desserts: "🍰 קינוחים"
   },
   en: {
@@ -24,6 +40,22 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     starters: "🥗 Starters",
     mains: "🍲 Main courses",
     drinks: "🍹 Drinks",
+    fluids: "🍹 Fluids",
+    draft: "🍺 Draft",
+    bottled: "🍾 Bottled",
+    fuel: "⛽ Fuel",
+    whiskey: "🥃 Whiskey",
+    vodka: "🍸 Vodka",
+    rum: "🥃 Rum",
+    cognac: "🥃 Cognac",
+    gin: "🍸 GIN",
+    tequila: "🍸 Tequila",
+    absent: "🍸 Absent",
+    ouzo: "🍸 Ouzo",
+    likers: "🍷 Likers",
+    two_component_mixture: "🧪 2 component mixture",
+    dot4: "🛢 DOT 4",
+    non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
     desserts: "🍰 Desserts"
   }
 };
@@ -32,8 +64,44 @@ const categoryOrder: MenuCategory[] = [
   "starters",
   "mains",
   "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks",
   "desserts"
 ];
+
+const drinkCategories = new Set<MenuCategory>([
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+]);
 
 export function MenuList({
   items,
@@ -70,7 +138,17 @@ export function MenuList({
           >
             {categoryLabels[language].all}
           </button>
-          {categoryOrder.map((category) => (
+          {categoryOrder
+            .filter((category) =>
+              category === "drinks"
+                ? categoryOrder.some(
+                    (candidate) =>
+                      drinkCategories.has(candidate) &&
+                      (grouped[candidate] ?? []).length > 0
+                  )
+                : (grouped[category] ?? []).length > 0
+            )
+            .map((category) => (
             <button
               key={category}
               type="button"
@@ -89,11 +167,24 @@ export function MenuList({
 
       {categoryOrder
         .filter((category) => {
-          if ((grouped[category] ?? []).length === 0) {
+          const hasItems =
+            category === "drinks"
+              ? categoryOrder.some(
+                  (candidate) =>
+                    drinkCategories.has(candidate) &&
+                    (grouped[candidate] ?? []).length > 0
+                )
+              : (grouped[category] ?? []).length > 0;
+
+          if (!hasItems) {
             return false;
           }
 
-          return selectedCategory === "all" || selectedCategory === category;
+          return (
+            selectedCategory === "all" ||
+            selectedCategory === category ||
+            (selectedCategory === "drinks" && drinkCategories.has(category))
+          );
         })
         .map((category) => (
         <section key={category} className="menu-section">

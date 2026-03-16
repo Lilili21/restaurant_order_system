@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
-import { Order, OrderStatus } from "@/lib/types";
+import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
 const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
 const NEW_HIGHLIGHT_MS = 2 * 60 * 1000;
@@ -19,6 +19,26 @@ const serveModeLabels = {
   all_at_once: "Serve everything together",
   as_ready: "Serve as ready"
 } as const;
+
+const barCategories = new Set<MenuCategory>([
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+]);
 
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -290,10 +310,14 @@ export function OrdersList() {
       : selectedZone === "bar"
         ? order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
-          order.items.some((item) => item.category === "drinks")
+          order.items.some((item) =>
+            item.category ? barCategories.has(item.category) : false
+          )
         : order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
-          order.items.some((item) => item.category !== "drinks"))
+          order.items.some((item) =>
+            item.category ? !barCategories.has(item.category) : true
+          ))
   );
 
   function toggleTable(tableNumber: number) {
@@ -563,8 +587,12 @@ export function OrdersList() {
               isHallView
                 ? order.items
                 : isBarView
-                ? order.items.filter((item) => item.category === "drinks")
-                : order.items.filter((item) => item.category !== "drinks");
+                ? order.items.filter((item) =>
+                    item.category ? barCategories.has(item.category) : false
+                  )
+                : order.items.filter((item) =>
+                    item.category ? !barCategories.has(item.category) : true
+                  );
             const visibleTotal = visibleItems.reduce(
               (sum, item) => sum + item.price * item.quantity,
               0
