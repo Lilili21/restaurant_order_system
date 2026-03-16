@@ -10,8 +10,44 @@ const categoryLabels: Record<MenuCategory, string> = {
   starters: "🥗 Starters",
   mains: "🍲 Main courses",
   drinks: "🍹 Drinks",
+  fluids: "🍹 Fluids",
+  draft: "🍺 Draft",
+  bottled: "🍾 Bottled",
+  fuel: "⛽ Fuel",
+  whiskey: "🥃 Whiskey",
+  vodka: "🍸 Vodka",
+  rum: "🥃 Rum",
+  cognac: "🥃 Cognac",
+  gin: "🍸 GIN",
+  tequila: "🍸 Tequila",
+  absent: "🍸 Absent",
+  ouzo: "🍸 Ouzo",
+  likers: "🍷 Likers",
+  two_component_mixture: "🧪 2 component mixture",
+  dot4: "🛢 DOT 4",
+  non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
   desserts: "🍰 Desserts"
 };
+
+const drinkCategories: MenuCategory[] = [
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+];
 
 const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
   { value: "chef_special", label: "🔥 Chef's special" },
@@ -734,7 +770,7 @@ export function MenuEditor() {
           type="button"
           onClick={() => setShowCreateForm((current) => !current)}
         >
-          {showCreateForm ? "Hide form" : "Add new dish"}
+          {showCreateForm ? "Hide form" : "Add new"}
         </button>
       </div>
       <div className="orders-filter">
@@ -771,7 +807,7 @@ export function MenuEditor() {
       <div className="orders-grid">
         {showCreateForm ? (
         <article className="order-card">
-          <h3>Add new dish</h3>
+          <h3>Add new</h3>
 
           <div className="menu-editor__form">
             <div className="menu-editor__top-row">
