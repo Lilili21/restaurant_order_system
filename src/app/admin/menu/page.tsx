@@ -10,8 +10,16 @@ export default function AdminMenuPage() {
           <h1>Menu editor</h1>
         </div>
         <div className="admin-nav" aria-label="Admin navigation">
-          <Link href="/admin" className="admin-menu-bubble admin-menu-bubble--active">
-            Admin
+          <div className="admin-switch">
+            <Link href="/admin/orders" className="admin-switch__item">
+              Orders
+            </Link>
+            <Link href="/admin/tables" className="admin-switch__item">
+              Tables
+            </Link>
+          </div>
+          <Link href="/admin/menu" className="admin-menu-bubble admin-menu-bubble--active">
+            Menu
           </Link>
         </div>
       </section>

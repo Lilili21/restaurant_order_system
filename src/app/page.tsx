@@ -23,14 +23,11 @@ export default async function HomePage() {
           <h1>QR ordering for restaurant tables without online payment</h1>
           <p className="lead">
             Guests scan a QR code, open their table menu, and send orders instantly.
-            Owners and staff see them in the waiter panel right away.
+            Owners and staff see them in the admin panel right away.
           </p>
           <div className="hero-actions">
-            <Link href="/waiter/orders" className="button-link button-link--hero">
-              Waiter
-            </Link>
-            <Link href="/admin" className="button-link button-link--hero">
-              Admin
+            <Link href="/admin/orders" className="button-link button-link--ghost">
+              Open admin panel
             </Link>
           </div>
         </div>

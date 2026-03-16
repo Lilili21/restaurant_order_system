@@ -141,9 +141,7 @@ export function MenuEditor() {
   const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
@@ -669,20 +667,10 @@ export function MenuEditor() {
     return <p className="muted">Loading menu...</p>;
   }
 
-  const visibleCategories = (Object.entries(categoryLabels) as Array<
-    [MenuCategory, string]
-  >).filter(([value]) =>
-    selectedKind === "drinks"
-      ? drinkCategories.includes(value) && value !== "drinks"
-      : !drinkCategories.includes(value)
-  );
   const filteredItems = items.filter((item) =>
-    (selectedKind === "drinks"
-      ? drinkCategories.includes(item.category)
-      : !drinkCategories.includes(item.category)) &&
-    (selectedCategories.length === 0
+    selectedCategories.length === 0
       ? true
-      : selectedCategories.includes(item.category))
+      : selectedCategories.includes(item.category)
   );
 
   function toggleCategory(category: MenuCategory) {
@@ -710,115 +698,72 @@ export function MenuEditor() {
 
   return (
     <div className="orders-layout">
-      <div className="menu-editor__toolbar">
-        <button
-          className={
-            notificationsOpen
-              ? "admin-menu-bubble admin-menu-bubble--active"
-              : "admin-menu-bubble"
-          }
-          type="button"
-          onClick={() => setNotificationsOpen((current) => !current)}
-        >
-          Notifications
-        </button>
-        {secondaryCredentials ? <TableCountControl credentials={secondaryCredentials} /> : null}
-        <div className="admin-switch menu-editor__kind-switch">
-          <button
-            type="button"
-            className={
-              selectedKind === "dishes"
-                ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                : "admin-switch__item menu-editor__kind-button"
-            }
-            onClick={() => {
-              setSelectedKind("dishes");
-              setSelectedCategories([]);
-            }}
-          >
-            Dishes
-          </button>
-          <button
-            type="button"
-            className={
-              selectedKind === "drinks"
-                ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                : "admin-switch__item menu-editor__kind-button"
-            }
-            onClick={() => {
-              setSelectedKind("drinks");
-              setSelectedCategories([]);
-            }}
-          >
-            Bar
-          </button>
+      {secondaryCredentials ? (
+        <div className="admin-menu-tools">
+          <TableCountControl credentials={secondaryCredentials} />
         </div>
-      </div>
-      {message ? <p className="status-message">{message}</p> : null}
-      {notificationsOpen ? (
-        <>
-          <div className="menu-notice-control menu-notice-control--inline">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={kitchenLoadWarningEnabled}
-                disabled={kitchenLoadWarningSaving}
-                onChange={(event) =>
-                  void toggleKitchenLoadWarning(event.target.checked)
-                }
-              />
-              <span
-                className={
-                  kitchenLoadWarningEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.
-              </span>
-            </label>
-          </div>
-          <div className="menu-notice-control">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={kitchenOpenEnabled}
-                disabled={kitchenOpenSaving}
-                onChange={(event) =>
-                  void saveKitchenOpenSettings(
-                    event.target.checked,
-                    kitchenOpenUntil
-                  )
-                }
-              />
-              <span
-                className={
-                  kitchenOpenEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Kitchen open
-              </span>
-            </label>
-            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
-              <span>Until</span>
-              <input
-                className="modal-input"
-                type="time"
-                value={kitchenOpenUntil}
-                disabled={kitchenOpenSaving}
-                onChange={(event) => setKitchenOpenUntil(event.target.value)}
-                onBlur={() => {
-                  if (kitchenOpenEnabled) {
-                    void saveKitchenOpenSettings(true, kitchenOpenUntil);
-                  }
-                }}
-              />
-            </label>
-          </div>
-        </>
       ) : null}
+      {message ? <p className="status-message">{message}</p> : null}
+      <div className="menu-notice-control menu-notice-control--inline">
+        <label className="menu-notice-control__toggle">
+          <input
+            type="checkbox"
+            checked={kitchenLoadWarningEnabled}
+            disabled={kitchenLoadWarningSaving}
+            onChange={(event) =>
+              void toggleKitchenLoadWarning(event.target.checked)
+            }
+          />
+          <span
+            className={
+              kitchenLoadWarningEnabled
+                ? "menu-notice-control__text menu-notice-control__text--active"
+                : "menu-notice-control__text"
+            }
+          >
+            Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.
+          </span>
+        </label>
+      </div>
+      <div className="menu-notice-control">
+        <label className="menu-notice-control__toggle">
+          <input
+            type="checkbox"
+            checked={kitchenOpenEnabled}
+            disabled={kitchenOpenSaving}
+            onChange={(event) =>
+              void saveKitchenOpenSettings(
+                event.target.checked,
+                kitchenOpenUntil
+              )
+            }
+          />
+          <span
+            className={
+              kitchenOpenEnabled
+                ? "menu-notice-control__text menu-notice-control__text--neutral-active"
+                : "menu-notice-control__text"
+            }
+          >
+            Kitchen open
+          </span>
+        </label>
+        <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+          <span>Until</span>
+          <input
+            className="modal-input"
+            type="time"
+            value={kitchenOpenUntil}
+            disabled={kitchenOpenSaving}
+            onChange={(event) => setKitchenOpenUntil(event.target.value)}
+            onBlur={() => {
+              if (kitchenOpenEnabled) {
+                void saveKitchenOpenSettings(true, kitchenOpenUntil);
+              }
+            }}
+          />
+        </label>
+      </div>
       <div className="menu-editor__create">
         <button
           className="button-success"
@@ -839,22 +784,24 @@ export function MenuEditor() {
             }
             onClick={() => setSelectedCategories([])}
           >
-            {selectedKind === "drinks" ? "All drinks" : "All dishes"}
+            All categories
           </button>
-          {visibleCategories.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
-                selectedCategories.includes(value)
-                  ? "orders-filter__chip orders-filter__chip--active"
-                  : "orders-filter__chip"
-              }
-              onClick={() => toggleCategory(value)}
-            >
-              {label}
-            </button>
-          ))}
+          {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(
+            ([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={
+                  selectedCategories.includes(value)
+                    ? "orders-filter__chip orders-filter__chip--active"
+                    : "orders-filter__chip"
+                }
+                onClick={() => toggleCategory(value)}
+              >
+                {label}
+              </button>
+            )
+          )}
         </div>
       </div>
       <div className="orders-grid">

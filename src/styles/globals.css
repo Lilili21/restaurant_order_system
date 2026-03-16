@@ -226,8 +226,8 @@ button:disabled {
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 24px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
 .hero-actions--menu {
@@ -397,45 +397,9 @@ button:disabled {
 .admin-menu-tools {
   display: flex;
   justify-content: flex-end;
-}
-
-.menu-editor__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.menu-editor__kind-switch {
-  width: min(100%, 360px);
-  flex-wrap: nowrap;
-}
-
-.menu-editor__toolbar .admin-menu-bubble,
-.menu-editor__toolbar .admin-table-count-trigger {
-  min-height: 56px;
-  min-width: 150px;
-}
-
-.menu-editor__kind-button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-}
-
-.menu-editor__kind-button.admin-switch__item--active {
-  background: var(--accent);
-  color: #fffaf2;
-}
-
-.menu-editor__toolbar .menu-editor__kind-switch .menu-editor__kind-button {
-  min-width: 0;
-  width: 100%;
+  margin-top: -112px;
+  margin-right: 360px;
+  margin-bottom: 28px;
 }
 
 .button-link {
@@ -447,21 +411,6 @@ button:disabled {
   border-radius: 999px;
   background: var(--accent);
   color: #fffaf2;
-}
-
-.button-link--hero {
-  min-height: 64px;
-  min-width: 180px;
-  padding: 0 30px;
-  font-size: 1.18rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
-  border: 1px solid rgba(110, 15, 24, 0.34);
-  box-shadow: 0 22px 42px rgba(110, 15, 24, 0.2);
-}
-
-.button-link--hero:hover {
-  background: linear-gradient(135deg, #b01f2d 0%, var(--accent-dark) 100%);
 }
 
 .button-link--ghost {
@@ -1788,17 +1737,9 @@ textarea.modal-input {
   }
 
   .admin-menu-tools {
-    width: 100%;
-    justify-content: stretch;
-  }
-
-  .menu-editor__toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .menu-editor__kind-switch {
-    width: 100%;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 18px;
   }
 
   .hero-card {
