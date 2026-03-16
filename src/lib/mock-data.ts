@@ -13,7 +13,7 @@ export const restaurants: Restaurant[] = [
       seats: index < 4 ? 2 : 4,
       zone: index < 4 ? "Hall A" : "Terrace",
       accessToken: `olive-demo-token-${index + 1}`,
-      qrCodeValue: `/menu/olive-bistro/olive-demo-token-${index + 1}`
+      qrCodeValue: `/olive-bistro/menu/olive-demo-token-${index + 1}`
     }))
   }
 ];

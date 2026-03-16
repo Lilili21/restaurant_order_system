@@ -16,7 +16,7 @@ type MenuPageProps = {
   }>;
 };
 
-export default async function MenuPage({ params }: MenuPageProps) {
+export default async function RestaurantMenuPage({ params }: MenuPageProps) {
   const { restaurantSlug, tableToken } = await params;
   const menuSettings = await getMenuSettings();
 

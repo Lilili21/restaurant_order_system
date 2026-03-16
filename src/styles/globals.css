@@ -1322,6 +1322,20 @@ textarea.modal-input {
   gap: 16px;
 }
 
+.table-links-panel__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.96);
+  border: 1px solid rgba(36, 23, 13, 0.08);
+  box-shadow: 0 18px 40px rgba(74, 48, 24, 0.1);
+  color: var(--text);
+  font-weight: 700;
+}
+
 .table-links-panel__field {
   display: grid;
   gap: 8px;
@@ -1335,8 +1349,11 @@ textarea.modal-input {
 
 .table-links-panel__list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
 }
 
 .table-links-panel__link {

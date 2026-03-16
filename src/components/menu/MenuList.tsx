@@ -7,16 +7,20 @@ type MenuListProps = {
   items: MenuItem[];
   language: MenuLanguage;
   quantities: Record<string, number>;
+  orderingEnabled?: boolean;
   onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
   onDecrease: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
 };
 
+type MenuFilter = MenuCategory | "dishes" | "drinks";
+
 const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
   he: {
-    all: "הכול",
+    dishes: "🍽️ מנות",
+    drinks_group: "🍹 שתייה",
     starters: "🥗 מנות פתיחה",
     mains: "🍲 עיקריות",
-    drinks: "🍹 שתייה",
+    drinks: "🍹 Drinks",
     fluids: "🍹 Fluids",
     draft: "🍺 Draft",
     bottled: "🍾 Bottled",
@@ -36,7 +40,8 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     desserts: "🍰 קינוחים"
   },
   en: {
-    all: "All",
+    dishes: "🍽️ Dishes",
+    drinks_group: "🍹 Drinks",
     starters: "🥗 Starters",
     mains: "🍲 Main courses",
     drinks: "🍹 Drinks",
@@ -103,16 +108,17 @@ const drinkCategories = new Set<MenuCategory>([
   "non_alcoholic_drinks"
 ]);
 
+const dishCategories = categoryOrder.filter((category) => !drinkCategories.has(category));
+
 export function MenuList({
   items,
   language,
   quantities,
+  orderingEnabled = true,
   onAdd,
   onDecrease
 }: MenuListProps) {
-  const [selectedCategory, setSelectedCategory] = useState<MenuCategory | "all">(
-    "all"
-  );
+  const [selectedCategory, setSelectedCategory] = useState<MenuFilter>("dishes");
   const grouped = useMemo(
     () =>
       items.reduce<Record<string, MenuItem[]>>((acc, item) => {
@@ -122,6 +128,38 @@ export function MenuList({
       }, {}),
     [items]
   );
+  const getCategoryItems = (category: MenuCategory) =>
+    category === "drinks"
+      ? categoryOrder.flatMap((candidate) =>
+          drinkCategories.has(candidate) ? grouped[candidate] ?? [] : []
+        )
+      : grouped[category] ?? [];
+  const visibleDishCategories = dishCategories.filter(
+    (category) => getCategoryItems(category).length > 0
+  );
+  const visibleDrinkCategories = categoryOrder.filter(
+    (category) =>
+      category !== "drinks" &&
+      drinkCategories.has(category) &&
+      getCategoryItems(category).length > 0
+  );
+  const visibleCategories = categoryOrder.filter((category) => {
+    const hasItems = getCategoryItems(category).length > 0;
+
+    if (!hasItems) {
+      return false;
+    }
+
+    if (selectedCategory === "dishes") {
+      return !drinkCategories.has(category);
+    }
+
+    if (selectedCategory === "drinks") {
+      return drinkCategories.has(category);
+    }
+
+    return selectedCategory === category;
+  });
 
   return (
     <div className="menu-sections">
@@ -130,25 +168,15 @@ export function MenuList({
           <button
             type="button"
             className={
-              selectedCategory === "all"
+              selectedCategory === "dishes"
                 ? "orders-filter__chip orders-filter__chip--active"
                 : "orders-filter__chip"
             }
-            onClick={() => setSelectedCategory("all")}
+            onClick={() => setSelectedCategory("dishes")}
           >
-            {categoryLabels[language].all}
+            {categoryLabels[language].dishes}
           </button>
-          {categoryOrder
-            .filter((category) =>
-              category === "drinks"
-                ? categoryOrder.some(
-                    (candidate) =>
-                      drinkCategories.has(candidate) &&
-                      (grouped[candidate] ?? []).length > 0
-                  )
-                : (grouped[category] ?? []).length > 0
-            )
-            .map((category) => (
+          {visibleDishCategories.map((category) => (
             <button
               key={category}
               type="button"
@@ -163,48 +191,61 @@ export function MenuList({
             </button>
           ))}
         </div>
-      </div>
-
-      {categoryOrder
-        .filter((category) => {
-          const hasItems =
-            category === "drinks"
-              ? categoryOrder.some(
-                  (candidate) =>
-                    drinkCategories.has(candidate) &&
-                    (grouped[candidate] ?? []).length > 0
-                )
-              : (grouped[category] ?? []).length > 0;
-
-          if (!hasItems) {
-            return false;
-          }
-
-          return (
-            selectedCategory === "all" ||
-            selectedCategory === category ||
-            (selectedCategory === "drinks" && drinkCategories.has(category))
-          );
-        })
-        .map((category) => (
-        <section key={category} className="menu-section">
-          <div className="section-header">
-            <h2>{categoryLabels[language][category] ?? category}</h2>
-          </div>
-          <div className="menu-grid">
-            {grouped[category].map((item) => (
-              <MenuItemCard
-                key={item.id}
-                item={item}
-                language={language}
-                quantity={quantities[item.id] ?? 0}
-                onAdd={onAdd}
-                onDecrease={onDecrease}
-              />
+        {visibleDrinkCategories.length ? (
+          <div className="orders-filter__chips">
+            <button
+              type="button"
+              className={
+                selectedCategory === "drinks"
+                  ? "orders-filter__chip orders-filter__chip--active"
+                  : "orders-filter__chip"
+              }
+              onClick={() => setSelectedCategory("drinks")}
+            >
+              {categoryLabels[language].drinks_group}
+            </button>
+            {visibleDrinkCategories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                className={
+                  selectedCategory === category
+                    ? "orders-filter__chip orders-filter__chip--active"
+                    : "orders-filter__chip"
+                }
+                onClick={() => setSelectedCategory(category)}
+              >
+                {categoryLabels[language][category]}
+              </button>
             ))}
           </div>
-        </section>
-      ))}
+        ) : null}
+      </div>
+
+      {visibleCategories.map((category) => {
+          const sectionItems = getCategoryItems(category);
+
+          return (
+            <section key={category} className="menu-section">
+              <div className="section-header">
+                <h2>{categoryLabels[language][category] ?? category}</h2>
+              </div>
+              <div className="menu-grid">
+                {sectionItems.map((item) => (
+                  <MenuItemCard
+                    key={item.id}
+                    item={item}
+                    language={language}
+                    quantity={quantities[item.id] ?? 0}
+                    orderingEnabled={orderingEnabled}
+                    onAdd={onAdd}
+                    onDecrease={onDecrease}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
     </div>
   );
 }

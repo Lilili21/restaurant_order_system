@@ -19,7 +19,7 @@ export async function getRestaurants() {
         seats: baseTable?.seats ?? (tableNumber <= 4 ? 2 : 4),
         zone: baseTable?.zone ?? (tableNumber <= 4 ? "Hall A" : "Terrace"),
         accessToken,
-        qrCodeValue: `/menu/${restaurant.slug}/${accessToken}`
+        qrCodeValue: `/${restaurant.slug}/menu/${accessToken}`
       };
     })
   }));

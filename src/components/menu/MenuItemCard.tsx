@@ -27,6 +27,7 @@ type MenuItemCardProps = {
   item: MenuItem;
   language: MenuLanguage;
   quantity: number;
+  orderingEnabled?: boolean;
   onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
   onDecrease: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
 };
@@ -35,6 +36,7 @@ export function MenuItemCard({
   item,
   language,
   quantity,
+  orderingEnabled = true,
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
@@ -104,7 +106,7 @@ export function MenuItemCard({
         </div>
         <div className="menu-card__footer">
           <strong>{formatCurrency(item.price)}</strong>
-          {quantity > 0 ? (
+          {!orderingEnabled ? null : quantity > 0 ? (
             <div className="menu-quantity-box">
               <button type="button" onClick={handleDecrease}>
                 -

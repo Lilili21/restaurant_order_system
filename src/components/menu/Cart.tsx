@@ -18,6 +18,7 @@ type CartProps = {
   restaurantName: string;
   tableNumber: number;
   tableToken: string;
+  orderingEnabled?: boolean;
   menu: MenuItem[];
   showKitchenLoadWarning: boolean;
   showKitchenOpen: boolean;
@@ -152,6 +153,7 @@ export function Cart({
   restaurantName,
   tableNumber,
   tableToken,
+  orderingEnabled = true,
   menu,
   showKitchenLoadWarning,
   showKitchenOpen,
@@ -246,6 +248,10 @@ export function Cart({
   }
 
   useEffect(() => {
+    if (!orderingEnabled) {
+      return;
+    }
+
     let cancelled = false;
 
     async function syncSubmittedOrders() {
@@ -313,9 +319,13 @@ export function Cart({
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [restaurantSlug, tableToken, currentSessionId]);
+  }, [restaurantSlug, tableToken, currentSessionId, orderingEnabled]);
 
   useEffect(() => {
+    if (!orderingEnabled) {
+      return;
+    }
+
     const storageKey = `service-request:${restaurantSlug}:${tableToken}`;
     const savedValue = window.localStorage.getItem(storageKey);
     const savedTimestamp = savedValue ? Number(savedValue) : 0;
@@ -743,26 +753,28 @@ export function Cart({
         </div>
       ) : null}
 
-      <button
-        ref={orderJumpButtonRef}
-        className={
-          [
-            "order-jump-button",
-            orderJumpExpanded ? "order-jump-button--expanded" : "",
-            language === "he" ? "order-jump-button--rtl" : ""
-          ]
-            .filter(Boolean)
-            .join(" ")
-        }
-        type="button"
-        aria-label={text.jumpToOrder}
-        onClick={handleOrderJump}
-      >
-        <span aria-hidden="true">🍽</span>
-        {orderJumpExpanded ? (
-          <span className="order-jump-button__label">{text.jumpToOrder}</span>
-        ) : null}
-      </button>
+      {orderingEnabled ? (
+        <button
+          ref={orderJumpButtonRef}
+          className={
+            [
+              "order-jump-button",
+              orderJumpExpanded ? "order-jump-button--expanded" : "",
+              language === "he" ? "order-jump-button--rtl" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")
+          }
+          type="button"
+          aria-label={text.jumpToOrder}
+          onClick={handleOrderJump}
+        >
+          <span aria-hidden="true">🍽</span>
+          {orderJumpExpanded ? (
+            <span className="order-jump-button__label">{text.jumpToOrder}</span>
+          ) : null}
+        </button>
+      ) : null}
       {flyingOrderItems.map((item) => {
         const style = {
           left: `${item.startX}px`,
@@ -814,7 +826,9 @@ export function Cart({
               </div>
             </div>
             <p className="lead">
-              {text.tableOrderingHint} {tableNumber}
+              {orderingEnabled
+                ? `${text.tableOrderingHint} ${tableNumber}`
+                : "Menu"}
             </p>
             {showKitchenOpenBanner ? (
               <div className="menu-kitchen-open">
@@ -836,32 +850,34 @@ export function Cart({
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}
           </div>
-          <div
-            className={
-              language === "he"
-                ? "menu-action-card menu-action-card--stacked menu-action-card--rtl"
-                : "menu-action-card menu-action-card--stacked"
-            }
-          >
-            <div className="menu-action-buttons">
-              <button
-                className="button-danger button-danger--call"
-                type="button"
-                onClick={callWaiter}
-                disabled={serviceRequestDisabled}
-              >
-                {text.callWaiter}
-              </button>
-              <button
-                className="button-neutral button-neutral--bill"
-                type="button"
-                onClick={requestBill}
-                disabled={serviceRequestDisabled}
-              >
-                {text.requestBill}
-              </button>
+          {orderingEnabled ? (
+            <div
+              className={
+                language === "he"
+                  ? "menu-action-card menu-action-card--stacked menu-action-card--rtl"
+                  : "menu-action-card menu-action-card--stacked"
+              }
+            >
+              <div className="menu-action-buttons">
+                <button
+                  className="button-danger button-danger--call"
+                  type="button"
+                  onClick={callWaiter}
+                  disabled={serviceRequestDisabled}
+                >
+                  {text.callWaiter}
+                </button>
+                <button
+                  className="button-neutral button-neutral--bill"
+                  type="button"
+                  onClick={requestBill}
+                  disabled={serviceRequestDisabled}
+                >
+                  {text.requestBill}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
         <div className="content-grid">
@@ -869,10 +885,12 @@ export function Cart({
             items={menu}
             language={language}
             quantities={quantities}
+            orderingEnabled={orderingEnabled}
             onAdd={addItem}
             onDecrease={decreaseItem}
           />
 
+          {orderingEnabled ? (
           <aside id="new-order-panel" className="cart-panel">
             <div className="section-header">
               <h2>{text.newOrder}</h2>
@@ -990,6 +1008,7 @@ export function Cart({
               </details>
             ) : null}
           </aside>
+          ) : null}
         </div>
       </div>
     </>
