@@ -38,6 +38,22 @@ const categoryFlightIcons: Record<MenuCategory, string> = {
   starters: "🥗",
   mains: "🍝",
   drinks: "🥤",
+  fluids: "🍹",
+  draft: "🍺",
+  bottled: "🍾",
+  fuel: "⛽",
+  whiskey: "🥃",
+  vodka: "🍸",
+  rum: "🥃",
+  cognac: "🥃",
+  gin: "🍸",
+  tequila: "🍸",
+  absent: "🍸",
+  ouzo: "🍸",
+  likers: "🍷",
+  two_component_mixture: "🧪",
+  dot4: "🛢",
+  non_alcoholic_drinks: "🥤",
   desserts: "🍰"
 };
 

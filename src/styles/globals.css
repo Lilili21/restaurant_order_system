@@ -402,6 +402,33 @@ button:disabled {
   margin-bottom: 28px;
 }
 
+.menu-editor__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.menu-editor__kind-switch {
+  width: min(100%, 360px);
+}
+
+.menu-editor__kind-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.menu-editor__kind-button.admin-switch__item--active {
+  background: var(--accent);
+  color: #fffaf2;
+}
+
 .button-link {
   display: inline-flex;
   align-items: center;
@@ -411,6 +438,21 @@ button:disabled {
   border-radius: 999px;
   background: var(--accent);
   color: #fffaf2;
+}
+
+.button-link--hero {
+  min-height: 72px;
+  min-width: 210px;
+  padding: 0 36px;
+  font-size: 1.28rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  border: 1px solid rgba(110, 15, 24, 0.34);
+  box-shadow: 0 22px 42px rgba(110, 15, 24, 0.2);
+}
+
+.button-link--hero:hover {
+  background: linear-gradient(135deg, #b01f2d 0%, var(--accent-dark) 100%);
 }
 
 .button-link--ghost {
@@ -1740,6 +1782,14 @@ textarea.modal-input {
     margin-top: 0;
     margin-right: 0;
     margin-bottom: 18px;
+  }
+
+  .menu-editor__toolbar {
+    justify-content: stretch;
+  }
+
+  .menu-editor__kind-switch {
+    width: 100%;
   }
 
   .hero-card {
