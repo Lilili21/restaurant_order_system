@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Next.js: dev server",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev"
+    },
+    {
+      "name": "Open Chrome on localhost:3010",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:3010",
+      "webRoot": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run App in VS Code",
+      "configurations": [
+        "Next.js: dev server",
+        "Open Chrome on localhost:3000"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Olive Bistro</title>
+  <desc id="desc">Default menu image placeholder for Olive Bistro.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f6efe4" />
+      <stop offset="55%" stop-color="#efe3d2" />
+      <stop offset="100%" stop-color="#e2d0b6" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)" rx="48" />
+  <circle cx="220" cy="180" r="120" fill="#d8b17d" opacity="0.22" />
+  <circle cx="1030" cy="130" r="150" fill="#b45309" opacity="0.12" />
+  <circle cx="940" cy="760" r="180" fill="#8a3d0c" opacity="0.1" />
+  <g fill="none" stroke="#b45309" stroke-opacity="0.22">
+    <path d="M170 720c120-90 250-120 395-88 75 17 150 24 226 10 74-14 144-46 213-100" stroke-width="10" stroke-linecap="round"/>
+    <path d="M214 772c87-53 188-74 305-63 49 5 99 15 151 18 115 6 226-22 332-84" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="600" y="392" text-anchor="middle" fill="#8a3d0c" font-family="Georgia, 'Times New Roman', serif" font-size="56" letter-spacing="18">
+    OLIVE BISTRO
+  </text>
+  <text x="600" y="472" text-anchor="middle" fill="#24170d" font-family="Georgia, 'Times New Roman', serif" font-size="118" font-weight="700">
+    Olive Bistro
+  </text>
+</svg>
