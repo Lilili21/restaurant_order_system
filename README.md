@@ -43,8 +43,8 @@ npm run dev
 Credentials are read from `.env.local`:
 
 ```env
-ADMIN_LOGIN=admin1
-ADMIN_PASSWORD=admin1
+ADMIN_LOGIN=waiter
+ADMIN_PASSWORD=waiter
 ADMIN_SECONDARY_LOGIN=admin
 ADMIN_SECONDARY_PASSWORD=admin
 ```

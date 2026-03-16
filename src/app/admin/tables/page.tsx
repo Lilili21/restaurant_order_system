@@ -9,18 +9,15 @@ export default function AdminTablesPage() {
         <div>
           <h1>Orders by table</h1>
         </div>
-        <div className="admin-nav" aria-label="Admin navigation">
+        <div className="admin-nav" aria-label="Waiter navigation">
           <div className="admin-switch">
-            <Link href="/admin/orders" className="admin-switch__item">
+            <Link href="/waiter/orders" className="admin-switch__item">
               Orders
             </Link>
-            <Link href="/admin/tables" className="admin-switch__item admin-switch__item--active">
+            <Link href="/waiter/tables" className="admin-switch__item admin-switch__item--active">
               Tables
             </Link>
           </div>
-          <Link href="/admin/menu" className="admin-menu-bubble">
-            Menu
-          </Link>
         </div>
       </section>
 

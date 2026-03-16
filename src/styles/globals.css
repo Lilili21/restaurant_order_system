@@ -226,8 +226,8 @@ button:disabled {
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 20px;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .hero-actions--menu {
@@ -411,6 +411,21 @@ button:disabled {
   border-radius: 999px;
   background: var(--accent);
   color: #fffaf2;
+}
+
+.button-link--hero {
+  min-height: 64px;
+  min-width: 180px;
+  padding: 0 30px;
+  font-size: 1.18rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  border: 1px solid rgba(110, 15, 24, 0.34);
+  box-shadow: 0 22px 42px rgba(110, 15, 24, 0.2);
+}
+
+.button-link--hero:hover {
+  background: linear-gradient(135deg, #b01f2d 0%, var(--accent-dark) 100%);
 }
 
 .button-link--ghost {

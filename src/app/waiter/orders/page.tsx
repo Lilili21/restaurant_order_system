@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { OrdersList } from "@/components/admin/OrdersList";
 
-export default function AdminOrdersPage() {
+export default function WaiterOrdersPage() {
   return (
     <main className="page-shell">
       <section className="hero hero--compact">

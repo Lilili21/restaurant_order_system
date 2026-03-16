@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { MenuEditor } from "@/components/admin/MenuEditor";
 
 export default function AdminPage() {
   return (
@@ -6,21 +6,15 @@ export default function AdminPage() {
       <section className="hero hero--compact">
         <div>
           <p className="eyebrow">Admin</p>
-          <h1>Restaurant dashboard</h1>
+          <h1>Menu editor</h1>
           <p className="muted">
-            Review incoming table orders here and keep extending the system with
-            statuses, kitchen printing, and payments.
+            Edit menu items, kitchen notices, and the table count controls from
+            one place.
           </p>
         </div>
-        <div className="hero-actions">
-          <Link href="/admin/orders" className="button-link">
-            View orders
-          </Link>
-          <Link href="/admin/tables" className="button-link button-link--ghost">
-            View tables
-          </Link>
-        </div>
       </section>
+
+      <MenuEditor />
     </main>
   );
 }
