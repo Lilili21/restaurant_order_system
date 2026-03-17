@@ -60,6 +60,26 @@ const categoryFlightIcons: Record<MenuCategory, string> = {
   desserts: "🍰"
 };
 
+const drinkCategories = new Set<MenuCategory>([
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+]);
+
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 
 const uiText = {
@@ -76,6 +96,15 @@ const uiText = {
     reviewOrderText: "נא לעבור על ההזמנה לפני השליחה.",
     reviewOrderOk: "אישור",
     reviewOrderChange: "עריכה",
+    dessertPromptTitle: "רגע לפני השליחה",
+    dessertPromptText: "שמתי לב שאין בהזמנה קינוח. תרצו להוסיף משהו מתוק לפני שנמשיך?",
+    drinksPromptTitle: "רגע לפני השליחה",
+    drinksPromptText: "שמתי לב שאין בהזמנה שתייה. תרצו להוסיף משהו לשתות לפני שנמשיך?",
+    dessertDrinksPromptTitle: "רגע לפני השליחה",
+    dessertDrinksPromptText:
+      "שמתי לב שאין בהזמנה גם שתייה וגם קינוח. תרצו להוסיף משהו לשתות או משהו מתוק לפני שנמשיך?",
+    dessertPromptLater: "אחר כך",
+    dessertPromptNow: "עכשיו",
     serveModeTitle: "איך להגיש את ההזמנה?",
     serveModeText: "בחרו את אופן ההגשה המתאים לכם.",
     serveAll: "להגיש הכול יחד",
@@ -124,6 +153,16 @@ const uiText = {
     reviewOrderText: "Please review your order before sending it.",
     reviewOrderOk: "OK",
     reviewOrderChange: "Change",
+    dessertPromptTitle: "One more thing",
+    dessertPromptText: "I noticed there is no dessert in your order. Would you like to add a dessert before we continue?",
+    drinksPromptTitle: "One more thing",
+    drinksPromptText:
+      "I noticed there are no drinks in your order. Would you like to add something to drink before we continue?",
+    dessertDrinksPromptTitle: "One more thing",
+    dessertDrinksPromptText:
+      "I noticed there are no drinks or desserts in your order. Would you like to add something to drink or a dessert before we continue?",
+    dessertPromptLater: "Later",
+    dessertPromptNow: "Now",
     serveModeTitle: "How should we serve your order?",
     serveModeText: "Choose the serving option that works best for you.",
     serveAll: "Serve everything together",
@@ -180,7 +219,9 @@ export function Cart({
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [showWelcomeDialog, setShowWelcomeDialog] = useState(true);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
-  const [showServeModeDialog, setShowServeModeDialog] = useState(false);
+  const [upsellPrompt, setUpsellPrompt] = useState<
+    null | "dessert" | "drinks" | "dessert_drinks"
+  >(null);
   const [language, setLanguage] = useState<MenuLanguage>("he");
   const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
@@ -211,6 +252,12 @@ export function Cart({
       (item.cartItem.priceOverride ?? item.menuItem.price) *
         item.cartItem.quantity,
     0
+  );
+  const hasDessertInOrder = detailedItems.some(
+    ({ menuItem }) => menuItem.category === "desserts"
+  );
+  const hasDrinksInOrder = detailedItems.some(({ menuItem }) =>
+    drinkCategories.has(menuItem.category)
   );
 
   const quantities = items.reduce<Record<string, number>>((acc, item) => {
@@ -518,7 +565,6 @@ export function Cart({
   async function submitOrder(serveMode: ServeMode) {
     setSubmitting(true);
     setMessage(null);
-    setShowServeModeDialog(false);
     setShowReviewDialog(false);
 
     try {
@@ -679,6 +725,47 @@ export function Cart({
     setOrderJumpExpanded(false);
   }
 
+  function getUpsellPromptType() {
+    if (!hasDessertInOrder && !hasDrinksInOrder) {
+      return "dessert_drinks" as const;
+    }
+
+    if (!hasDessertInOrder) {
+      return "dessert" as const;
+    }
+
+    if (!hasDrinksInOrder) {
+      return "drinks" as const;
+    }
+
+    return null;
+  }
+
+  function getUpsellPromptContent() {
+    if (upsellPrompt === "dessert") {
+      return {
+        title: text.dessertPromptTitle,
+        description: text.dessertPromptText
+      };
+    }
+
+    if (upsellPrompt === "drinks") {
+      return {
+        title: text.drinksPromptTitle,
+        description: text.drinksPromptText
+      };
+    }
+
+    if (upsellPrompt === "dessert_drinks") {
+      return {
+        title: text.dessertDrinksPromptTitle,
+        description: text.dessertDrinksPromptText
+      };
+    }
+
+    return null;
+  }
+
   return (
     <>
       {dialogMessage ? (
@@ -766,8 +853,15 @@ export function Cart({
                 className="button-success"
                 type="button"
                 onClick={() => {
+                  const nextUpsellPrompt = getUpsellPromptType();
+
+                  if (!nextUpsellPrompt) {
+                    void submitOrder("as_ready");
+                    return;
+                  }
+
                   setShowReviewDialog(false);
-                  setShowServeModeDialog(true);
+                  setUpsellPrompt(nextUpsellPrompt);
                 }}
               >
                 {text.reviewOrderOk}
@@ -784,41 +878,35 @@ export function Cart({
         </div>
       ) : null}
 
-      {showServeModeDialog ? (
+      {upsellPrompt && getUpsellPromptContent() ? (
         <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card"
             role="dialog"
             aria-modal="true"
-            aria-labelledby="serve-mode-dialog-title"
+            aria-labelledby="upsell-prompt-dialog-title"
           >
-            <button
-              className="modal-card__close"
-              type="button"
-              aria-label={text.close}
-              onClick={() => {
-                setShowServeModeDialog(false);
-                setShowReviewDialog(false);
-              }}
-            >
-              X
-            </button>
-            <h2 id="serve-mode-dialog-title">{text.serveModeTitle}</h2>
-            <p>{text.serveModeText}</p>
+            <h2 id="upsell-prompt-dialog-title">
+              {getUpsellPromptContent()?.title}
+            </h2>
+            <p>{getUpsellPromptContent()?.description}</p>
             <div className="modal-actions">
               <button
                 className="button-success"
                 type="button"
-                onClick={() => submitOrder("all_at_once")}
+                onClick={() => {
+                  setUpsellPrompt(null);
+                  void submitOrder("as_ready");
+                }}
               >
-                {text.serveAll}
+                {text.dessertPromptLater}
               </button>
               <button
                 className="button-neutral"
                 type="button"
-                onClick={() => submitOrder("as_ready")}
+                onClick={() => setUpsellPrompt(null)}
               >
-                {text.serveAsReady}
+                {text.dessertPromptNow}
               </button>
             </div>
           </div>

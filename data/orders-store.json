@@ -1,15 +1,81 @@
 {
   "orders": [
     {
-      "id": "ord_1773757119479",
+      "id": "ord_1773758722306",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 2,
       "sessionId": 2,
       "status": "new",
-      "serveMode": "all_at_once",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-17T14:45:22.306Z",
+      "updatedAt": "2026-03-17T14:45:22.306Z",
+      "items": [
+        {
+          "id": "item_1773758722306_nbyaze",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 100
+    },
+    {
+      "id": "ord_1773758047329",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 2,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-17T14:34:07.330Z",
+      "updatedAt": "2026-03-17T14:44:45.208Z",
+      "items": [
+        {
+          "id": "item_1773758047329_rgpus1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773758685206_5qchp5",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773758685207_2z73la",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 100
+    },
+    {
+      "id": "ord_1773757119479",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 2,
+      "status": "preparing",
+      "serveMode": "as_ready",
       "createdAt": "2026-03-17T14:18:39.479Z",
-      "updatedAt": "2026-03-17T14:18:39.479Z",
+      "updatedAt": "2026-03-17T14:33:14.716Z",
       "items": [
         {
           "id": "item_1773757119479_05i896",
@@ -43,9 +109,27 @@
           "price": 20,
           "quantity": 1,
           "served": false
+        },
+        {
+          "id": "item_1773757333773_65tk59",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773757994715_4ib1ky",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 50
+      "total": 198
     },
     {
       "id": "bill_1773757001987",
