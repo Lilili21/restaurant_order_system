@@ -1,5 +1,28 @@
 [
   {
+    "id": "m_1773757074844",
+    "restaurantSlug": "olive-bistro",
+    "category": "two_component_mixture",
+    "name": "פינה קולהדה",
+    "description": "",
+    "nameHe": "פינה קולהדה",
+    "nameEn": "pina colada",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "price": 20,
+    "image": "/images/default-menu-item.svg",
+    "showImage": true,
+    "available": true,
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_0_empty_20",
+        "label": "",
+        "price": 20
+      }
+    ]
+  },
+  {
     "id": "m_1773741164354",
     "restaurantSlug": "olive-bistro",
     "category": "non_alcoholic_drinks",
@@ -26,31 +49,6 @@
         "id": "volume_1_2L",
         "label": "2L",
         "price": 20
-      }
-    ]
-  },
-  {
-    "id": "m_1773741086722",
-    "restaurantSlug": "olive-bistro",
-    "category": "drinks",
-    "name": "מיץ תפוזים",
-    "description": "",
-    "nameHe": "מיץ תפוזים",
-    "nameEn": "orange juice",
-    "descriptionHe": "",
-    "descriptionEn": "",
-    "price": 10,
-    "image": "/images/default-menu-item.svg",
-    "showImage": true,
-    "available": true,
-    "badges": [
-      "most_popular"
-    ],
-    "volumeOptions": [
-      {
-        "id": "volume_0_1L",
-        "label": "1L",
-        "price": 10
       }
     ]
   },
@@ -156,10 +154,10 @@
   {
     "id": "m5",
     "restaurantSlug": "olive-bistro",
-    "category": "ouzo",
+    "category": "non_alcoholic_drinks",
     "name": "לימונדה עם נענע",
     "description": "לימונדה ביתית בלי סירופים.",
-    "price": 18,
+    "price": 10,
     "image": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=900&q=80",
     "available": true,
     "nameHe": "לימונדה עם נענע",
@@ -170,8 +168,8 @@
     "badges": [],
     "volumeOptions": [
       {
-        "id": "volume_0_10",
-        "label": "10",
+        "id": "volume_0_empty_10",
+        "label": "",
         "price": 10
       }
     ]

@@ -39,6 +39,8 @@ export default async function MenuPage({ params }: MenuPageProps) {
           showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
+          showBarOpen={menuSettings.barOpenEnabled}
+          barOpenUntil={menuSettings.barOpenUntil}
           initialSubmittedOrders={[]}
         />
       </main>
@@ -62,6 +64,8 @@ export default async function MenuPage({ params }: MenuPageProps) {
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
         showKitchenOpen={menuSettings.kitchenOpenEnabled}
         kitchenOpenUntil={menuSettings.kitchenOpenUntil}
+        showBarOpen={menuSettings.barOpenEnabled}
+        barOpenUntil={menuSettings.barOpenUntil}
         initialSubmittedOrders={await getTableSessionOrders(
           restaurantSlug,
           session.table.number

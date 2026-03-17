@@ -23,6 +23,8 @@ type CartProps = {
   showKitchenLoadWarning: boolean;
   showKitchenOpen: boolean;
   kitchenOpenUntil: string | null;
+  showBarOpen: boolean;
+  barOpenUntil: string | null;
   initialSubmittedOrders: Order[];
 };
 
@@ -93,6 +95,10 @@ const uiText = {
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenOpen: "המטבח נסגר בעוד",
     kitchenClosed: "המטבח סגור",
+    kitchenClosedNote: "קראו למלצר כדי לשאול על נשנושים אפשריים.",
+    barOpen: "הבר נסגר בעוד",
+    barClosed: "הבר סגור",
+    barClosedNote: "קראו למלצר כדי לשאול על משקאות אפשריים.",
     kitchenClosedAction: "לצערנו המטבח סגור",
     waiterAvailable: "המלצר עדיין זמין עבורכם אם תצטרכו עזרה.",
     kitchenLoadWarning:
@@ -137,6 +143,10 @@ const uiText = {
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
+    kitchenClosedNote: "Call the waiter to ask about available snacks.",
+    barOpen: "Bar closed in",
+    barClosed: "Bar closed",
+    barClosedNote: "Call the waiter to ask about available drinks.",
     kitchenClosedAction: "Unfortunately, the kitchen is closed",
     waiterAvailable: "A waiter is still available if you need any assistance.",
     kitchenLoadWarning:
@@ -160,6 +170,8 @@ export function Cart({
   showKitchenLoadWarning,
   showKitchenOpen,
   kitchenOpenUntil,
+  showBarOpen,
+  barOpenUntil,
   initialSubmittedOrders
 }: CartProps) {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -219,6 +231,12 @@ export function Cart({
   const hasKitchenOpenTimer = showKitchenOpen && Boolean(kitchenOpenUntil);
   const showKitchenOpenBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs > 0;
   const showKitchenClosedBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs <= 0;
+  const barOpenRemainingMs = barOpenUntil
+    ? new Date(barOpenUntil).getTime() - countdownNow
+    : 0;
+  const hasBarOpenTimer = showBarOpen && Boolean(barOpenUntil);
+  const showBarOpenBanner = hasBarOpenTimer && barOpenRemainingMs > 0;
+  const showBarClosedBanner = hasBarOpenTimer && barOpenRemainingMs <= 0;
   const isKitchenClosed = showKitchenClosedBanner;
 
   function getMenuItemDisplayName(
@@ -901,7 +919,23 @@ export function Cart({
               </div>
             ) : null}
             {showKitchenClosedBanner ? (
-              <p className="menu-kitchen-note">{text.waiterAvailable}</p>
+              <p className="menu-kitchen-note">{text.kitchenClosedNote}</p>
+            ) : null}
+            {showBarOpenBanner ? (
+              <div className="menu-kitchen-open">
+                <span className="menu-kitchen-open__label">{text.barOpen}</span>
+                <strong className="menu-kitchen-open__timer">
+                  {formatCountdown(barOpenRemainingMs)}
+                </strong>
+              </div>
+            ) : null}
+            {showBarClosedBanner ? (
+              <div className="menu-kitchen-open menu-kitchen-open--closed">
+                <strong className="menu-kitchen-open__label">{text.barClosed}</strong>
+              </div>
+            ) : null}
+            {showBarClosedBanner ? (
+              <p className="menu-kitchen-note">{text.barClosedNote}</p>
             ) : null}
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>

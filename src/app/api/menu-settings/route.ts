@@ -11,6 +11,8 @@ export async function GET() {
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
     kitchenOpenEnabled: settings.kitchenOpenEnabled,
     kitchenOpenUntil: settings.kitchenOpenUntil,
+    barOpenEnabled: settings.barOpenEnabled,
+    barOpenUntil: settings.barOpenUntil,
     tableCount: settings.tableCount
   });
 }
@@ -39,6 +41,8 @@ export async function PATCH(request: NextRequest) {
       kitchenLoadWarningEnabled?: boolean;
       kitchenOpenEnabled?: boolean;
       kitchenOpenUntil?: string | null;
+      barOpenEnabled?: boolean;
+      barOpenUntil?: string | null;
       tableCount?: number;
     };
 
@@ -47,6 +51,8 @@ export async function PATCH(request: NextRequest) {
         kitchenLoadWarningEnabled: body.kitchenLoadWarningEnabled,
         kitchenOpenEnabled: body.kitchenOpenEnabled,
         kitchenOpenUntil: body.kitchenOpenUntil,
+        barOpenEnabled: body.barOpenEnabled,
+        barOpenUntil: body.barOpenUntil,
         tableCount: body.tableCount
       })
     );

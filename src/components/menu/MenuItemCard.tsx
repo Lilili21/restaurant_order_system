@@ -133,7 +133,7 @@ export function MenuItemCard({
               return (
                 <div key={option.id} className="menu-card__volume-row">
                   <div className="menu-card__volume-meta">
-                    <strong>{option.label}</strong>
+                    {option.label ? <strong>{option.label}</strong> : null}
                     <span>{formatCurrency(option.price)}</span>
                   </div>
                   {!orderingEnabled ? null : optionQuantity > 0 ? (

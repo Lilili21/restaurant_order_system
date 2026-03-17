@@ -1,13 +1,131 @@
 {
   "orders": [
     {
+      "id": "ord_1773757119479",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 2,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-17T14:18:39.479Z",
+      "updatedAt": "2026-03-17T14:18:39.479Z",
+      "items": [
+        {
+          "id": "item_1773757119479_05i896",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773757119479_xe7ngs",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_0_1L",
+          "volumeLabel": "1L",
+          "price": 10,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773757119479_gekvsb",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_1_2L",
+          "volumeLabel": "2L",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 50
+    },
+    {
+      "id": "bill_1773757001987",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 2,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-17T14:16:41.987Z",
+      "updatedAt": "2026-03-17T14:16:41.987Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "bill_1773755791649",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 1,
+      "kind": "bill_request",
+      "status": "served",
+      "createdAt": "2026-03-17T13:56:31.650Z",
+      "updatedAt": "2026-03-17T13:56:31.650Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773746144027",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 2,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-17T11:15:44.027Z",
+      "updatedAt": "2026-03-17T11:15:44.027Z",
+      "items": [
+        {
+          "id": "item_1773746144027_5fftmc",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773746144027_9oy04k",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_0_1L",
+          "volumeLabel": "1L",
+          "price": 10,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773746144027_ps4cfd",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_1_2L",
+          "volumeLabel": "2L",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 130
+    },
+    {
       "id": "bill_1773740240220",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 7,
       "sessionId": 1,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-17T09:37:20.220Z",
       "updatedAt": "2026-03-17T09:37:20.220Z",
       "items": [],
@@ -20,7 +138,7 @@
       "tableNumber": 4,
       "sessionId": 2,
       "kind": "waiter_call",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-17T09:37:11.510Z",
       "updatedAt": "2026-03-17T09:37:11.510Z",
       "items": [],

@@ -165,7 +165,7 @@ export function MenuList({
     }
 
     if (selectedCategory === "drinks") {
-      return drinkCategories.has(category);
+      return category !== "drinks" && drinkCategories.has(category);
     }
 
     return selectedCategory === category;

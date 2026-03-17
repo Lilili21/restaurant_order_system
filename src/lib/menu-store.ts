@@ -37,12 +37,17 @@ function normalizeVolumeOptions(
       const label = option?.label?.trim() || "";
       const price = Number(option?.price);
 
-      if (!label || !Number.isFinite(price)) {
+      if (!Number.isFinite(price)) {
         return null;
       }
 
       return {
-        id: option?.id?.trim() || `volume_${index}_${Date.now()}`,
+        id:
+          option?.id?.trim() ||
+          `volume_${index}_${(label || "empty").replace(/\s+/g, "_")}_${Math.max(
+            0,
+            Math.round(price)
+          )}`,
         label,
         price: Math.max(0, Math.round(price))
       };

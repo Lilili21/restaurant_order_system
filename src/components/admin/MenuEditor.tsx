@@ -160,12 +160,15 @@ function parseVolumeOptions(value: string): MenuVolumeOption[] {
       const [rawLabel, rawPrice] = line.split("|").map((part) => part.trim());
       const price = Number(rawPrice);
 
-      if (!rawLabel || !Number.isFinite(price)) {
+      if (!Number.isFinite(price)) {
         return null;
       }
 
       return {
-        id: `volume_${index}_${rawLabel.replace(/\s+/g, "_")}`,
+        id: `volume_${index}_${(rawLabel || "empty").replace(/\s+/g, "_")}_${Math.max(
+          0,
+          Math.round(price)
+        )}`,
         label: rawLabel,
         price: Math.max(0, Math.round(price))
       };
@@ -261,6 +264,9 @@ export function MenuEditor() {
   const [kitchenOpenEnabled, setKitchenOpenEnabled] = useState(false);
   const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
+  const [barOpenEnabled, setBarOpenEnabled] = useState(false);
+  const [barOpenUntil, setBarOpenUntil] = useState("");
+  const [barOpenSaving, setBarOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
@@ -327,6 +333,8 @@ export function MenuEditor() {
           kitchenLoadWarningEnabled?: boolean;
           kitchenOpenEnabled?: boolean;
           kitchenOpenUntil?: string | null;
+          barOpenEnabled?: boolean;
+          barOpenUntil?: string | null;
         };
 
         setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
@@ -334,6 +342,16 @@ export function MenuEditor() {
         setKitchenOpenUntil(
           settings.kitchenOpenUntil
             ? new Date(settings.kitchenOpenUntil).toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              })
+            : ""
+        );
+        setBarOpenEnabled(Boolean(settings.barOpenEnabled));
+        setBarOpenUntil(
+          settings.barOpenUntil
+            ? new Date(settings.barOpenUntil).toLocaleTimeString("en-GB", {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: false
@@ -605,6 +623,54 @@ export function MenuEditor() {
     }
 
     setKitchenOpenSaving(false);
+  }
+
+  async function saveBarOpenSettings(nextEnabled: boolean, nextTime: string) {
+    const normalizedTime = nextTime.trim();
+    let isoValue: string | null = null;
+
+    if (nextEnabled) {
+      if (!normalizedTime) {
+        setMessage("Select the bar open time first.");
+        return;
+      }
+
+      const [hours, minutes] = normalizedTime.split(":").map(Number);
+
+      if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        setMessage("Invalid bar open time.");
+        return;
+      }
+
+      const target = new Date();
+      target.setHours(hours, minutes, 0, 0);
+      isoValue = target.toISOString();
+    }
+
+    setBarOpenEnabled(nextEnabled);
+    setBarOpenUntil(normalizedTime);
+    setBarOpenSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        barOpenEnabled: nextEnabled,
+        barOpenUntil: nextEnabled ? isoValue : null
+      })
+    });
+
+    if (!response.ok) {
+      setMessage("Failed to update bar open settings.");
+      setBarOpenSaving(false);
+      return;
+    }
+
+    setBarOpenSaving(false);
   }
 
   async function saveItem(itemId: string) {
@@ -1056,6 +1122,42 @@ export function MenuEditor() {
                 onBlur={() => {
                   if (kitchenOpenEnabled) {
                     void saveKitchenOpenSettings(true, kitchenOpenUntil);
+                  }
+                }}
+              />
+            </label>
+          </div>
+          <div className="menu-notice-control">
+            <label className="menu-notice-control__toggle">
+              <input
+                type="checkbox"
+                checked={barOpenEnabled}
+                disabled={barOpenSaving}
+                onChange={(event) =>
+                  void saveBarOpenSettings(event.target.checked, barOpenUntil)
+                }
+              />
+              <span
+                className={
+                  barOpenEnabled
+                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
+                    : "menu-notice-control__text"
+                }
+              >
+                Bar open
+              </span>
+            </label>
+            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+              <span>Until</span>
+              <input
+                className="modal-input"
+                type="time"
+                value={barOpenUntil}
+                disabled={barOpenSaving}
+                onChange={(event) => setBarOpenUntil(event.target.value)}
+                onBlur={() => {
+                  if (barOpenEnabled) {
+                    void saveBarOpenSettings(true, barOpenUntil);
                   }
                 }}
               />

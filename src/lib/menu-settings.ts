@@ -7,6 +7,8 @@ export type MenuSettings = {
   kitchenLoadWarningEnabled: boolean;
   kitchenOpenEnabled: boolean;
   kitchenOpenUntil: string | null;
+  barOpenEnabled: boolean;
+  barOpenUntil: string | null;
   tableCount: number;
   tableTokens: Record<string, string>;
 };
@@ -19,6 +21,8 @@ const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
   kitchenOpenEnabled: false,
   kitchenOpenUntil: null,
+  barOpenEnabled: false,
+  barOpenUntil: null,
   tableCount: 8,
   tableTokens: {}
 };
@@ -65,11 +69,17 @@ function normalizeSettings(
     settings.kitchenOpenUntil.trim()
       ? settings.kitchenOpenUntil
       : null;
+  const barOpenUntil =
+    typeof settings?.barOpenUntil === "string" && settings.barOpenUntil.trim()
+      ? settings.barOpenUntil
+      : null;
 
   return {
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
     kitchenOpenEnabled: Boolean(settings?.kitchenOpenEnabled),
     kitchenOpenUntil,
+    barOpenEnabled: Boolean(settings?.barOpenEnabled),
+    barOpenUntil,
     tableCount,
     tableTokens
   };
