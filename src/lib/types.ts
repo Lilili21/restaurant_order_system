@@ -77,6 +77,9 @@ export type CartItem = {
   menuItemId: string;
   quantity: number;
   note?: string;
+  volumeOptionId?: string;
+  volumeLabel?: string;
+  priceOverride?: number;
 };
 
 export type OrderItem = {
@@ -84,6 +87,8 @@ export type OrderItem = {
   menuItemId: string;
   category?: MenuCategory;
   name: string;
+  volumeOptionId?: string;
+  volumeLabel?: string;
   price: number;
   quantity: number;
   note?: string;

@@ -194,12 +194,15 @@ export function Cart({
   }, [items, menu]);
 
   const total = detailedItems.reduce(
-    (sum, item) => sum + item.menuItem.price * item.cartItem.quantity,
+    (sum, item) =>
+      sum +
+      (item.cartItem.priceOverride ?? item.menuItem.price) *
+        item.cartItem.quantity,
     0
   );
 
   const quantities = items.reduce<Record<string, number>>((acc, item) => {
-    acc[item.menuItemId] = item.quantity;
+    acc[`${item.menuItemId}:${item.volumeOptionId ?? "base"}`] = item.quantity;
     return acc;
   }, {});
 
@@ -218,16 +221,26 @@ export function Cart({
   const showKitchenClosedBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs <= 0;
   const isKitchenClosed = showKitchenClosedBanner;
 
-  function getMenuItemDisplayName(menuItemId: string) {
+  function getMenuItemDisplayName(
+    menuItemId: string,
+    volumeLabel?: string | null
+  ) {
     const menuItem = menu.find((item) => item.id === menuItemId);
 
     if (!menuItem) {
       return "";
     }
 
-    return language === "he"
+    const baseName =
+      language === "he"
       ? menuItem.nameHe || menuItem.name
       : menuItem.nameEn || menuItem.nameHe || menuItem.name;
+
+    return volumeLabel ? `${baseName} · ${volumeLabel}` : baseName;
+  }
+
+  function getCartItemKey(cartItem: CartItem) {
+    return `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`;
   }
 
   useEffect(() => {
@@ -406,28 +419,56 @@ export function Cart({
     }, 1320);
   }
 
-  function addItem(menuItemId: string, sourceElement?: HTMLElement | null) {
+  function addItem(
+    menuItemId: string,
+    sourceElement?: HTMLElement | null,
+    volumeOptionId?: string
+  ) {
     animateOrderMovement(menuItemId, "to-order", sourceElement);
+    const menuItem = menu.find((item) => item.id === menuItemId);
+    const matchedVolumeOption = menuItem?.volumeOptions?.find(
+      (option) => option.id === volumeOptionId
+    );
+
     setItems((current) => {
-      const existing = current.find((item) => item.menuItemId === menuItemId);
+      const existing = current.find(
+        (item) =>
+          item.menuItemId === menuItemId &&
+          (item.volumeOptionId ?? "") === (volumeOptionId ?? "")
+      );
 
       if (existing) {
         return current.map((item) =>
-          item.menuItemId === menuItemId
+          item.menuItemId === menuItemId &&
+          (item.volumeOptionId ?? "") === (volumeOptionId ?? "")
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
 
-      return [...current, { menuItemId, quantity: 1 }];
+      return [
+        ...current,
+        {
+          menuItemId,
+          quantity: 1,
+          volumeOptionId,
+          volumeLabel: matchedVolumeOption?.label,
+          priceOverride: matchedVolumeOption?.price
+        }
+      ];
     });
   }
 
-  function changeQuantity(menuItemId: string, delta: number) {
+  function changeQuantity(
+    menuItemId: string,
+    delta: number,
+    volumeOptionId?: string
+  ) {
     setItems((current) =>
       current
         .map((item) =>
-          item.menuItemId === menuItemId
+          item.menuItemId === menuItemId &&
+          (item.volumeOptionId ?? "") === (volumeOptionId ?? "")
             ? { ...item, quantity: item.quantity + delta }
             : item
         )
@@ -447,9 +488,13 @@ export function Cart({
     }
   }
 
-  function decreaseItem(menuItemId: string, sourceElement?: HTMLElement | null) {
+  function decreaseItem(
+    menuItemId: string,
+    sourceElement?: HTMLElement | null,
+    volumeOptionId?: string
+  ) {
     animateOrderMovement(menuItemId, "from-order", sourceElement);
-    changeQuantity(menuItemId, -1);
+    changeQuantity(menuItemId, -1, volumeOptionId);
   }
 
   async function submitOrder(serveMode: ServeMode) {
@@ -675,14 +720,21 @@ export function Cart({
           >
             <h2 id="review-order-dialog-title">{text.reviewOrderTitle}</h2>
             <p>{text.reviewOrderText}</p>
-            <div className="table-order-items">
-              {detailedItems.map(({ cartItem, menuItem }) => (
-                <div key={menuItem.id} className="table-order-item">
+              <div className="table-order-items">
+                {detailedItems.map(({ cartItem, menuItem }) => (
+                <div key={getCartItemKey(cartItem)} className="table-order-item">
                   <span>
-                    {getMenuItemDisplayName(menuItem.id)} x {cartItem.quantity}
+                    {getMenuItemDisplayName(
+                      menuItem.id,
+                      cartItem.volumeLabel
+                    )}{" "}
+                    x {cartItem.quantity}
                   </span>
                   <strong>
-                    {formatCurrency(menuItem.price * cartItem.quantity)}
+                    {formatCurrency(
+                      (cartItem.priceOverride ?? menuItem.price) *
+                        cartItem.quantity
+                    )}
                   </strong>
                 </div>
               ))}
@@ -906,22 +958,41 @@ export function Cart({
             ) : (
               <div className="cart-list">
                 {detailedItems.map(({ cartItem, menuItem }) => (
-                  <div className="cart-row" key={menuItem.id}>
+                  <div className="cart-row" key={getCartItemKey(cartItem)}>
                     <div>
-                      <strong>{getMenuItemDisplayName(menuItem.id)}</strong>
-                      <p className="muted">{formatCurrency(menuItem.price)}</p>
+                      <strong>
+                        {getMenuItemDisplayName(
+                          menuItem.id,
+                          cartItem.volumeLabel
+                        )}
+                      </strong>
+                      <p className="muted">
+                        {formatCurrency(cartItem.priceOverride ?? menuItem.price)}
+                      </p>
                     </div>
                     <div className="quantity-box">
                       <button
                         type="button"
-                        onClick={() => changeQuantity(menuItem.id, -1)}
+                        onClick={() =>
+                          changeQuantity(
+                            menuItem.id,
+                            -1,
+                            cartItem.volumeOptionId
+                          )
+                        }
                       >
                         -
                       </button>
                       <span>{cartItem.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => changeQuantity(menuItem.id, 1)}
+                        onClick={() =>
+                          changeQuantity(
+                            menuItem.id,
+                            1,
+                            cartItem.volumeOptionId
+                          )
+                        }
                       >
                         +
                       </button>
@@ -1001,7 +1072,10 @@ export function Cart({
                           <div key={item.id} className="table-order-item">
                             <span>
                               {item.quantity} x{" "}
-                              {getMenuItemDisplayName(item.menuItemId) || item.name}
+                              {getMenuItemDisplayName(
+                                item.menuItemId,
+                                item.volumeLabel
+                              ) || item.name}
                             </span>
                             <strong>{formatCurrency(item.price * item.quantity)}</strong>
                           </div>

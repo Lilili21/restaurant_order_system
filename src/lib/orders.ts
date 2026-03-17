@@ -38,12 +38,16 @@ function cloneInitialOrders() {
 
 async function normalizeOrderItemForAdmin(item: OrderItem): Promise<OrderItem> {
   const menuItem = await getMenuItemById(item.menuItemId);
+  const matchedVolumeOption = menuItem?.volumeOptions?.find(
+    (option) => option.id === item.volumeOptionId
+  );
 
   return {
     ...item,
     category: item.category ?? menuItem?.category,
     name: menuItem?.nameEn || item.name,
-    price: menuItem?.price ?? item.price
+    volumeLabel: item.volumeLabel ?? matchedVolumeOption?.label,
+    price: matchedVolumeOption?.price ?? item.price
   };
 }
 
@@ -284,12 +288,21 @@ async function createOrderItem(cartItem: CartItem): Promise<OrderItem> {
     throw new Error(`Menu item ${cartItem.menuItemId} not found`);
   }
 
+  const matchedVolumeOption = menuItem.volumeOptions?.find(
+    (option) => option.id === cartItem.volumeOptionId
+  );
+
   return {
     id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     menuItemId: menuItem.id,
     category: menuItem.category,
     name: menuItem.nameEn || menuItem.name,
-    price: menuItem.price,
+    volumeOptionId: cartItem.volumeOptionId,
+    volumeLabel: cartItem.volumeLabel ?? matchedVolumeOption?.label,
+    price:
+      matchedVolumeOption?.price ??
+      cartItem.priceOverride ??
+      menuItem.price,
     quantity: cartItem.quantity,
     note: cartItem.note?.trim() || undefined,
     served: false
@@ -304,6 +317,7 @@ async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
     const existingItem = mergedItems.find(
       (item) =>
         item.menuItemId === nextItem.menuItemId &&
+        (item.volumeOptionId ?? "") === (nextItem.volumeOptionId ?? "") &&
         (item.note ?? "") === (nextItem.note ?? "") &&
         !item.served
     );

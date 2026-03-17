@@ -567,6 +567,32 @@ button:disabled {
   padding: 18px;
 }
 
+.menu-card__volume-list {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-card__volume-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.72);
+  border: 1px solid var(--border);
+}
+
+.menu-card__volume-meta {
+  display: grid;
+  gap: 4px;
+}
+
+.menu-card__volume-meta span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .menu-card__footer,
 .cart-summary,
 .order-card__header,

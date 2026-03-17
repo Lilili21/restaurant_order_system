@@ -8,8 +8,16 @@ type MenuListProps = {
   language: MenuLanguage;
   quantities: Record<string, number>;
   orderingEnabled?: boolean;
-  onAdd: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
-  onDecrease: (menuItemId: string, sourceElement?: HTMLElement | null) => void;
+  onAdd: (
+    menuItemId: string,
+    sourceElement?: HTMLElement | null,
+    volumeOptionId?: string
+  ) => void;
+  onDecrease: (
+    menuItemId: string,
+    sourceElement?: HTMLElement | null,
+    volumeOptionId?: string
+  ) => void;
 };
 
 type MenuFilter = MenuCategory | "dishes" | "drinks";
@@ -119,6 +127,8 @@ export function MenuList({
   onDecrease
 }: MenuListProps) {
   const [selectedCategory, setSelectedCategory] = useState<MenuFilter>("dishes");
+  const getQuantityKey = (menuItemId: string, volumeOptionId?: string) =>
+    `${menuItemId}:${volumeOptionId ?? "base"}`;
   const grouped = useMemo(
     () =>
       items.reduce<Record<string, MenuItem[]>>((acc, item) => {
@@ -236,7 +246,8 @@ export function MenuList({
                     key={item.id}
                     item={item}
                     language={language}
-                    quantity={quantities[item.id] ?? 0}
+                    quantity={quantities[getQuantityKey(item.id)] ?? 0}
+                    optionQuantities={quantities}
                     orderingEnabled={orderingEnabled}
                     onAdd={onAdd}
                     onDecrease={onDecrease}

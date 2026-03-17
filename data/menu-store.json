@@ -1,5 +1,60 @@
 [
   {
+    "id": "m_1773741164354",
+    "restaurantSlug": "olive-bistro",
+    "category": "non_alcoholic_drinks",
+    "name": "מיץץ2",
+    "description": "",
+    "nameHe": "מיץץ2",
+    "nameEn": "orange juice2",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "price": 10,
+    "image": "/images/default-menu-item.svg",
+    "showImage": true,
+    "available": true,
+    "badges": [
+      "most_popular"
+    ],
+    "volumeOptions": [
+      {
+        "id": "volume_0_1L",
+        "label": "1L",
+        "price": 10
+      },
+      {
+        "id": "volume_1_2L",
+        "label": "2L",
+        "price": 20
+      }
+    ]
+  },
+  {
+    "id": "m_1773741086722",
+    "restaurantSlug": "olive-bistro",
+    "category": "drinks",
+    "name": "מיץ תפוזים",
+    "description": "",
+    "nameHe": "מיץ תפוזים",
+    "nameEn": "orange juice",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "price": 10,
+    "image": "/images/default-menu-item.svg",
+    "showImage": true,
+    "available": true,
+    "badges": [
+      "most_popular"
+    ],
+    "volumeOptions": [
+      {
+        "id": "volume_0_1L",
+        "label": "1L",
+        "price": 10
+      }
+    ]
+  },
+  {
     "id": "m_1773255842139",
     "restaurantSlug": "olive-bistro",
     "category": "starters",

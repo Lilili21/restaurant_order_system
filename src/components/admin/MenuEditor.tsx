@@ -228,6 +228,19 @@ function updateVolumeRow(
   return stringifyVolumeRows(rows);
 }
 
+function getBasePriceForKind(
+  kind: "dishes" | "drinks",
+  priceText: string,
+  volumeOptionsText: string
+) {
+  if (kind === "drinks") {
+    const firstVolumePrice = parseVolumeOptions(volumeOptionsText)[0]?.price;
+    return Number.isFinite(firstVolumePrice) ? firstVolumePrice : NaN;
+  }
+
+  return Number(priceText);
+}
+
 export function MenuEditor() {
   const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -607,6 +620,27 @@ export function MenuEditor() {
       )
     );
 
+    const itemKind = getItemKind(currentItem.draftCategory);
+    const basePrice = getBasePriceForKind(
+      itemKind,
+      currentItem.draftPrice,
+      currentItem.draftVolumeOptionsText
+    );
+
+    if (!currentItem.draftNameHe.trim() || !Number.isFinite(basePrice)) {
+      setMessage(
+        itemKind === "drinks"
+          ? "Fill in the item name and at least one volume and price."
+          : "Fill in the item name and price."
+      );
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId ? { ...item, saving: false } : item
+        )
+      );
+      return;
+    }
+
     const response = await fetch("/api/menu", {
       method: "PATCH",
       headers: {
@@ -623,9 +657,9 @@ export function MenuEditor() {
         descriptionHe: currentItem.draftDescriptionHe,
         descriptionEn:
           currentItem.draftDescriptionEn || currentItem.draftDescriptionHe,
-        price: Number(currentItem.draftPrice),
+        price: basePrice,
         volumeOptions:
-          getItemKind(currentItem.draftCategory) === "drinks"
+          itemKind === "drinks"
             ? parseVolumeOptions(currentItem.draftVolumeOptionsText)
             : [],
         image: currentItem.draftImage,
@@ -661,8 +695,18 @@ export function MenuEditor() {
   }
 
   async function createItem() {
-    if (!newItem.nameHe.trim() || !newItem.price.trim()) {
-      setMessage("Fill in the item name and price for the new entry.");
+    const basePrice = getBasePriceForKind(
+      selectedKind,
+      newItem.price,
+      newItem.volumeOptionsText
+    );
+
+    if (!newItem.nameHe.trim() || !Number.isFinite(basePrice)) {
+      setMessage(
+        selectedKind === "drinks"
+          ? "Fill in the item name and at least one volume and price for the new entry."
+          : "Fill in the item name and price for the new entry."
+      );
       return;
     }
 
@@ -683,7 +727,7 @@ export function MenuEditor() {
         nameEn: newItem.nameEn || newItem.nameHe,
         descriptionHe: newItem.descriptionHe,
         descriptionEn: newItem.descriptionEn || newItem.descriptionHe,
-        price: Number(newItem.price),
+        price: basePrice,
         volumeOptions:
           selectedKind === "drinks"
             ? parseVolumeOptions(newItem.volumeOptionsText)
@@ -715,7 +759,7 @@ export function MenuEditor() {
       image: "",
       showImage: true,
       badges: [],
-      category: "starters",
+      category: selectedKind === "drinks" ? drinkCategories[0] : "starters",
       available: true,
       saving: false
     });
@@ -929,7 +973,7 @@ export function MenuEditor() {
                   ...current,
                   category: drinkCategories.includes(current.category)
                     ? current.category
-                    : "drinks",
+                    : drinkCategories[0],
                   badges: current.badges.filter((badge) =>
                     getBadgeOptionsForKind("drinks").some(
                       (option) => option.value === badge
