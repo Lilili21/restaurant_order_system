@@ -1,7 +1,7 @@
 import { menuItems } from "@/lib/mock-data";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-import { MenuBadge, MenuItem, TableSession } from "@/lib/types";
+import { MenuBadge, MenuItem, MenuVolumeOption, TableSession } from "@/lib/types";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -25,6 +25,31 @@ function cloneDefaultMenuItems() {
   return menuItems.map((item) => ({ ...item }));
 }
 
+function normalizeVolumeOptions(
+  volumeOptions: MenuItem["volumeOptions"]
+): MenuVolumeOption[] {
+  if (!Array.isArray(volumeOptions)) {
+    return [];
+  }
+
+  return volumeOptions
+    .map((option, index) => {
+      const label = option?.label?.trim() || "";
+      const price = Number(option?.price);
+
+      if (!label || !Number.isFinite(price)) {
+        return null;
+      }
+
+      return {
+        id: option?.id?.trim() || `volume_${index}_${Date.now()}`,
+        label,
+        price: Math.max(0, Math.round(price))
+      };
+    })
+    .filter(Boolean) as MenuVolumeOption[];
+}
+
 function normalizeMenuItem(item: MenuItem): MenuItem {
   const nameHe = item.nameHe?.trim() || item.name?.trim() || "";
   const descriptionHe =
@@ -45,6 +70,7 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
           ALLOWED_BADGES.includes(badge as MenuBadge)
         )
       : [],
+    volumeOptions: normalizeVolumeOptions(item.volumeOptions),
     showImage: item.showImage ?? true,
     image: item.image?.trim() || DEFAULT_MENU_IMAGE
   };
@@ -166,6 +192,7 @@ export async function updateMenuItem(
       | "category"
       | "image"
       | "badges"
+      | "volumeOptions"
     >
   >
 ) {
@@ -226,6 +253,10 @@ export async function updateMenuItem(
     );
   }
 
+  if (Array.isArray(updates.volumeOptions)) {
+    menuItem.volumeOptions = normalizeVolumeOptions(updates.volumeOptions);
+  }
+
   menuItem.nameHe = menuItem.nameHe?.trim() || menuItem.name?.trim() || "";
   menuItem.descriptionHe =
     menuItem.descriptionHe?.trim() || menuItem.description?.trim() || "";
@@ -253,6 +284,7 @@ export async function createMenuItem(input: {
   showImage?: boolean;
   image?: string;
   badges?: MenuBadge[];
+  volumeOptions?: MenuVolumeOption[];
 }) {
   const menuStore = await loadMenuItemsAsync();
   const menuItem: MenuItem = {
@@ -273,7 +305,8 @@ export async function createMenuItem(input: {
       ? input.badges.filter((badge): badge is MenuBadge =>
           ALLOWED_BADGES.includes(badge)
         )
-      : []
+      : [],
+    volumeOptions: normalizeVolumeOptions(input.volumeOptions)
   };
 
   menuStore.unshift(menuItem);

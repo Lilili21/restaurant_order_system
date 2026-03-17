@@ -159,6 +159,18 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.hero-title-stacked {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  line-height: 0.88;
+}
+
+.hero-title-stacked span {
+  display: block;
+}
+
 .menu-hero-header {
   display: flex;
   align-items: center;
@@ -407,7 +419,9 @@ button:disabled {
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  margin-bottom: 24px;
+  width: 100%;
+  margin-top: -168px;
+  margin-bottom: 56px;
   flex-wrap: wrap;
 }
 
@@ -879,6 +893,81 @@ textarea.modal-input {
 .menu-editor__description-block {
   display: grid;
   gap: 10px;
+}
+
+.menu-editor__volume-options {
+  display: grid;
+  gap: 12px;
+}
+
+.menu-editor__volume-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.menu-editor__volume-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-editor__volume-add {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.92);
+  color: var(--accent-dark);
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.menu-editor__volume-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-editor__volume-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: 12px;
+}
+
+.menu-editor__volume-price {
+  width: 100%;
+}
+
+.menu-editor__volume-price .modal-input {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.menu-editor__volume-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.menu-editor__volume-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 250, 240, 0.92);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.menu-editor__volume-chip strong {
+  color: var(--text);
+  font-size: 0.92rem;
 }
 
 .menu-editor__description-toggle {
@@ -1802,6 +1891,8 @@ textarea.modal-input {
   }
 
   .menu-editor__toolbar {
+    margin-top: 0;
+    margin-bottom: 24px;
     justify-content: stretch;
   }
 

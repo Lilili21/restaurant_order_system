@@ -10,8 +10,8 @@ const ADMIN_COOKIE_NAME = "admin_access";
 function getConfiguredCredentials(scope: AdminAuthScope) {
   if (scope === "admin") {
     return {
-      login: process.env.ADMIN_LOGIN ?? "admin1",
-      password: process.env.ADMIN_PASSWORD ?? "admin1"
+      login: process.env.ADMIN_LOGIN ?? "waiter",
+      password: process.env.ADMIN_PASSWORD ?? "waiter"
     };
   }
 

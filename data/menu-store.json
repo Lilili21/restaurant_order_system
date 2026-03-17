@@ -16,7 +16,8 @@
     "badges": [
       "chef_special",
       "vegan"
-    ]
+    ],
+    "volumeOptions": []
   },
   {
     "id": "m1",
@@ -35,7 +36,8 @@
     "badges": [
       "most_popular",
       "spicy"
-    ]
+    ],
+    "volumeOptions": []
   },
   {
     "id": "m2",
@@ -54,7 +56,8 @@
     "badges": [
       "new",
       "gluten_free"
-    ]
+    ],
+    "volumeOptions": []
   },
   {
     "id": "m3",
@@ -73,7 +76,8 @@
     "badges": [
       "kids_favorite",
       "dairy_free"
-    ]
+    ],
+    "volumeOptions": []
   },
   {
     "id": "m4",
@@ -91,7 +95,8 @@
     "showImage": true,
     "badges": [
       "nut_free"
-    ]
+    ],
+    "volumeOptions": []
   },
   {
     "id": "m5",
@@ -107,7 +112,14 @@
     "descriptionHe": "לימונדה ביתית בלי סירופים.",
     "descriptionEn": "Homemade lemonade without syrups.",
     "showImage": true,
-    "badges": []
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_0_10",
+        "label": "10",
+        "price": 10
+      }
+    ]
   },
   {
     "id": "m6",
@@ -123,6 +135,7 @@
     "descriptionHe": "קינוח חם עם גבינה, פיסטוקים וסירופ.",
     "descriptionEn": "Warm dessert with cheese, pistachios and syrup.",
     "showImage": true,
-    "badges": []
+    "badges": [],
+    "volumeOptions": []
   }
 ]

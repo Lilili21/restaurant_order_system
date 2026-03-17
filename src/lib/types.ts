@@ -49,6 +49,12 @@ export type MenuBadge =
   | "dairy_free"
   | "nut_free";
 
+export type MenuVolumeOption = {
+  id: string;
+  label: string;
+  price: number;
+};
+
 export type MenuItem = {
   id: string;
   restaurantSlug: string;
@@ -64,6 +70,7 @@ export type MenuItem = {
   showImage: boolean;
   available: boolean;
   badges?: MenuBadge[];
+  volumeOptions?: MenuVolumeOption[];
 };
 
 export type CartItem = {

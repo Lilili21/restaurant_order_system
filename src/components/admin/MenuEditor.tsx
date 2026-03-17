@@ -1,10 +1,16 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
+import Link from "next/link";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
 import { formatCurrency } from "@/lib/menu";
-import { MenuBadge, MenuCategory, MenuItem } from "@/lib/types";
+import {
+  MenuBadge,
+  MenuCategory,
+  MenuItem,
+  MenuVolumeOption
+} from "@/lib/types";
 
 const categoryLabels: Record<MenuCategory, string> = {
   starters: "🥗 Starters",
@@ -30,7 +36,6 @@ const categoryLabels: Record<MenuCategory, string> = {
 };
 
 const drinkCategories: MenuCategory[] = [
-  "drinks",
   "fluids",
   "draft",
   "bottled",
@@ -60,6 +65,13 @@ const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
   { value: "dairy_free", label: "🥛 Dairy free" },
   { value: "nut_free", label: "🥜 Nut free" }
 ];
+const drinkBadgeOptions = badgeOptions.filter(
+  (badge) => badge.value === "most_popular" || badge.value === "new"
+);
+const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
+  (category) => category !== "drinks" && !drinkCategories.includes(category)
+);
+const allDrinkCategories = [...drinkCategories];
 
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
@@ -68,6 +80,7 @@ type EditableMenuItem = MenuItem & {
   draftDescriptionEn: string;
   draftCategory: MenuCategory;
   draftPrice: string;
+  draftVolumeOptionsText: string;
   draftImage: string;
   draftShowImage: boolean;
   draftBadges: MenuBadge[];
@@ -80,6 +93,7 @@ type NewMenuItemDraft = {
   descriptionHe: string;
   descriptionEn: string;
   price: string;
+  volumeOptionsText: string;
   image: string;
   showImage: boolean;
   badges: MenuBadge[];
@@ -97,6 +111,9 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
     draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
     draftCategory: item.category,
     draftPrice: String(item.price),
+    draftVolumeOptionsText: (item.volumeOptions ?? [])
+      .map((option) => `${option.label} | ${option.price}`)
+      .join("\n"),
     draftImage: item.image,
     draftShowImage: item.showImage ?? true,
     draftBadges: item.badges ?? []
@@ -119,6 +136,95 @@ function readImageFile(file: File) {
     reader.onerror = () => reject(new Error("Failed to read the image."));
     reader.readAsDataURL(file);
   });
+}
+
+function getCategoryOptions(kind: "dishes" | "drinks") {
+  return kind === "drinks" ? allDrinkCategories : dishCategories;
+}
+
+function getItemKind(category: MenuCategory): "dishes" | "drinks" {
+  return drinkCategories.includes(category) ? "drinks" : "dishes";
+}
+
+function getBadgeOptionsForKind(kind: "dishes" | "drinks") {
+  return kind === "drinks" ? drinkBadgeOptions : badgeOptions;
+}
+
+function parseVolumeOptions(value: string): MenuVolumeOption[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [rawLabel, rawPrice] = line.split("|").map((part) => part.trim());
+      const price = Number(rawPrice);
+
+      if (!rawLabel || !Number.isFinite(price)) {
+        return null;
+      }
+
+      return {
+        id: `volume_${index}_${rawLabel.replace(/\s+/g, "_")}`,
+        label: rawLabel,
+        price: Math.max(0, Math.round(price))
+      };
+    })
+    .filter(Boolean) as MenuVolumeOption[];
+}
+
+function parseVolumeRows(value: string) {
+  return value
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const [label = "", price = ""] = line.split("|").map((part) => part.trim());
+      return { label, price };
+    });
+}
+
+function stringifyVolumeRows(rows: Array<{ label: string; price: string }>) {
+  return rows
+    .filter((row) => row.label.trim() || row.price.trim())
+    .map((row) => `${row.label.trim()} | ${row.price.trim()}`)
+    .join("\n");
+}
+
+function addVolumeRow(value: string) {
+  const rows = parseVolumeRows(value);
+  rows.push({ label: "", price: "" });
+  return rows.map((row) => `${row.label} | ${row.price}`).join("\n");
+}
+
+function removeVolumeRow(value: string) {
+  const rows = parseVolumeRows(value);
+
+  if (rows.length <= 1) {
+    return "";
+  }
+
+  rows.pop();
+  return rows.map((row) => `${row.label} | ${row.price}`).join("\n");
+}
+
+function updateVolumeRow(
+  value: string,
+  rowIndex: number,
+  field: "label" | "price",
+  nextValue: string
+) {
+  const rows = parseVolumeRows(value);
+
+  while (rows.length <= rowIndex) {
+    rows.push({ label: "", price: "" });
+  }
+
+  rows[rowIndex] = {
+    ...rows[rowIndex],
+    [field]:
+      field === "price" ? nextValue.replace(/[^\d./]/g, "") : nextValue
+  };
+
+  return stringifyVolumeRows(rows);
 }
 
 export function MenuEditor() {
@@ -158,6 +264,7 @@ export function MenuEditor() {
     descriptionHe: "",
     descriptionEn: "",
     price: "",
+    volumeOptionsText: "",
     image: "",
     showImage: true,
     badges: [],
@@ -479,6 +586,10 @@ export function MenuEditor() {
         descriptionEn:
           currentItem.draftDescriptionEn || currentItem.draftDescriptionHe,
         price: Number(currentItem.draftPrice),
+        volumeOptions:
+          getItemKind(currentItem.draftCategory) === "drinks"
+            ? parseVolumeOptions(currentItem.draftVolumeOptionsText)
+            : [],
         image: currentItem.draftImage,
         showImage: currentItem.draftShowImage,
         badges: currentItem.draftBadges,
@@ -535,6 +646,10 @@ export function MenuEditor() {
         descriptionHe: newItem.descriptionHe,
         descriptionEn: newItem.descriptionEn || newItem.descriptionHe,
         price: Number(newItem.price),
+        volumeOptions:
+          selectedKind === "drinks"
+            ? parseVolumeOptions(newItem.volumeOptionsText)
+            : [],
         image: newItem.image,
         showImage: newItem.showImage,
         badges: newItem.badges,
@@ -558,6 +673,7 @@ export function MenuEditor() {
       descriptionHe: "",
       descriptionEn: "",
       price: "",
+      volumeOptionsText: "",
       image: "",
       showImage: true,
       badges: [],
@@ -674,7 +790,7 @@ export function MenuEditor() {
   >).filter(([value]) =>
     selectedKind === "drinks"
       ? drinkCategories.includes(value)
-      : !drinkCategories.includes(value)
+      : value !== "drinks" && !drinkCategories.includes(value)
   );
 
   const filteredItems = items.filter((item) =>
@@ -712,6 +828,9 @@ export function MenuEditor() {
   return (
     <div className="orders-layout">
       <div className="menu-editor__toolbar">
+        <Link href="/olive-bistro/menu/0" className="admin-menu-bubble">
+          Menu preview
+        </Link>
         <button
           className={
             notificationsOpen
@@ -735,6 +854,18 @@ export function MenuEditor() {
             onClick={() => {
               setSelectedKind("dishes");
               setSelectedCategories([]);
+              setNewItem((current) => ({
+                ...current,
+                category: dishCategories.includes(current.category)
+                  ? current.category
+                  : "starters",
+                volumeOptionsText: "",
+                badges: current.badges.filter((badge) =>
+                  getBadgeOptionsForKind("dishes").some(
+                    (option) => option.value === badge
+                  )
+                )
+              }));
             }}
           >
             Dishes
@@ -749,6 +880,17 @@ export function MenuEditor() {
             onClick={() => {
               setSelectedKind("drinks");
               setSelectedCategories([]);
+              setNewItem((current) => ({
+                ...current,
+                category: drinkCategories.includes(current.category)
+                  ? current.category
+                  : "drinks",
+                badges: current.badges.filter((badge) =>
+                  getBadgeOptionsForKind("drinks").some(
+                    (option) => option.value === badge
+                  )
+                )
+              }));
             }}
           >
             Drinks
@@ -925,13 +1067,11 @@ export function MenuEditor() {
                 updateNewItem("category", event.target.value as MenuCategory)
               }
             >
-              {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(
-                ([value, label]) => (
+              {getCategoryOptions(selectedKind).map((value) => (
                   <option key={value} value={value}>
-                    {label}
+                    {categoryLabels[value]}
                   </option>
-                )
-              )}
+                ))}
             </select>
 
             <div className="menu-editor__description-block">
@@ -1024,28 +1164,113 @@ export function MenuEditor() {
               </div>
             ) : null}
 
-              <label className="menu-editor__field">
-                <span>Price</span>
-                <div className="menu-editor__price-input">
-                  <input
-                    className="modal-input"
-                    type="text"
-                    inputMode="numeric"
-                    value={newItem.price}
-                    onChange={(event) =>
-                      updateNewItem(
-                        "price",
-                        event.target.value.replace(/[^\d]/g, "")
-                      )
-                    }
-                  />
-                  <span className="menu-editor__price-currency">₪</span>
+            {selectedKind === "drinks" ? (
+              <div className="menu-editor__volume-options">
+                <div className="menu-editor__field">
+                  <span className="menu-editor__volume-label">
+                    <span>Volumes and prices</span>
+                    <span className="menu-editor__volume-actions">
+                      <button
+                        className="menu-editor__volume-add"
+                        type="button"
+                        onClick={() =>
+                          updateNewItem(
+                            "volumeOptionsText",
+                            removeVolumeRow(newItem.volumeOptionsText)
+                          )
+                        }
+                      >
+                        -
+                      </button>
+                      <button
+                        className="menu-editor__volume-add"
+                        type="button"
+                        onClick={() =>
+                          updateNewItem(
+                            "volumeOptionsText",
+                            addVolumeRow(newItem.volumeOptionsText)
+                          )
+                        }
+                      >
+                        +
+                      </button>
+                    </span>
+                  </span>
+                  <div className="menu-editor__volume-grid">
+                    {(parseVolumeRows(newItem.volumeOptionsText).length
+                      ? parseVolumeRows(newItem.volumeOptionsText)
+                      : [{ label: "", price: "" }]
+                    ).map((row, index) => (
+                      <div key={`new-volume-${index}`} className="menu-editor__volume-row">
+                        <input
+                          className="modal-input"
+                          type="text"
+                          placeholder="Volume"
+                          value={row.label}
+                          onChange={(event) =>
+                            updateNewItem(
+                              "volumeOptionsText",
+                              updateVolumeRow(
+                                newItem.volumeOptionsText,
+                                index,
+                                "label",
+                                event.target.value
+                              )
+                            )
+                          }
+                        />
+                        <div className="menu-editor__price-input menu-editor__volume-price">
+                          <input
+                            className="modal-input"
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="Price"
+                            value={row.price}
+                            onChange={(event) =>
+                              updateNewItem(
+                                "volumeOptionsText",
+                                updateVolumeRow(
+                                  newItem.volumeOptionsText,
+                                  index,
+                                  "price",
+                                  event.target.value
+                                )
+                              )
+                            }
+                          />
+                          <span className="menu-editor__price-currency">₪</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </label>
+              </div>
+            ) : null}
+
+              {selectedKind === "drinks" ? null : (
+                <label className="menu-editor__field">
+                  <span>Price</span>
+                  <div className="menu-editor__price-input">
+                    <input
+                      className="modal-input"
+                      type="text"
+                      inputMode="numeric"
+                      value={newItem.price}
+                      onChange={(event) =>
+                        updateNewItem(
+                          "price",
+                          event.target.value.replace(/[^\d]/g, "")
+                        )
+                      }
+                    />
+                    <span className="menu-editor__price-currency">₪</span>
+                  </div>
+                </label>
+              )}
           </div>
 
           <div className="menu-editor__badges">
-            {badgeOptions.map((badge) => (
+            {getBadgeOptionsForKind(selectedKind).map((badge) => (
               <label key={badge.value} className="menu-editor__badge-option">
                 <input
                   type="checkbox"
@@ -1072,6 +1297,13 @@ export function MenuEditor() {
 
         {filteredItems.map((item) => (
           <article key={item.id} className="order-card">
+            {(() => {
+              const itemKind = getItemKind(item.draftCategory);
+              const itemCategoryOptions = getCategoryOptions(itemKind);
+              const itemBadgeOptions = getBadgeOptionsForKind(itemKind);
+
+              return (
+                <>
             <div className="menu-editor__top-row">
               <div className="menu-editor__language-block">
                 <div className="menu-editor__language-toggle" role="tablist" aria-label="Dish language">
@@ -1139,21 +1371,37 @@ export function MenuEditor() {
               <select
                 className="modal-input"
                 value={item.draftCategory}
-                onChange={(event) =>
-                  updateDraft(
-                    item.id,
-                    "draftCategory",
-                    event.target.value as MenuCategory
-                  )
-                }
+                onChange={(event) => {
+                  const nextCategory = event.target.value as MenuCategory;
+                  const nextKind = getItemKind(nextCategory);
+                  const allowedBadges = getBadgeOptionsForKind(nextKind).map(
+                    (badge) => badge.value
+                  );
+
+                  setItems((current) =>
+                    current.map((currentItem) =>
+                      currentItem.id === item.id
+                        ? {
+                            ...currentItem,
+                            draftCategory: nextCategory,
+                            draftVolumeOptionsText:
+                              nextKind === "drinks"
+                                ? currentItem.draftVolumeOptionsText
+                                : "",
+                            draftBadges: currentItem.draftBadges.filter((badge) =>
+                              allowedBadges.includes(badge)
+                            )
+                          }
+                        : currentItem
+                    )
+                  );
+                }}
               >
-                {(Object.entries(categoryLabels) as Array<[MenuCategory, string]>).map(
-                  ([value, label]) => (
+                {itemCategoryOptions.map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {categoryLabels[value]}
                     </option>
-                  )
-                )}
+                ))}
               </select>
 
               <div className="menu-editor__description-block">
@@ -1251,30 +1499,119 @@ export function MenuEditor() {
                 </div>
               ) : null}
 
-              <label className="menu-editor__field">
-                <span>Price</span>
-                <div className="menu-editor__price-input">
-                  <input
-                    className="modal-input"
-                    type="text"
-                    inputMode="numeric"
-                    value={item.draftPrice}
-                    onChange={(event) =>
-                      updateDraft(
-                        item.id,
-                        "draftPrice",
-                        event.target.value.replace(/[^\d]/g, "")
-                      )
-                    }
-                  />
-                  <span className="menu-editor__price-currency">₪</span>
+              {itemKind === "drinks" ? (
+                <div className="menu-editor__volume-options">
+                  <div className="menu-editor__field">
+                    <span className="menu-editor__volume-label">
+                      <span>Volumes and prices</span>
+                      <span className="menu-editor__volume-actions">
+                        <button
+                          className="menu-editor__volume-add"
+                          type="button"
+                          onClick={() =>
+                            updateDraft(
+                              item.id,
+                              "draftVolumeOptionsText",
+                              removeVolumeRow(item.draftVolumeOptionsText)
+                            )
+                          }
+                        >
+                          -
+                        </button>
+                        <button
+                          className="menu-editor__volume-add"
+                          type="button"
+                          onClick={() =>
+                            updateDraft(
+                              item.id,
+                              "draftVolumeOptionsText",
+                              addVolumeRow(item.draftVolumeOptionsText)
+                            )
+                          }
+                        >
+                          +
+                        </button>
+                      </span>
+                    </span>
+                    <div className="menu-editor__volume-grid">
+                      {(parseVolumeRows(item.draftVolumeOptionsText).length
+                        ? parseVolumeRows(item.draftVolumeOptionsText)
+                        : [{ label: "", price: "" }]
+                      ).map((row, index) => (
+                        <div key={`${item.id}-volume-${index}`} className="menu-editor__volume-row">
+                          <input
+                            className="modal-input"
+                            type="text"
+                            placeholder="Volume"
+                            value={row.label}
+                            onChange={(event) =>
+                              updateDraft(
+                                item.id,
+                                "draftVolumeOptionsText",
+                                updateVolumeRow(
+                                  item.draftVolumeOptionsText,
+                                  index,
+                                  "label",
+                                  event.target.value
+                                )
+                              )
+                            }
+                          />
+                        <div className="menu-editor__price-input menu-editor__volume-price">
+                          <input
+                              className="modal-input"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="Price"
+                              value={row.price}
+                              onChange={(event) =>
+                                updateDraft(
+                                  item.id,
+                                  "draftVolumeOptionsText",
+                                  updateVolumeRow(
+                                    item.draftVolumeOptionsText,
+                                    index,
+                                    "price",
+                                    event.target.value
+                                  )
+                                )
+                              }
+                            />
+                            <span className="menu-editor__price-currency">₪</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </label>
+              ) : null}
+
+              {itemKind === "drinks" ? null : (
+                <label className="menu-editor__field">
+                  <span>Price</span>
+                  <div className="menu-editor__price-input">
+                    <input
+                      className="modal-input"
+                      type="text"
+                      inputMode="numeric"
+                      value={item.draftPrice}
+                      onChange={(event) =>
+                        updateDraft(
+                          item.id,
+                          "draftPrice",
+                          event.target.value.replace(/[^\d]/g, "")
+                        )
+                      }
+                    />
+                    <span className="menu-editor__price-currency">₪</span>
+                  </div>
+                </label>
+              )}
 
             </div>
 
             <div className="menu-editor__badges">
-              {badgeOptions.map((badge) => (
+              {itemBadgeOptions.map((badge) => (
                 <label key={badge.value} className="menu-editor__badge-option">
                   <input
                     type="checkbox"
@@ -1303,6 +1640,9 @@ export function MenuEditor() {
                 {item.saving ? "Saving..." : "Save"}
               </button>
             </div>
+                </>
+              );
+            })()}
           </article>
         ))}
       </div>
