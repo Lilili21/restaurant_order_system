@@ -415,13 +415,20 @@ button:disabled {
 }
 
 .menu-editor__toolbar {
+  display: grid;
+  justify-items: end;
+  gap: 16px;
+  width: 100%;
+  margin-top: -168px;
+  margin-bottom: 56px;
+}
+
+.menu-editor__toolbar-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
   width: 100%;
-  margin-top: -168px;
-  margin-bottom: 56px;
   flex-wrap: wrap;
 }
 
@@ -1394,6 +1401,12 @@ textarea.modal-input {
   color: var(--text-soft);
 }
 
+.menu-service-note {
+  margin-top: 10px;
+  color: #b42318;
+  font-weight: 700;
+}
+
 .table-links-panel {
   display: grid;
   gap: 18px;
@@ -1893,6 +1906,10 @@ textarea.modal-input {
   .menu-editor__toolbar {
     margin-top: 0;
     margin-bottom: 24px;
+    justify-items: stretch;
+  }
+
+  .menu-editor__toolbar-row {
     justify-content: stretch;
   }
 

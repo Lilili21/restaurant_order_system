@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
 import { formatCurrency } from "@/lib/menu";
@@ -228,6 +229,7 @@ function updateVolumeRow(
 }
 
 export function MenuEditor() {
+  const pathname = usePathname();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [authOpen, setAuthOpen] = useState(true);
   const [login, setLogin] = useState("");
@@ -252,6 +254,7 @@ export function MenuEditor() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
+  const [waiterRedirecting, setWaiterRedirecting] = useState(false);
   const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
     {}
   );
@@ -362,6 +365,40 @@ export function MenuEditor() {
     setShowPassword(false);
   }
 
+  async function openWaiterPanel() {
+    if (!secondaryCredentials || waiterRedirecting) {
+      return;
+    }
+
+    setWaiterRedirecting(true);
+
+    const response = await fetch("/api/admin-auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        scope: "admin",
+        persist: true,
+        secondaryLogin: secondaryCredentials.login,
+        secondaryPassword: secondaryCredentials.password
+      })
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as { message?: string };
+      setMessage(error.message ?? "Failed to open waiter panel.");
+      setWaiterRedirecting(false);
+      return;
+    }
+
+    const segments = pathname.split("/").filter(Boolean);
+    const restaurantSlug =
+      segments.length >= 2 && segments[1] === "admin" ? segments[0] : "olive-bistro";
+
+    window.location.href = `/${restaurantSlug}/waiter/orders`;
+  }
+
   function updateDraft(
     itemId: string,
     field:
@@ -371,6 +408,7 @@ export function MenuEditor() {
       | "draftDescriptionEn"
       | "draftCategory"
       | "draftPrice"
+      | "draftVolumeOptionsText"
       | "draftImage"
       | "draftShowImage"
       | "draftBadges"
@@ -825,75 +863,94 @@ export function MenuEditor() {
     }));
   }
 
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const restaurantSlug =
+    pathSegments.length >= 2 && pathSegments[1] === "admin"
+      ? pathSegments[0]
+      : "olive-bistro";
+  const menuPreviewHref = `/${restaurantSlug}/menu/0`;
+
   return (
     <div className="orders-layout">
       <div className="menu-editor__toolbar">
-        <Link href="/olive-bistro/menu/0" className="admin-menu-bubble">
-          Menu preview
-        </Link>
-        <button
-          className={
-            notificationsOpen
-              ? "admin-menu-bubble admin-menu-bubble--active"
-              : "admin-menu-bubble"
-          }
-          type="button"
-          onClick={() => setNotificationsOpen((current) => !current)}
-        >
-          Notifications
-        </button>
-        {secondaryCredentials ? <TableCountControl credentials={secondaryCredentials} /> : null}
-        <div className="admin-switch menu-editor__kind-switch">
+        <div className="menu-editor__toolbar-row">
+          {secondaryCredentials ? <TableCountControl credentials={secondaryCredentials} /> : null}
+          <Link href={menuPreviewHref} className="admin-menu-bubble">
+            Menu preview
+          </Link>
           <button
+            className="admin-menu-bubble"
             type="button"
-            className={
-              selectedKind === "dishes"
-                ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                : "admin-switch__item menu-editor__kind-button"
-            }
-            onClick={() => {
-              setSelectedKind("dishes");
-              setSelectedCategories([]);
-              setNewItem((current) => ({
-                ...current,
-                category: dishCategories.includes(current.category)
-                  ? current.category
-                  : "starters",
-                volumeOptionsText: "",
-                badges: current.badges.filter((badge) =>
-                  getBadgeOptionsForKind("dishes").some(
-                    (option) => option.value === badge
-                  )
-                )
-              }));
-            }}
+            disabled={waiterRedirecting}
+            onClick={() => void openWaiterPanel()}
           >
-            Dishes
+            Waiter
           </button>
-          <button
-            type="button"
-            className={
-              selectedKind === "drinks"
-                ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                : "admin-switch__item menu-editor__kind-button"
-            }
-            onClick={() => {
-              setSelectedKind("drinks");
-              setSelectedCategories([]);
-              setNewItem((current) => ({
-                ...current,
-                category: drinkCategories.includes(current.category)
-                  ? current.category
-                  : "drinks",
-                badges: current.badges.filter((badge) =>
-                  getBadgeOptionsForKind("drinks").some(
-                    (option) => option.value === badge
+        </div>
+        <div className="menu-editor__toolbar-row">
+          <div className="admin-switch menu-editor__kind-switch">
+            <button
+              type="button"
+              className={
+                selectedKind === "dishes"
+                  ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button"
+              }
+              onClick={() => {
+                setSelectedKind("dishes");
+                setSelectedCategories([]);
+                setNewItem((current) => ({
+                  ...current,
+                  category: dishCategories.includes(current.category)
+                    ? current.category
+                    : "starters",
+                  volumeOptionsText: "",
+                  badges: current.badges.filter((badge) =>
+                    getBadgeOptionsForKind("dishes").some(
+                      (option) => option.value === badge
+                    )
                   )
-                )
-              }));
-            }}
+                }));
+              }}
+            >
+              Dishes
+            </button>
+            <button
+              type="button"
+              className={
+                selectedKind === "drinks"
+                  ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button"
+              }
+              onClick={() => {
+                setSelectedKind("drinks");
+                setSelectedCategories([]);
+                setNewItem((current) => ({
+                  ...current,
+                  category: drinkCategories.includes(current.category)
+                    ? current.category
+                    : "drinks",
+                  badges: current.badges.filter((badge) =>
+                    getBadgeOptionsForKind("drinks").some(
+                      (option) => option.value === badge
+                    )
+                  )
+                }));
+              }}
+            >
+              Drinks
+            </button>
+          </div>
+          <button
+            className={
+              notificationsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={() => setNotificationsOpen((current) => !current)}
           >
-            Drinks
+            Notifications
           </button>
         </div>
       </div>

@@ -89,6 +89,7 @@ const uiText = {
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
     billRequested: "המלצר יביא את החשבון לשולחן שלכם בקרוב.\nתודה שסעדתם אצלנו!",
+    waiterServiceNote: "המלצר יהיה אצלכם בקרוב.",
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenOpen: "המטבח נסגר בעוד",
     kitchenClosed: "המטבח סגור",
@@ -132,6 +133,7 @@ const uiText = {
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
     billRequested: "A waiter will bring your bill shortly.\nThank you for dining with us!",
+    waiterServiceNote: "A waiter will be with you shortly.",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
@@ -830,6 +832,9 @@ export function Cart({
                 ? `${text.tableOrderingHint} ${tableNumber}`
                 : "Menu"}
             </p>
+            {orderingEnabled && serviceRequestDisabled ? (
+              <p className="menu-service-note">{text.waiterServiceNote}</p>
+            ) : null}
             {showKitchenOpenBanner ? (
               <div className="menu-kitchen-open">
                 <span className="menu-kitchen-open__label">{text.kitchenOpen}</span>

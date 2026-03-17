@@ -51,13 +51,28 @@ export async function POST(request: NextRequest) {
       login?: string;
       password?: string;
       persist?: boolean;
+      secondaryLogin?: string;
+      secondaryPassword?: string;
     };
 
     if (!body.scope || !isScope(body.scope)) {
       throw new Error("scope is required");
     }
 
-    if (!verifyAdminCredentials(body.scope, body.login ?? "", body.password ?? "")) {
+    const directAuth = verifyAdminCredentials(
+      body.scope,
+      body.login ?? "",
+      body.password ?? ""
+    );
+    const adminFromSecondary =
+      body.scope === "admin" &&
+      verifyAdminCredentials(
+        "secondary",
+        body.secondaryLogin ?? "",
+        body.secondaryPassword ?? ""
+      );
+
+    if (!directAuth && !adminFromSecondary) {
       return NextResponse.json(
         { message: "Invalid login or password." },
         { status: 401 }
