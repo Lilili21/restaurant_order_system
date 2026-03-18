@@ -255,7 +255,7 @@ function hasInvalidDrinkVolumeRows(value: string) {
     return true;
   }
 
-  return rows.some((row) => {
+  const hasInvalidPrice = rows.some((row) => {
     const rawPrice = row.price.trim();
 
     if (!rawPrice) {
@@ -265,6 +265,16 @@ function hasInvalidDrinkVolumeRows(value: string) {
     const parsedPrice = Number(rawPrice);
     return !Number.isFinite(parsedPrice) || parsedPrice <= 0;
   });
+
+  if (hasInvalidPrice) {
+    return true;
+  }
+
+  if (rows.length > 1) {
+    return rows.some((row) => !row.label.trim());
+  }
+
+  return false;
 }
 
 export function MenuEditor() {
@@ -722,7 +732,9 @@ export function MenuEditor() {
       itemKind === "drinks" &&
       hasInvalidDrinkVolumeRows(currentItem.draftVolumeOptionsText)
     ) {
-      setMessage("Add a valid price for every volume row before saving.");
+      setMessage(
+        "Add a valid price for every row. If there are multiple rows, fill in volume for each."
+      );
       setItems((current) =>
         current.map((item) =>
           item.id === itemId ? { ...item, saving: false } : item
@@ -809,7 +821,9 @@ export function MenuEditor() {
       selectedKind === "drinks" &&
       hasInvalidDrinkVolumeRows(newItem.volumeOptionsText)
     ) {
-      setMessage("Add a valid price for every volume row before saving.");
+      setMessage(
+        "Add a valid price for every row. If there are multiple rows, fill in volume for each."
+      );
       return;
     }
 

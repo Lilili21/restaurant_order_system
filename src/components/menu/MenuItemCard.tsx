@@ -25,6 +25,7 @@ const imageBadgeSet = new Set<MenuBadge>([
   "new",
   "kids_favorite"
 ]);
+const noImagePriorityBadgeOrder: MenuBadge[] = ["new", "most_popular"];
 
 type MenuItemCardProps = {
   item: MenuItem;
@@ -53,7 +54,9 @@ export function MenuItemCard({
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
-  const [activeBadge, setActiveBadge] = useState<MenuBadge | null>(null);
+  const [expandedImageBadge, setExpandedImageBadge] = useState<MenuBadge | null>(
+    null
+  );
   const addLabel = language === "he" ? "הוסף" : "Add";
   const name =
     language === "he"
@@ -63,8 +66,20 @@ export function MenuItemCard({
     language === "he"
       ? item.descriptionHe || item.description
       : item.descriptionEn || item.descriptionHe || item.description;
-  const imageBadges = (item.badges ?? []).filter((badge) => imageBadgeSet.has(badge));
-  const detailBadges = (item.badges ?? []).filter((badge) => !imageBadgeSet.has(badge));
+  const hasImage = Boolean(item.showImage);
+  const imageBadges = hasImage
+    ? (item.badges ?? []).filter((badge) => imageBadgeSet.has(badge))
+    : [];
+  const detailBadges = hasImage
+    ? (item.badges ?? []).filter((badge) => !imageBadgeSet.has(badge))
+    : (item.badges ?? []).slice().sort((left, right) => {
+        const leftIndex = noImagePriorityBadgeOrder.indexOf(left);
+        const rightIndex = noImagePriorityBadgeOrder.indexOf(right);
+        const leftPriority = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+        const rightPriority =
+          rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+        return leftPriority - rightPriority;
+      });
   const hasVolumeOptions = Boolean(item.volumeOptions?.length);
 
   function getQuantityKey(volumeOptionId?: string) {
@@ -89,9 +104,13 @@ export function MenuItemCard({
     return badgeMeta[badge].label[language];
   }
 
+  function handleImageBadgeClick(badge: MenuBadge) {
+    setExpandedImageBadge((current) => (current === badge ? null : badge));
+  }
+
   return (
     <article className="menu-card">
-      {item.showImage ? (
+      {hasImage ? (
         <div className="menu-card__image-wrap">
           {imageBadges.length ? (
             <div className="menu-card__image-badges" aria-label="Dish highlights">
@@ -99,20 +118,27 @@ export function MenuItemCard({
                 <button
                   key={badge}
                   type="button"
-                  className="menu-card__image-badge"
-                  onClick={() =>
-                    setActiveBadge((current) => (current === badge ? null : badge))
-                  }
+                  className={`menu-card__image-badge ${
+                    expandedImageBadge === badge
+                      ? "menu-card__image-badge--expanded"
+                      : ""
+                  }`}
                   aria-label={getBadgeLabel(badge)}
                   title={getBadgeLabel(badge)}
+                  aria-expanded={expandedImageBadge === badge}
+                  onClick={() => handleImageBadgeClick(badge)}
                 >
-                  {badgeMeta[badge].icon}
+                  <span className="menu-card__image-badge-icon" aria-hidden="true">
+                    {badgeMeta[badge].icon}
+                  </span>
+                  {expandedImageBadge === badge ? (
+                    <span className="menu-card__image-badge-label">
+                      {getBadgeLabel(badge)}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
-          ) : null}
-          {activeBadge ? (
-            <div className="menu-card__badge-hint">{getBadgeLabel(activeBadge)}</div>
           ) : null}
           <img
             className="menu-card__image"

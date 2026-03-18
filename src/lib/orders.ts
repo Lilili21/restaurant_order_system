@@ -57,6 +57,7 @@ type OrderItemRow = {
 const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
 const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
+const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
@@ -282,6 +283,74 @@ function createSessionsFromOrders(orders: Order[]) {
   }
 
   return sessions;
+}
+
+function isServiceRequest(order: Order) {
+  return order.kind === "waiter_call" || order.kind === "bill_request";
+}
+
+function autoCloseStaleServiceRequests(state: RuntimeState) {
+  const now = Date.now();
+  let changed = false;
+
+  for (const order of state.ordersStore) {
+    if (!isServiceRequest(order)) {
+      continue;
+    }
+
+    if (order.status === "served" || order.status === "cancelled") {
+      continue;
+    }
+
+    const createdAtMs = new Date(order.createdAt).getTime();
+    const isExpired =
+      Number.isFinite(createdAtMs) &&
+      now - createdAtMs >= SERVICE_REQUEST_AUTO_CLOSE_MS;
+
+    const currentSessionId = state.currentTableSessions.get(
+      createTableKey(order.restaurantSlug, order.tableNumber)
+    );
+    const isFromClosedSession =
+      typeof currentSessionId === "number" && order.sessionId < currentSessionId;
+
+    if (isExpired || isFromClosedSession) {
+      order.status = "cancelled";
+      order.updatedAt = new Date().toISOString();
+      changed = true;
+    }
+  }
+
+  return changed;
+}
+
+function closeServiceRequestsForSession(
+  state: RuntimeState,
+  restaurantSlug: string,
+  tableNumber: number,
+  sessionId: number
+) {
+  let changed = false;
+
+  for (const order of state.ordersStore) {
+    if (
+      !isServiceRequest(order) ||
+      order.restaurantSlug !== restaurantSlug ||
+      order.tableNumber !== tableNumber ||
+      order.sessionId !== sessionId
+    ) {
+      continue;
+    }
+
+    if (order.status === "served" || order.status === "cancelled") {
+      continue;
+    }
+
+    order.status = "cancelled";
+    order.updatedAt = new Date().toISOString();
+    changed = true;
+  }
+
+  return changed;
 }
 
 function getDefaultState(): OrdersPersistence {
@@ -629,14 +698,19 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
 
 async function readRuntimeStateAsync(): Promise<RuntimeState> {
   const persistedState = await loadStateAsync();
-
-  return {
+  const state: RuntimeState = {
     ordersStore: persistedState.orders,
     currentTableSessions: new Map<string, number>(
       persistedState.currentTableSessions
     ),
     closedTableSummaries: persistedState.closedTableSummaries
   };
+
+  if (autoCloseStaleServiceRequests(state)) {
+    await persistStateAsync(state);
+  }
+
+  return state;
 }
 
 function toRuntimeState(state: OrdersPersistence): RuntimeState {
@@ -1317,6 +1391,7 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
   }
 
   const { sessionId } = ensureCurrentSessionId(state, restaurantSlug, tableNumber);
+  closeServiceRequestsForSession(state, restaurantSlug, tableNumber, sessionId);
   const orders = state.ordersStore.filter(
     (order) =>
       order.restaurantSlug === restaurantSlug &&

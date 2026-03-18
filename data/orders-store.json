@@ -1,6 +1,19 @@
 {
   "orders": [
     {
+      "id": "bill_1773864143358",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 5,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-18T20:02:23.358Z",
+      "updatedAt": "2026-03-18T20:02:23.358Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "ord_1773858064551",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

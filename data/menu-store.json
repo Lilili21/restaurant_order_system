@@ -1,5 +1,30 @@
 [
   {
+    "id": "m_1773862719283",
+    "restaurantSlug": "olive-bistro",
+    "category": "rum",
+    "name": "קפטן מורגן",
+    "description": "רום ורום ורום",
+    "nameHe": "קפטן מורגן",
+    "nameEn": "captain morgan",
+    "descriptionHe": "רום ורום ורום",
+    "descriptionEn": "rum wrum wrum wrum",
+    "price": 50,
+    "image": "/images/default-menu-item.svg",
+    "showImage": false,
+    "available": true,
+    "badges": [
+      "new"
+    ],
+    "volumeOptions": [
+      {
+        "id": "volume_0_empty_50",
+        "label": "",
+        "price": 50
+      }
+    ]
+  },
+  {
     "id": "m_1773757074844",
     "restaurantSlug": "olive-bistro",
     "category": "two_component_mixture",
@@ -41,14 +66,19 @@
     ],
     "volumeOptions": [
       {
-        "id": "volume_0_1L",
+        "id": "volume_0_1L_10",
         "label": "1L",
         "price": 10
       },
       {
-        "id": "volume_1_2L",
+        "id": "volume_1_2L_20",
         "label": "2L",
         "price": 20
+      },
+      {
+        "id": "volume_2_3L_30",
+        "label": "3L",
+        "price": 30
       }
     ]
   },
