@@ -202,10 +202,12 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
 
     const menuLookupByRestaurant: MenuLookupByRestaurant = new Map(
       await Promise.all(
-        [...restaurantSlugs].map(async (restaurantSlug) => [
-          restaurantSlug,
-          await getMenuLookupForRestaurant(restaurantSlug)
-        ])
+        [...restaurantSlugs].map(
+          async (restaurantSlug): Promise<[string, Map<string, MenuItem>]> => [
+            restaurantSlug,
+            await getMenuLookupForRestaurant(restaurantSlug)
+          ]
+        )
       )
     );
 
