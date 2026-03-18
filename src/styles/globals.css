@@ -188,6 +188,30 @@ button:disabled {
   margin-top: 0;
 }
 
+.menu-quick-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+
+.menu-quick-info--bottom {
+  margin: 18px 0 0;
+}
+
+.menu-quick-info__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 250, 240, 0.78);
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
 .lead,
 .muted,
 .hero-card p,

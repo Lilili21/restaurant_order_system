@@ -142,7 +142,12 @@ const uiText = {
     waiterError: "לא ניתן היה לקרוא למלצר",
     billError: "לא ניתן היה לבקש חשבון",
     close: "סגור חלון",
-    jumpToOrder: "Orders"
+    jumpToOrder: "Orders",
+    quickInfo: [
+      "📍 סניפים נוספים",
+      "⭐ השאירו ביקורת",
+      "📲 עקבו אחרינו"
+    ]
   },
   en: {
     restaurantHeader: "Olive Bistro",
@@ -203,7 +208,12 @@ const uiText = {
     waiterError: "Failed to call the waiter",
     billError: "Failed to request the bill",
     close: "Close dialog",
-    jumpToOrder: "Orders"
+    jumpToOrder: "Orders",
+    quickInfo: [
+      "📍 Other locations",
+      "⭐ Leave a review",
+      "📲 Follow us"
+    ]
   }
 } as const;
 
@@ -1288,6 +1298,13 @@ export function Cart({
             ) : null}
           </aside>
           ) : null}
+        </div>
+        <div className="menu-quick-info menu-quick-info--bottom" aria-label="Guest information shortcuts">
+          {text.quickInfo.map((label) => (
+            <span key={label} className="menu-quick-info__chip">
+              {label}
+            </span>
+          ))}
         </div>
       </div>
     </>
