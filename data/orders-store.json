@@ -1,15 +1,40 @@
 {
   "orders": [
     {
-      "id": "ord_1773842670071",
+      "id": "ord_1773854497438",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 3,
       "sessionId": 1,
       "status": "new",
       "serveMode": "as_ready",
+      "createdAt": "2026-03-18T17:21:37.438Z",
+      "updatedAt": "2026-03-18T17:21:37.438Z",
+      "items": [
+        {
+          "id": "item_1773854497438_kak8nx",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 20
+    },
+    {
+      "id": "ord_1773842670071",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "status": "preparing",
+      "serveMode": "as_ready",
       "createdAt": "2026-03-18T14:04:30.071Z",
-      "updatedAt": "2026-03-18T14:04:37.879Z",
+      "updatedAt": "2026-03-18T17:17:20.072Z",
       "items": [
         {
           "id": "item_1773842670071_86ama6",
@@ -21,9 +46,18 @@
           "price": 20,
           "quantity": 2,
           "served": false
+        },
+        {
+          "id": "item_1773854240072_37tp6b",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 40
+      "total": 64
     },
     {
       "id": "bill_1773842650696",

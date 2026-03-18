@@ -124,11 +124,15 @@ const uiText = {
     waiterAlreadyCalled: "המלצר כבר בדרך לשולחן שלכם.",
     kitchenOpen: "המטבח נסגר בעוד",
     kitchenClosed: "המטבח סגור",
-    kitchenClosedNote: "קראו למלצר כדי לשאול על נשנושים אפשריים.",
+    kitchenClosedNote: "כרגע ניתן להזמין רק משקאות.",
     barOpen: "הבר נסגר בעוד",
     barClosed: "הבר סגור",
-    barClosedNote: "קראו למלצר כדי לשאול על משקאות אפשריים.",
+    barClosedNote: "כרגע ניתן להזמין רק מנות מטבח.",
     kitchenClosedAction: "לצערנו המטבח סגור",
+    kitchenClosedOrderCheck:
+      "המטבח סגור. בדקו את ההזמנה והשאירו רק משקאות, ואז אשרו שוב.",
+    barClosedOrderCheck:
+      "הבר סגור. בדקו את ההזמנה והשאירו רק מנות מטבח, ואז אשרו שוב.",
     waiterAvailable: "המלצר עדיין זמין עבורכם אם תצטרכו עזרה.",
     kitchenLoadWarning:
       "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
@@ -182,11 +186,15 @@ const uiText = {
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
-    kitchenClosedNote: "Call the waiter to ask about available snacks.",
+    kitchenClosedNote: "Only drinks are available to order right now.",
     barOpen: "Bar closed in",
     barClosed: "Bar closed",
-    barClosedNote: "Call the waiter to ask about available drinks.",
+    barClosedNote: "Only kitchen dishes are available to order right now.",
     kitchenClosedAction: "Unfortunately, the kitchen is closed",
+    kitchenClosedOrderCheck:
+      "The kitchen is closed. Check your order and keep drinks only, then confirm again.",
+    barClosedOrderCheck:
+      "The bar is closed. Check your order and keep dishes only, then confirm again.",
     waiterAvailable: "A waiter is still available if you need any assistance.",
     kitchenLoadWarning:
       "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
@@ -260,6 +268,9 @@ export function Cart({
   const hasDrinksInOrder = detailedItems.some(({ menuItem }) =>
     drinkCategories.has(menuItem.category)
   );
+  const hasDishesInOrder = detailedItems.some(
+    ({ menuItem }) => !drinkCategories.has(menuItem.category)
+  );
 
   const quantities = items.reduce<Record<string, number>>((acc, item) => {
     acc[`${item.menuItemId}:${item.volumeOptionId ?? "base"}`] = item.quantity;
@@ -286,6 +297,8 @@ export function Cart({
   const showBarOpenBanner = hasBarOpenTimer && barOpenRemainingMs > 0;
   const showBarClosedBanner = hasBarOpenTimer && barOpenRemainingMs <= 0;
   const isKitchenClosed = showKitchenClosedBanner;
+  const isBarClosed = showBarClosedBanner;
+  const areKitchenAndBarClosed = isKitchenClosed && isBarClosed;
 
   function getMenuItemDisplayName(
     menuItemId: string,
@@ -578,6 +591,23 @@ export function Cart({
   }
 
   async function submitOrder(serveMode: ServeMode) {
+    if (areKitchenAndBarClosed) {
+      setMessage(text.kitchenClosedAction);
+      return;
+    }
+
+    if (isKitchenClosed && hasDishesInOrder) {
+      setShowReviewDialog(true);
+      setMessage(text.kitchenClosedOrderCheck);
+      return;
+    }
+
+    if (isBarClosed && hasDrinksInOrder) {
+      setShowReviewDialog(true);
+      setMessage(text.barClosedOrderCheck);
+      return;
+    }
+
     setSubmitting(true);
     setMessage(null);
     setShowReviewDialog(false);
@@ -622,8 +652,18 @@ export function Cart({
   }
 
   function openServeModeDialog() {
-    if (isKitchenClosed) {
+    if (areKitchenAndBarClosed) {
       setMessage(text.kitchenClosedAction);
+      return;
+    }
+
+    if (isKitchenClosed && hasDishesInOrder) {
+      setMessage(text.kitchenClosedOrderCheck);
+      return;
+    }
+
+    if (isBarClosed && hasDrinksInOrder) {
+      setMessage(text.barClosedOrderCheck);
       return;
     }
 
@@ -1148,10 +1188,19 @@ export function Cart({
               className="cart-submit"
               type="button"
               onClick={openServeModeDialog}
-              disabled={submitting || isKitchenClosed}
+              disabled={
+                submitting ||
+                areKitchenAndBarClosed ||
+                (isKitchenClosed && hasDishesInOrder) ||
+                (isBarClosed && hasDrinksInOrder)
+              }
             >
-              {isKitchenClosed
+              {areKitchenAndBarClosed
                 ? text.kitchenClosedAction
+                : isKitchenClosed && hasDishesInOrder
+                ? text.kitchenClosedAction
+                : isBarClosed && hasDrinksInOrder
+                  ? text.barClosed
                 : submitting
                   ? text.submitting
                   : text.submit}

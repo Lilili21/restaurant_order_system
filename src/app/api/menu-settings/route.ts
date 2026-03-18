@@ -53,27 +53,56 @@ export async function PATCH(request: NextRequest) {
       throw new Error("tableCount must be an integer from 1 to 100");
     }
 
-    if (
-      typeof body.kitchenOpenUntil === "string" &&
-      body.kitchenOpenUntil.length > 10
-    ) {
-      throw new Error("kitchenOpenUntil is invalid");
+    if (typeof body.kitchenOpenUntil === "string") {
+      const parsed = Date.parse(body.kitchenOpenUntil);
+
+      if (!Number.isFinite(parsed)) {
+        throw new Error("kitchenOpenUntil is invalid");
+      }
     }
 
-    if (typeof body.barOpenUntil === "string" && body.barOpenUntil.length > 10) {
-      throw new Error("barOpenUntil is invalid");
+    if (typeof body.barOpenUntil === "string") {
+      const parsed = Date.parse(body.barOpenUntil);
+
+      if (!Number.isFinite(parsed)) {
+        throw new Error("barOpenUntil is invalid");
+      }
     }
 
-    return NextResponse.json(
-      await updateMenuSettings({
-        kitchenLoadWarningEnabled: body.kitchenLoadWarningEnabled,
-        kitchenOpenEnabled: body.kitchenOpenEnabled,
-        kitchenOpenUntil: body.kitchenOpenUntil,
-        barOpenEnabled: body.barOpenEnabled,
-        barOpenUntil: body.barOpenUntil,
-        tableCount: body.tableCount
-      })
-    );
+    const updates: {
+      kitchenLoadWarningEnabled?: boolean;
+      kitchenOpenEnabled?: boolean;
+      kitchenOpenUntil?: string | null;
+      barOpenEnabled?: boolean;
+      barOpenUntil?: string | null;
+      tableCount?: number;
+    } = {};
+
+    if (typeof body.kitchenLoadWarningEnabled === "boolean") {
+      updates.kitchenLoadWarningEnabled = body.kitchenLoadWarningEnabled;
+    }
+
+    if (typeof body.kitchenOpenEnabled === "boolean") {
+      updates.kitchenOpenEnabled = body.kitchenOpenEnabled;
+    }
+
+    if (body.kitchenOpenUntil === null || typeof body.kitchenOpenUntil === "string") {
+      updates.kitchenOpenUntil = body.kitchenOpenUntil;
+    }
+
+    if (typeof body.barOpenEnabled === "boolean") {
+      updates.barOpenEnabled = body.barOpenEnabled;
+    }
+
+    if (body.barOpenUntil === null || typeof body.barOpenUntil === "string") {
+      updates.barOpenUntil = body.barOpenUntil;
+    }
+
+    if (typeof body.tableCount === "number") {
+      updates.tableCount = body.tableCount;
+    }
+
+    return NextResponse.json(await updateMenuSettings(updates));
   } catch (error) {
     return NextResponse.json(
       {

@@ -5,7 +5,7 @@ import { getAvailableMenuByRestaurant, getTableSession } from "@/lib/menu-store"
 import { getMenuSettings } from "@/lib/menu-settings";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
-export const revalidate = 300;
+export const revalidate = 30;
 
 type MenuPageProps = {
   params: Promise<{

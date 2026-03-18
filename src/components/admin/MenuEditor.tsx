@@ -601,6 +601,8 @@ export function MenuEditor() {
     nextEnabled: boolean,
     nextTime: string
   ) {
+    const previousEnabled = kitchenOpenEnabled;
+    const previousTime = kitchenOpenUntil;
     const normalizedTime = nextTime.trim();
     let isoValue: string | null = null;
 
@@ -640,6 +642,8 @@ export function MenuEditor() {
     });
 
     if (!response.ok) {
+      setKitchenOpenEnabled(previousEnabled);
+      setKitchenOpenUntil(previousTime);
       setMessage("Failed to update kitchen open settings.");
       setKitchenOpenSaving(false);
       return;
@@ -649,6 +653,8 @@ export function MenuEditor() {
   }
 
   async function saveBarOpenSettings(nextEnabled: boolean, nextTime: string) {
+    const previousEnabled = barOpenEnabled;
+    const previousTime = barOpenUntil;
     const normalizedTime = nextTime.trim();
     let isoValue: string | null = null;
 
@@ -688,6 +694,8 @@ export function MenuEditor() {
     });
 
     if (!response.ok) {
+      setBarOpenEnabled(previousEnabled);
+      setBarOpenUntil(previousTime);
       setMessage("Failed to update bar open settings.");
       setBarOpenSaving(false);
       return;

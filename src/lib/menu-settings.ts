@@ -226,9 +226,12 @@ export async function updateMenuSettings(
   updates: Partial<MenuSettings>
 ): Promise<MenuSettings> {
   const current = await getMenuSettings();
+  const definedUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([, value]) => value !== undefined)
+  ) as Partial<MenuSettings>;
   const next = normalizeSettings({
     ...current,
-    ...updates
+    ...definedUpdates
   });
 
   await persistMenuSettingsAsync(next);
