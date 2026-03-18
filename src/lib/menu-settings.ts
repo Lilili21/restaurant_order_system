@@ -16,6 +16,7 @@ export type MenuSettings = {
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
 const MENU_SETTINGS_KEY = "menu-settings";
+const MENU_SETTINGS_CACHE_TTL_MS = 2_000;
 
 const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
@@ -26,6 +27,30 @@ const DEFAULT_SETTINGS: MenuSettings = {
   tableCount: 8,
   tableTokens: {}
 };
+
+type MenuSettingsCacheEntry = {
+  settings: MenuSettings;
+  expiresAt: number;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __menuSettingsCache: MenuSettingsCacheEntry | undefined;
+}
+
+function getSettingsCache() {
+  return globalThis.__menuSettingsCache;
+}
+
+function setSettingsCache(settings: MenuSettings) {
+  globalThis.__menuSettingsCache = {
+    settings: {
+      ...settings,
+      tableTokens: { ...settings.tableTokens }
+    },
+    expiresAt: Date.now() + MENU_SETTINGS_CACHE_TTL_MS
+  };
+}
 
 function generateTableToken() {
   return `tbl_${randomBytes(9).toString("base64url")}`;
@@ -98,6 +123,7 @@ async function persistMenuSettingsAsync(settings: MenuSettings) {
 
   if (!supabase) {
     persistMenuSettings(settings);
+    setSettingsCache(settings);
     return;
   }
 
@@ -113,6 +139,8 @@ async function persistMenuSettingsAsync(settings: MenuSettings) {
   if (error) {
     throw new Error(`Supabase persist failed: ${error.message}`);
   }
+
+  setSettingsCache(settings);
 }
 
 function getMenuSettingsSync() {
@@ -138,10 +166,24 @@ function getMenuSettingsSync() {
 }
 
 export async function getMenuSettings() {
+  const cached = getSettingsCache();
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return {
+      ...cached.settings,
+      tableTokens: { ...cached.settings.tableTokens }
+    };
+  }
+
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    return getMenuSettingsSync();
+    const localSettings = getMenuSettingsSync();
+    setSettingsCache(localSettings);
+    return {
+      ...localSettings,
+      tableTokens: { ...localSettings.tableTokens }
+    };
   }
 
   try {
@@ -158,13 +200,25 @@ export async function getMenuSettings() {
     if (!data?.value) {
       const normalized = normalizeSettings(DEFAULT_SETTINGS);
       await persistMenuSettingsAsync(normalized);
-      return normalized;
+      return {
+        ...normalized,
+        tableTokens: { ...normalized.tableTokens }
+      };
     }
 
     const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
-    return normalized;
+    setSettingsCache(normalized);
+    return {
+      ...normalized,
+      tableTokens: { ...normalized.tableTokens }
+    };
   } catch {
-    return getMenuSettingsSync();
+    const localSettings = getMenuSettingsSync();
+    setSettingsCache(localSettings);
+    return {
+      ...localSettings,
+      tableTokens: { ...localSettings.tableTokens }
+    };
   }
 }
 

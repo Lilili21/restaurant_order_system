@@ -13,6 +13,103 @@ import {
 } from "@/lib/orders";
 import { OrderStatus } from "@/lib/types";
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidSlug(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 80 &&
+    /^[a-z0-9-]+$/.test(value)
+  );
+}
+
+function isValidTableNumber(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 200
+  );
+}
+
+function validateServiceRequestPayload(body: unknown) {
+  if (!isPlainObject(body)) {
+    throw new Error("Invalid payload");
+  }
+
+  if (!isValidSlug(body.restaurantSlug)) {
+    throw new Error("restaurantSlug is required");
+  }
+
+  if (!isValidTableNumber(body.tableNumber)) {
+    throw new Error("tableNumber is required");
+  }
+}
+
+function validateCreateOrderPayload(body: unknown) {
+  if (!isPlainObject(body)) {
+    throw new Error("Invalid payload");
+  }
+
+  if (!isValidSlug(body.restaurantSlug)) {
+    throw new Error("restaurantSlug is required");
+  }
+
+  if (!isValidTableNumber(body.tableNumber)) {
+    throw new Error("tableNumber is required");
+  }
+
+  if (!Array.isArray(body.items) || body.items.length < 1 || body.items.length > 60) {
+    throw new Error("items must contain from 1 to 60 entries");
+  }
+
+  for (const item of body.items) {
+    if (!isPlainObject(item)) {
+      throw new Error("Invalid order item");
+    }
+
+    if (typeof item.menuItemId !== "string" || !item.menuItemId.trim()) {
+      throw new Error("menuItemId is required");
+    }
+
+    if (
+      typeof item.quantity !== "number" ||
+      !Number.isInteger(item.quantity) ||
+      item.quantity < 1 ||
+      item.quantity > 50
+    ) {
+      throw new Error("quantity must be an integer from 1 to 50");
+    }
+
+    if (typeof item.note === "string" && item.note.length > 300) {
+      throw new Error("note is too long");
+    }
+
+    if (
+      typeof item.volumeOptionId === "string" &&
+      item.volumeOptionId.length > 120
+    ) {
+      throw new Error("volumeOptionId is too long");
+    }
+
+    if (typeof item.volumeLabel === "string" && item.volumeLabel.length > 60) {
+      throw new Error("volumeLabel is too long");
+    }
+
+    if (
+      typeof item.priceOverride === "number" &&
+      (!Number.isFinite(item.priceOverride) ||
+        item.priceOverride < 0 ||
+        item.priceOverride > 1_000_000)
+    ) {
+      throw new Error("priceOverride is invalid");
+    }
+  }
+}
+
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminAccess(request, "admin");
 
@@ -53,6 +150,12 @@ export async function POST(request: NextRequest) {
 
     if (limited) {
       return limited;
+    }
+
+    if (body.type === "waiter_call" || body.type === "bill_request") {
+      validateServiceRequestPayload(body);
+    } else {
+      validateCreateOrderPayload(body);
     }
 
     const order =

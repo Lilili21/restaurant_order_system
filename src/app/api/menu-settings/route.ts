@@ -46,6 +46,24 @@ export async function PATCH(request: NextRequest) {
       tableCount?: number;
     };
 
+    if (
+      typeof body.tableCount === "number" &&
+      (!Number.isInteger(body.tableCount) || body.tableCount < 1 || body.tableCount > 100)
+    ) {
+      throw new Error("tableCount must be an integer from 1 to 100");
+    }
+
+    if (
+      typeof body.kitchenOpenUntil === "string" &&
+      body.kitchenOpenUntil.length > 10
+    ) {
+      throw new Error("kitchenOpenUntil is invalid");
+    }
+
+    if (typeof body.barOpenUntil === "string" && body.barOpenUntil.length > 10) {
+      throw new Error("barOpenUntil is invalid");
+    }
+
     return NextResponse.json(
       await updateMenuSettings({
         kitchenLoadWarningEnabled: body.kitchenLoadWarningEnabled,

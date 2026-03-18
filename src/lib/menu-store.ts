@@ -9,6 +9,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
 const MENU_STORE_KEY = "menu-store";
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
+const MENU_STORE_CACHE_TTL_MS = 2_000;
 const ALLOWED_BADGES: MenuBadge[] = [
   "chef_special",
   "most_popular",
@@ -20,6 +21,37 @@ const ALLOWED_BADGES: MenuBadge[] = [
   "dairy_free",
   "nut_free"
 ];
+
+type MenuStoreCacheEntry = {
+  items: MenuItem[];
+  expiresAt: number;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __menuStoreCache: MenuStoreCacheEntry | undefined;
+}
+
+function cloneMenuItems(items: MenuItem[]) {
+  return items.map((item) => ({
+    ...item,
+    badges: Array.isArray(item.badges) ? [...item.badges] : [],
+    volumeOptions: Array.isArray(item.volumeOptions)
+      ? item.volumeOptions.map((option) => ({ ...option }))
+      : []
+  }));
+}
+
+function getMenuStoreCache() {
+  return globalThis.__menuStoreCache;
+}
+
+function setMenuStoreCache(items: MenuItem[]) {
+  globalThis.__menuStoreCache = {
+    items: cloneMenuItems(items),
+    expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+  };
+}
 
 function cloneDefaultMenuItems() {
   return menuItems.map((item) => ({ ...item }));
@@ -107,10 +139,18 @@ function persistMenuItemsWith(items: MenuItem[]) {
 }
 
 async function loadMenuItemsAsync() {
+  const cached = getMenuStoreCache();
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneMenuItems(cached.items);
+  }
+
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    return loadMenuItems();
+    const localItems = loadMenuItems();
+    setMenuStoreCache(localItems);
+    return cloneMenuItems(localItems);
   }
 
   try {
@@ -127,16 +167,21 @@ async function loadMenuItemsAsync() {
     if (!data?.value) {
       const defaults = cloneDefaultMenuItems();
       await persistMenuItemsAsync(defaults);
-      return defaults;
+      setMenuStoreCache(defaults);
+      return cloneMenuItems(defaults);
     }
 
     const parsed = data.value as MenuItem[];
-
-    return Array.isArray(parsed)
+    const normalized = Array.isArray(parsed)
       ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
       : cloneDefaultMenuItems();
+
+    setMenuStoreCache(normalized);
+    return cloneMenuItems(normalized);
   } catch {
-    return loadMenuItems();
+    const localItems = loadMenuItems();
+    setMenuStoreCache(localItems);
+    return cloneMenuItems(localItems);
   }
 }
 
@@ -145,6 +190,7 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
 
   if (!supabase) {
     persistMenuItemsWith(items);
+    setMenuStoreCache(items);
     return;
   }
 
@@ -160,6 +206,8 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
   if (error) {
     throw new Error(`Supabase persist failed: ${error.message}`);
   }
+
+  setMenuStoreCache(items);
 }
 
 if (!existsSync(MENU_STORE_PATH)) {

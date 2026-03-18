@@ -51,12 +51,27 @@ export async function PATCH(request: NextRequest) {
       targetTableNumber?: number;
     };
 
-    if (!body.restaurantSlug || !body.tableNumber) {
+    const isValidSlug =
+      typeof body.restaurantSlug === "string" &&
+      /^[a-z0-9-]+$/.test(body.restaurantSlug);
+    const isValidTableNumber =
+      typeof body.tableNumber === "number" &&
+      Number.isInteger(body.tableNumber) &&
+      body.tableNumber >= 1 &&
+      body.tableNumber <= 200;
+
+    if (!isValidSlug || !isValidTableNumber) {
       throw new Error("restaurantSlug and tableNumber are required");
     }
 
     if (body.action === "move") {
-      if (!body.targetTableNumber) {
+      const isValidTargetTable =
+        typeof body.targetTableNumber === "number" &&
+        Number.isInteger(body.targetTableNumber) &&
+        body.targetTableNumber >= 1 &&
+        body.targetTableNumber <= 200;
+
+      if (!isValidTargetTable) {
         throw new Error("targetTableNumber is required");
       }
 

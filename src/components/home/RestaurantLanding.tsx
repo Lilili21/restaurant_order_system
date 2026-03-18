@@ -21,6 +21,7 @@ export function RestaurantLanding({
   tableLinks
 }: RestaurantLandingProps) {
   const [tablesOpen, setTablesOpen] = useState(false);
+  const hasTableLinks = tableLinks.length > 0;
 
   return (
     <main className="page-shell">
@@ -39,13 +40,15 @@ export function RestaurantLanding({
             >
               Admin
             </Link>
-            <button
-              type="button"
-              className="button-link button-link--hero"
-              onClick={() => setTablesOpen((current) => !current)}
-            >
-              Tables menu
-            </button>
+            {hasTableLinks ? (
+              <button
+                type="button"
+                className="button-link button-link--hero"
+                onClick={() => setTablesOpen((current) => !current)}
+              >
+                Tables menu
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -56,7 +59,7 @@ export function RestaurantLanding({
         </div>
       </section>
 
-      {tablesOpen ? (
+      {tablesOpen && hasTableLinks ? (
         <section className="table-links-panel">
           <div className="table-links-panel__list">
             {tableLinks.map((table) => (

@@ -1,12 +1,51 @@
 import { restaurants } from "@/lib/mock-data";
 import { getMenuSettings } from "@/lib/menu-settings";
-import { MenuItem, TableSession } from "@/lib/types";
+import { MenuItem, Restaurant, TableSession } from "@/lib/types";
 import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
+
+const RESTAURANTS_CACHE_TTL_MS = 2_000;
+
+type RestaurantsCacheEntry = {
+  restaurants: Restaurant[];
+  expiresAt: number;
+  signature: string;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __restaurantsCache: RestaurantsCacheEntry | undefined;
+}
+
+function buildRestaurantsSignature(
+  tableCount: number,
+  tableTokens: Record<string, string>
+) {
+  return `${tableCount}:${Object.entries(tableTokens)
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([key, value]) => `${key}:${value}`)
+    .join("|")}`;
+}
 
 export async function getRestaurants() {
   const settings = await getMenuSettings();
+  const signature = buildRestaurantsSignature(
+    settings.tableCount,
+    settings.tableTokens
+  );
+  const cached = globalThis.__restaurantsCache;
 
-  return restaurants.map((restaurant) => ({
+  if (
+    cached &&
+    cached.expiresAt > Date.now() &&
+    cached.signature === signature
+  ) {
+    return cached.restaurants.map((restaurant) => ({
+      ...restaurant,
+      tables: restaurant.tables.map((table) => ({ ...table }))
+    }));
+  }
+
+  const computedRestaurants = restaurants.map((restaurant) => ({
     ...restaurant,
     tables: Array.from({ length: settings.tableCount }, (_, index) => {
       const tableNumber = index + 1;
@@ -23,6 +62,17 @@ export async function getRestaurants() {
       };
     })
   }));
+
+  globalThis.__restaurantsCache = {
+    restaurants: computedRestaurants.map((restaurant) => ({
+      ...restaurant,
+      tables: restaurant.tables.map((table) => ({ ...table }))
+    })),
+    expiresAt: Date.now() + RESTAURANTS_CACHE_TTL_MS,
+    signature
+  };
+
+  return computedRestaurants;
 }
 
 export async function getRestaurantBySlug(slug: string) {

@@ -2,6 +2,7 @@ import { initialOrders } from "@/lib/mock-data";
 import {
   CartItem,
   ClosedTableSummary,
+  MenuItem,
   Order,
   OrderItem,
   OrderStatus,
@@ -9,7 +10,7 @@ import {
   TableOverview
 } from "@/lib/types";
 import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
-import { getMenuItemById } from "@/lib/menu-store";
+import { getAllMenuItems, getMenuItemById } from "@/lib/menu-store";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -36,8 +37,18 @@ function cloneInitialOrders() {
   }));
 }
 
-async function normalizeOrderItemForAdmin(item: OrderItem): Promise<OrderItem> {
-  const menuItem = await getMenuItemById(item.menuItemId);
+async function getMenuLookupForRestaurant(restaurantSlug: string) {
+  const menuItems = await getAllMenuItems(restaurantSlug);
+  return new Map(menuItems.map((menuItem) => [menuItem.id, menuItem] as const));
+}
+
+type MenuLookupByRestaurant = Map<string, Map<string, MenuItem>>;
+
+async function normalizeOrderItemForAdmin(
+  item: OrderItem,
+  menuLookup?: Map<string, MenuItem>
+): Promise<OrderItem> {
+  const menuItem = menuLookup?.get(item.menuItemId) ?? (await getMenuItemById(item.menuItemId));
   const matchedVolumeOption = menuItem?.volumeOptions?.find(
     (option) => option.id === item.volumeOptionId
   );
@@ -51,12 +62,18 @@ async function normalizeOrderItemForAdmin(item: OrderItem): Promise<OrderItem> {
   };
 }
 
-async function normalizePersistedOrder(order: Order): Promise<Order> {
+async function normalizePersistedOrder(
+  order: Order,
+  menuLookupByRestaurant?: MenuLookupByRestaurant
+): Promise<Order> {
   if (order.kind === "waiter_call" || order.kind === "bill_request") {
     return order;
   }
 
-  const items = await Promise.all(order.items.map(normalizeOrderItemForAdmin));
+  const menuLookup = menuLookupByRestaurant?.get(order.restaurantSlug);
+  const items = await Promise.all(
+    order.items.map((item) => normalizeOrderItemForAdmin(item, menuLookup))
+  );
 
   return {
     ...order,
@@ -151,9 +168,52 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
     }
 
     const parsed = data.value as OrdersPersistence;
+    const restaurantSlugs = new Set<string>();
+
+    if (Array.isArray(parsed.orders)) {
+      for (const order of parsed.orders) {
+        if (
+          order &&
+          typeof order.restaurantSlug === "string" &&
+          order.kind !== "waiter_call" &&
+          order.kind !== "bill_request"
+        ) {
+          restaurantSlugs.add(order.restaurantSlug);
+        }
+      }
+    }
+
+    if (Array.isArray(parsed.closedTableSummaries)) {
+      for (const summary of parsed.closedTableSummaries) {
+        if (Array.isArray(summary?.orders)) {
+          for (const order of summary.orders) {
+            if (
+              order &&
+              typeof order.restaurantSlug === "string" &&
+              order.kind !== "waiter_call" &&
+              order.kind !== "bill_request"
+            ) {
+              restaurantSlugs.add(order.restaurantSlug);
+            }
+          }
+        }
+      }
+    }
+
+    const menuLookupByRestaurant: MenuLookupByRestaurant = new Map(
+      await Promise.all(
+        [...restaurantSlugs].map(async (restaurantSlug) => [
+          restaurantSlug,
+          await getMenuLookupForRestaurant(restaurantSlug)
+        ])
+      )
+    );
+
     const orders = Array.isArray(parsed.orders)
       ? await Promise.all(
-          parsed.orders.map((order) => normalizePersistedOrder(order as Order))
+          parsed.orders.map((order) =>
+            normalizePersistedOrder(order as Order, menuLookupByRestaurant)
+          )
         )
       : cloneInitialOrders();
     const closedTableSummaries = Array.isArray(parsed.closedTableSummaries)
@@ -163,7 +223,10 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
             orders: Array.isArray(summary.orders)
               ? await Promise.all(
                   summary.orders.map((order) =>
-                    normalizePersistedOrder(order as Order)
+                    normalizePersistedOrder(
+                      order as Order,
+                      menuLookupByRestaurant
+                    )
                   )
                 )
               : []
@@ -281,12 +344,7 @@ if (!existsSync(ORDERS_STORE_PATH)) {
   persistState(readRuntimeState());
 }
 
-async function createOrderItem(cartItem: CartItem): Promise<OrderItem> {
-  const menuItem = await getMenuItemById(cartItem.menuItemId);
-
-  if (!menuItem) {
-    throw new Error(`Menu item ${cartItem.menuItemId} not found`);
-  }
+function createOrderItem(cartItem: CartItem, menuItem: MenuItem): OrderItem {
 
   const matchedVolumeOption = menuItem.volumeOptions?.find(
     (option) => option.id === cartItem.volumeOptionId
@@ -336,7 +394,10 @@ async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
 }
 
 async function normalizeOrderState(order: Order) {
-  order.items = await Promise.all(order.items.map(normalizeOrderItemForAdmin));
+  const menuLookup = await getMenuLookupForRestaurant(order.restaurantSlug);
+  order.items = await Promise.all(
+    order.items.map((item) => normalizeOrderItemForAdmin(item, menuLookup))
+  );
 
   if (order.kind === "waiter_call" || order.kind === "bill_request") {
     order.total = 0;
@@ -409,6 +470,20 @@ export async function createWaiterCall(input: {
     input.tableNumber
   );
 
+  const existingActiveWaiterCall = state.ordersStore.find(
+    (order) =>
+      order.restaurantSlug === restaurant.slug &&
+      order.tableNumber === input.tableNumber &&
+      order.sessionId === sessionId &&
+      order.kind === "waiter_call" &&
+      order.status !== "cancelled" &&
+      order.status !== "served"
+  );
+
+  if (existingActiveWaiterCall) {
+    return existingActiveWaiterCall;
+  }
+
   const waiterCall: Order = {
     id: `call_${Date.now()}`,
     restaurantSlug: restaurant.slug,
@@ -453,6 +528,20 @@ export async function createBillRequest(input: {
     input.restaurantSlug,
     input.tableNumber
   );
+
+  const existingActiveBillRequest = state.ordersStore.find(
+    (order) =>
+      order.restaurantSlug === restaurant.slug &&
+      order.tableNumber === input.tableNumber &&
+      order.sessionId === sessionId &&
+      order.kind === "bill_request" &&
+      order.status !== "cancelled" &&
+      order.status !== "served"
+  );
+
+  if (existingActiveBillRequest) {
+    return existingActiveBillRequest;
+  }
 
   const billRequest: Order = {
     id: `bill_${Date.now()}`,
@@ -555,7 +644,16 @@ export async function createOrder(input: {
     throw new Error("Order must contain at least one item");
   }
 
-  const items = await Promise.all(input.items.map(createOrderItem));
+  const menuLookup = await getMenuLookupForRestaurant(input.restaurantSlug);
+  const items = input.items.map((cartItem) => {
+    const menuItem = menuLookup.get(cartItem.menuItemId);
+
+    if (!menuItem) {
+      throw new Error(`Menu item ${cartItem.menuItemId} not found`);
+    }
+
+    return createOrderItem(cartItem, menuItem);
+  });
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0

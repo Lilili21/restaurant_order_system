@@ -2,10 +2,13 @@ import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export type AdminAuthScope = "admin" | "secondary";
 
 const ADMIN_COOKIE_NAME = "admin_access";
+const ADMIN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
+const ADMIN_COOKIE_SECRET_FALLBACK = randomBytes(32).toString("hex");
 
 function getConfiguredCredentials(scope: AdminAuthScope) {
   if (scope === "admin") {
@@ -25,13 +28,81 @@ function getCookieName(scope: AdminAuthScope) {
   return ADMIN_COOKIE_NAME;
 }
 
+function getCookieSigningKey() {
+  return (
+    process.env.ADMIN_COOKIE_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ADMIN_COOKIE_SECRET_FALLBACK
+  );
+}
+
+function signCookiePayload(payload: string) {
+  return createHmac("sha256", getCookieSigningKey())
+    .update(payload)
+    .digest("base64url");
+}
+
+function createCookieValue(scope: AdminAuthScope) {
+  const expiresAt = Date.now() + ADMIN_COOKIE_MAX_AGE_SECONDS * 1000;
+  const payload = `${scope}.${expiresAt}`;
+  const signature = signCookiePayload(payload);
+  return `${payload}.${signature}`;
+}
+
+function verifyCookieValue(scope: AdminAuthScope, value: string | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  const chunks = value.split(".");
+
+  if (chunks.length !== 3) {
+    return false;
+  }
+
+  const [cookieScope, expiresAtRaw, signature] = chunks;
+
+  if (cookieScope !== scope) {
+    return false;
+  }
+
+  const expiresAt = Number(expiresAtRaw);
+
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    return false;
+  }
+
+  const payload = `${cookieScope}.${expiresAtRaw}`;
+  const expectedSignature = signCookiePayload(payload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+  return (
+    signatureBuffer.length === expectedSignatureBuffer.length &&
+    timingSafeEqual(signatureBuffer, expectedSignatureBuffer)
+  );
+}
+
 export function verifyAdminCredentials(
   scope: AdminAuthScope,
   login: string,
   password: string
 ) {
   const configured = getConfiguredCredentials(scope);
-  return login === configured.login && password === configured.password;
+
+  const loginBuffer = Buffer.from(login);
+  const configuredLoginBuffer = Buffer.from(configured.login);
+  const passwordBuffer = Buffer.from(password);
+  const configuredPasswordBuffer = Buffer.from(configured.password);
+
+  const loginMatches =
+    loginBuffer.length === configuredLoginBuffer.length &&
+    timingSafeEqual(loginBuffer, configuredLoginBuffer);
+  const passwordMatches =
+    passwordBuffer.length === configuredPasswordBuffer.length &&
+    timingSafeEqual(passwordBuffer, configuredPasswordBuffer);
+
+  return loginMatches && passwordMatches;
 }
 
 function isSafeMethod(method: string) {
@@ -73,6 +144,10 @@ export function requireSameOrigin(request: NextRequest) {
     }
   }
 
+  if (!origin && !referer) {
+    return NextResponse.json({ message: "Forbidden origin" }, { status: 403 });
+  }
+
   return null;
 }
 
@@ -82,7 +157,7 @@ export async function hasAdminAccess(scope: AdminAuthScope) {
   }
 
   const cookieStore = await cookies();
-  return cookieStore.get(getCookieName(scope))?.value === "true";
+  return verifyCookieValue(scope, cookieStore.get(getCookieName(scope))?.value);
 }
 
 export function setAdminAccessCookie(
@@ -95,12 +170,12 @@ export function setAdminAccessCookie(
 
   response.cookies.set({
     name: getCookieName(scope),
-    value: "true",
+    value: createCookieValue(scope),
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 12
+    maxAge: ADMIN_COOKIE_MAX_AGE_SECONDS
   });
 }
 
@@ -127,6 +202,14 @@ export async function requireAdminAccess(
   request: NextRequest,
   scope: AdminAuthScope
 ) {
+  if (!isSafeMethod(request.method)) {
+    const originError = requireSameOrigin(request);
+
+    if (originError) {
+      return originError;
+    }
+  }
+
   if (scope === "secondary") {
     const login = request.headers.get("x-admin-secondary-login") ?? "";
     const password = request.headers.get("x-admin-secondary-password") ?? "";
@@ -138,15 +221,10 @@ export async function requireAdminAccess(
     return null;
   }
 
-  if (!isSafeMethod(request.method)) {
-    const originError = requireSameOrigin(request);
-
-    if (originError) {
-      return originError;
-    }
-  }
-
-  const hasAccess = request.cookies.get(getCookieName(scope))?.value === "true";
+  const hasAccess = verifyCookieValue(
+    scope,
+    request.cookies.get(getCookieName(scope))?.value
+  );
 
   if (!hasAccess) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

@@ -236,6 +236,7 @@ export function Cart({
   const [orderJumpExpanded, setOrderJumpExpanded] = useState(false);
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
+  const currentSessionIdRef = useRef(currentSessionId);
 
   const detailedItems = useMemo(() => {
     return items
@@ -309,6 +310,10 @@ export function Cart({
   }
 
   useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
+  useEffect(() => {
     const savedLanguage = window.localStorage.getItem(
       `menu-language:${restaurantSlug}:${tableToken}`
     );
@@ -333,18 +338,26 @@ export function Cart({
     }
 
     let cancelled = false;
+    let inFlightAbortController: AbortController | null = null;
 
     async function syncSubmittedOrders() {
       if (document.visibilityState === "hidden") {
         return;
       }
 
-      const response = await fetch(
-        `/api/tables/${restaurantSlug}/${tableToken}`,
-        {
-          cache: "no-store"
-        }
-      );
+      inFlightAbortController?.abort();
+      inFlightAbortController = new AbortController();
+
+      let response: Response;
+
+      try {
+        response = await fetch(`/api/tables/${restaurantSlug}/${tableToken}`, {
+          cache: "no-store",
+          signal: inFlightAbortController.signal
+        });
+      } catch {
+        return;
+      }
 
       if (!response.ok) {
         return;
@@ -357,7 +370,8 @@ export function Cart({
       };
 
       if (!cancelled) {
-        const nextSessionId = data.currentSessionId ?? currentSessionId;
+        const previousSessionId = currentSessionIdRef.current;
+        const nextSessionId = data.currentSessionId ?? previousSessionId;
         const nextOrders = data.submittedOrders ?? [];
         const hasActiveServiceRequests = (data.activeServiceRequests ?? []).some(
           (kind) => kind === "waiter_call" || kind === "bill_request"
@@ -369,7 +383,7 @@ export function Cart({
           setServiceRequestBlockedUntil(0);
         }
         setSubmittedOrders((current) => {
-          if (nextSessionId !== currentSessionId) {
+          if (nextSessionId !== previousSessionId) {
             return nextOrders;
           }
 
@@ -397,9 +411,10 @@ export function Cart({
 
     return () => {
       cancelled = true;
+      inFlightAbortController?.abort();
       window.clearInterval(intervalId);
     };
-  }, [restaurantSlug, tableToken, currentSessionId, orderingEnabled]);
+  }, [restaurantSlug, tableToken, orderingEnabled]);
 
   useEffect(() => {
     if (!orderingEnabled) {
