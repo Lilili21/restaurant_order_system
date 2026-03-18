@@ -2,8 +2,7 @@ import "@/styles/globals.css";
 
 import type { Metadata } from "next";
 import { ReactNode } from "react";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Restaurant QR Orders",
@@ -19,8 +18,11 @@ export default function RootLayout({
     <html lang="ru">
       <body>
         {children}
-        <Analytics />
-        <SpeedInsights />
+        <Script src="/_vercel/insights/script.js" strategy="afterInteractive" />
+        <Script
+          src="/_vercel/speed-insights/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

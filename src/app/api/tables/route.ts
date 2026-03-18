@@ -64,6 +64,9 @@ export async function PATCH(request: NextRequest) {
       throw new Error("restaurantSlug and tableNumber are required");
     }
 
+    const restaurantSlug = body.restaurantSlug as string;
+    const tableNumber = body.tableNumber as number;
+
     if (body.action === "move") {
       const isValidTargetTable =
         typeof body.targetTableNumber === "number" &&
@@ -75,18 +78,18 @@ export async function PATCH(request: NextRequest) {
         throw new Error("targetTableNumber is required");
       }
 
+      const targetTableNumber = body.targetTableNumber as number;
+
       return NextResponse.json(
         await moveTableOrders(
-          body.restaurantSlug,
-          body.tableNumber,
-          body.targetTableNumber
+          restaurantSlug,
+          tableNumber,
+          targetTableNumber
         )
       );
     }
 
-    return NextResponse.json(
-      await closeTable(body.restaurantSlug, body.tableNumber)
-    );
+    return NextResponse.json(await closeTable(restaurantSlug, tableNumber));
   } catch (error) {
     return NextResponse.json(
       {
