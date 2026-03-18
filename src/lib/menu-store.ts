@@ -32,7 +32,7 @@ declare global {
   var __menuStoreCache: MenuStoreCacheEntry | undefined;
 }
 
-function cloneMenuItems(items: MenuItem[]) {
+function cloneMenuItems(items: MenuItem[]): MenuItem[] {
   return items.map((item) => ({
     ...item,
     badges: Array.isArray(item.badges) ? [...item.badges] : [],
@@ -53,7 +53,7 @@ function setMenuStoreCache(items: MenuItem[]) {
   };
 }
 
-function cloneDefaultMenuItems() {
+function cloneDefaultMenuItems(): MenuItem[] {
   return menuItems.map((item) => ({ ...item }));
 }
 
@@ -113,7 +113,7 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
   };
 }
 
-function loadMenuItems() {
+function loadMenuItems(): MenuItem[] {
   if (!existsSync(MENU_STORE_PATH)) {
     return cloneDefaultMenuItems();
   }
@@ -138,7 +138,7 @@ function persistMenuItemsWith(items: MenuItem[]) {
   writeFileSync(MENU_STORE_PATH, JSON.stringify(items, null, 2), "utf8");
 }
 
-async function loadMenuItemsAsync() {
+async function loadMenuItemsAsync(): Promise<MenuItem[]> {
   const cached = getMenuStoreCache();
 
   if (cached && cached.expiresAt > Date.now()) {

@@ -1,6 +1,29 @@
 {
   "orders": [
     {
+      "id": "ord_1773817156178",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 3,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-18T06:59:16.178Z",
+      "updatedAt": "2026-03-18T06:59:16.178Z",
+      "items": [
+        {
+          "id": "item_1773817156177_lq0igo",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 156
+    },
+    {
       "id": "ord_1773791963138",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -70,7 +93,7 @@
       "tableNumber": 1,
       "sessionId": 5,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-17T23:58:43.480Z",
       "updatedAt": "2026-03-17T23:58:43.480Z",
       "items": [],
@@ -214,7 +237,7 @@
       "tableNumber": 2,
       "sessionId": 2,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-17T14:16:41.987Z",
       "updatedAt": "2026-03-17T14:16:41.987Z",
       "items": [],

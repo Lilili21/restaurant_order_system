@@ -28,6 +28,26 @@ function getCookieName(scope: AdminAuthScope) {
   return ADMIN_COOKIE_NAME;
 }
 
+function matchCredentials(
+  configured: { login: string; password: string },
+  login: string,
+  password: string
+) {
+  const loginBuffer = Buffer.from(login);
+  const configuredLoginBuffer = Buffer.from(configured.login);
+  const passwordBuffer = Buffer.from(password);
+  const configuredPasswordBuffer = Buffer.from(configured.password);
+
+  const loginMatches =
+    loginBuffer.length === configuredLoginBuffer.length &&
+    timingSafeEqual(loginBuffer, configuredLoginBuffer);
+  const passwordMatches =
+    passwordBuffer.length === configuredPasswordBuffer.length &&
+    timingSafeEqual(passwordBuffer, configuredPasswordBuffer);
+
+  return loginMatches && passwordMatches;
+}
+
 function getCookieSigningKey() {
   return (
     process.env.ADMIN_COOKIE_SECRET ||
@@ -89,20 +109,17 @@ export function verifyAdminCredentials(
   password: string
 ) {
   const configured = getConfiguredCredentials(scope);
+  const directMatch = matchCredentials(configured, login, password);
 
-  const loginBuffer = Buffer.from(login);
-  const configuredLoginBuffer = Buffer.from(configured.login);
-  const passwordBuffer = Buffer.from(password);
-  const configuredPasswordBuffer = Buffer.from(configured.password);
+  if (directMatch) {
+    return true;
+  }
 
-  const loginMatches =
-    loginBuffer.length === configuredLoginBuffer.length &&
-    timingSafeEqual(loginBuffer, configuredLoginBuffer);
-  const passwordMatches =
-    passwordBuffer.length === configuredPasswordBuffer.length &&
-    timingSafeEqual(passwordBuffer, configuredPasswordBuffer);
+  if (scope === "admin") {
+    return matchCredentials(getConfiguredCredentials("secondary"), login, password);
+  }
 
-  return loginMatches && passwordMatches;
+  return false;
 }
 
 function isSafeMethod(method: string) {
