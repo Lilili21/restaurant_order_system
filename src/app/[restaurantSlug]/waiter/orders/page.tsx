@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { OrdersList } from "@/components/admin/OrdersList";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
@@ -21,30 +22,32 @@ export default async function RestaurantWaiterOrdersPage({
   }
 
   return (
-    <main className="page-shell">
-      <section className="hero hero--compact">
-        <div>
-          <h1>Incoming orders</h1>
-        </div>
-        <div className="admin-nav" aria-label="Waiter navigation">
-          <div className="admin-switch">
-            <Link
-              href={`/${restaurant.slug}/waiter/orders`}
-              className="admin-switch__item admin-switch__item--active"
-            >
-              Orders
-            </Link>
-            <Link
-              href={`/${restaurant.slug}/waiter/tables`}
-              className="admin-switch__item"
-            >
-              Tables
-            </Link>
+    <AdminAccessGate>
+      <main className="page-shell">
+        <section className="hero hero--compact">
+          <div>
+            <h1>Incoming orders</h1>
           </div>
-        </div>
-      </section>
+          <div className="admin-nav" aria-label="Waiter navigation">
+            <div className="admin-switch">
+              <Link
+                href={`/${restaurant.slug}/waiter/orders`}
+                className="admin-switch__item admin-switch__item--active"
+              >
+                Orders
+              </Link>
+              <Link
+                href={`/${restaurant.slug}/waiter/tables`}
+                className="admin-switch__item"
+              >
+                Tables
+              </Link>
+            </div>
+          </div>
+        </section>
 
-      <OrdersList />
-    </main>
+        <OrdersList />
+      </main>
+    </AdminAccessGate>
   );
 }

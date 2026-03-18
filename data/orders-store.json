@@ -1,6 +1,57 @@
 {
   "orders": [
     {
+      "id": "ord_1773842670071",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-18T14:04:30.071Z",
+      "updatedAt": "2026-03-18T14:04:37.879Z",
+      "items": [
+        {
+          "id": "item_1773842670071_86ama6",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 40
+    },
+    {
+      "id": "bill_1773842650696",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-18T14:04:10.696Z",
+      "updatedAt": "2026-03-18T14:04:10.696Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "bill_1773842172780",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 5,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-18T13:56:12.780Z",
+      "updatedAt": "2026-03-18T13:56:12.780Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "bill_1773821108347",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

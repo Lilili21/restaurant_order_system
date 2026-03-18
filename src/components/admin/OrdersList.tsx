@@ -61,7 +61,8 @@ export function OrdersList() {
     }
 
     try {
-      return JSON.parse(raw) as Order[];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as Order[]) : [];
     } catch {
       return [];
     }
@@ -82,10 +83,15 @@ export function OrdersList() {
     const nextAlertCalls = safeNextOrders.filter(
       (order) => order.kind === "waiter_call" || order.kind === "bill_request"
     );
+    const nextAlertIds = new Set(nextAlertCalls.map((order) => order.id));
     const mergedAlertCallsMap = new Map<string, Order>();
 
     [...storedCalls, ...nextAlertCalls].forEach((order) => {
-      if (order.status !== "served" && order.status !== "cancelled") {
+      if (
+        nextAlertIds.has(order.id) &&
+        order.status !== "served" &&
+        order.status !== "cancelled"
+      ) {
         mergedAlertCallsMap.set(order.id, order);
       }
     });

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
-import { ClosedTableSummary, TableOverview } from "@/lib/types";
+import { ClosedTableSummary, Order, TableOverview } from "@/lib/types";
 
 type TablesResponse = {
   tables: TableOverview[];
@@ -20,8 +20,8 @@ type SessionItemSummary = {
 function groupSessionItems(table: TableOverview): SessionItemSummary[] {
   const grouped = new Map<string, SessionItemSummary>();
 
-  for (const order of table.orders) {
-    for (const item of order.items) {
+  for (const order of table.orders ?? []) {
+    for (const item of order.items ?? []) {
       const key = item.menuItemId;
       const existing = grouped.get(key);
 
@@ -46,8 +46,8 @@ function groupSessionItems(table: TableOverview): SessionItemSummary[] {
 function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummary[] {
   const grouped = new Map<string, SessionItemSummary>();
 
-  for (const order of session.orders) {
-    for (const item of order.items) {
+  for (const order of session.orders ?? []) {
+    for (const item of order.items ?? []) {
       const key = item.menuItemId;
       const existing = grouped.get(key);
 
@@ -82,6 +82,21 @@ export function TablesOverview() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [serviceRequests, setServiceRequests] = useState<Order[]>([]);
+
+  function normalizeTablesResponse(payload: unknown): TablesResponse {
+    if (!payload || typeof payload !== "object") {
+      return { tables: [], closedSessions: [] };
+    }
+
+    const candidate = payload as Partial<TablesResponse>;
+    return {
+      tables: Array.isArray(candidate.tables) ? candidate.tables : [],
+      closedSessions: Array.isArray(candidate.closedSessions)
+        ? candidate.closedSessions
+        : []
+    };
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -91,11 +106,24 @@ export function TablesOverview() {
         return;
       }
 
-      const response = await fetch("/api/tables");
-      const nextData = (await response.json()) as TablesResponse;
+      const [tablesResponse, ordersResponse] = await Promise.all([
+        fetch("/api/tables"),
+        fetch("/api/orders")
+      ]);
+      const payload = tablesResponse.ok ? await tablesResponse.json() : null;
+      const nextData = normalizeTablesResponse(payload);
+      const nextServiceRequests = ordersResponse.ok
+        ? ((await ordersResponse.json()) as Order[]).filter(
+            (order) =>
+              (order.kind === "waiter_call" || order.kind === "bill_request") &&
+              order.status !== "served" &&
+              order.status !== "cancelled"
+          )
+        : [];
 
       if (!cancelled) {
         setData(nextData);
+        setServiceRequests(nextServiceRequests);
         setLoading(false);
       }
     }
@@ -139,6 +167,29 @@ export function TablesOverview() {
       ),
       closedSessions: [summary, ...current.closedSessions]
     }));
+  }
+
+  async function resolveServiceRequest(orderId: string) {
+    const response = await fetch("/api/orders", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        orderId,
+        status: "served"
+      })
+    });
+
+    if (!response.ok) {
+      const error = (await response.json()) as { message?: string };
+      setDialogMessage(error.message ?? "Failed to update request status.");
+      return;
+    }
+
+    setServiceRequests((current) =>
+      current.filter((order) => order.id !== orderId)
+    );
   }
 
   function requestMoveTable(table: TableOverview) {
@@ -219,7 +270,7 @@ export function TablesOverview() {
       return;
     }
 
-    const nextData = (await refreshResponse.json()) as TablesResponse;
+    const nextData = normalizeTablesResponse(await refreshResponse.json());
     setData(nextData);
   }
 
@@ -415,7 +466,48 @@ export function TablesOverview() {
       ) : null}
 
       <div className="tables-layout">
-        {!data.tables.length ? (
+        {serviceRequests.length > 0 ? (
+          <section className="closed-sessions">
+            <div className="section-header">
+              <h2>Service requests</h2>
+            </div>
+            <div className="closed-grid">
+              {serviceRequests.map((order) => (
+                <article
+                  key={order.id}
+                  className="info-card order-card order-card--service"
+                >
+                  <h3>
+                    Table {order.tableNumber} ·{" "}
+                    {order.kind === "bill_request" ? "Bill request" : "Waiter call"}
+                  </h3>
+                  <p className="muted">
+                    Order time{" "}
+                    {new Date(order.updatedAt || order.createdAt).toLocaleTimeString(
+                      "en-GB",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                      }
+                    )}
+                  </p>
+                  <div className="order-actions">
+                    <button
+                      className="button-success"
+                      type="button"
+                      onClick={() => void resolveServiceRequest(order.id)}
+                    >
+                      OK
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!Array.isArray(data.tables) || data.tables.length === 0 ? (
           <p className="muted">
             There are no active orders left in the tables view.
           </p>
@@ -497,7 +589,7 @@ export function TablesOverview() {
             </button>
           </div>
 
-          {!data.closedSessions.length ? (
+          {!Array.isArray(data.closedSessions) || data.closedSessions.length === 0 ? (
             <p className="muted">No closed tables yet.</p>
           ) : (
             <div className="closed-grid">

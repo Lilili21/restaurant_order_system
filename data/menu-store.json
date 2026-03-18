@@ -11,7 +11,7 @@
     "descriptionEn": "",
     "price": 20,
     "image": "/images/default-menu-item.svg",
-    "showImage": true,
+    "showImage": false,
     "available": true,
     "badges": [],
     "volumeOptions": [
