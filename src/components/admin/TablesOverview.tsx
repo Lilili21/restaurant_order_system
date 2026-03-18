@@ -13,16 +13,25 @@ type TablesResponse = {
 type SessionItemSummary = {
   key: string;
   name: string;
+  volumeLabel?: string;
   quantity: number;
   total: number;
 };
+
+function getSessionItemKey(item: { menuItemId: string; volumeOptionId?: string; volumeLabel?: string }) {
+  return `${item.menuItemId}:${item.volumeOptionId ?? item.volumeLabel ?? "base"}`;
+}
+
+function getSessionItemName(item: { name: string; volumeLabel?: string }) {
+  return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
+}
 
 function groupSessionItems(table: TableOverview): SessionItemSummary[] {
   const grouped = new Map<string, SessionItemSummary>();
 
   for (const order of table.orders ?? []) {
     for (const item of order.items ?? []) {
-      const key = item.menuItemId;
+      const key = getSessionItemKey(item);
       const existing = grouped.get(key);
 
       if (existing) {
@@ -33,7 +42,8 @@ function groupSessionItems(table: TableOverview): SessionItemSummary[] {
 
       grouped.set(key, {
         key,
-        name: item.name,
+        name: getSessionItemName(item),
+        volumeLabel: item.volumeLabel,
         quantity: item.quantity,
         total: item.price * item.quantity
       });
@@ -48,7 +58,7 @@ function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummar
 
   for (const order of session.orders ?? []) {
     for (const item of order.items ?? []) {
-      const key = item.menuItemId;
+      const key = getSessionItemKey(item);
       const existing = grouped.get(key);
 
       if (existing) {
@@ -59,7 +69,8 @@ function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummar
 
       grouped.set(key, {
         key,
-        name: item.name,
+        name: getSessionItemName(item),
+        volumeLabel: item.volumeLabel,
         quantity: item.quantity,
         total: item.price * item.quantity
       });

@@ -1,10 +1,10 @@
 {
   "kitchenLoadWarningEnabled": false,
-  "kitchenOpenEnabled": true,
-  "kitchenOpenUntil": "2026-03-18T12:00:00.000Z",
-  "barOpenEnabled": true,
-  "barOpenUntil": "2026-03-18T14:28:00.000Z",
-  "tableCount": 8,
+  "kitchenOpenEnabled": false,
+  "kitchenOpenUntil": null,
+  "barOpenEnabled": false,
+  "barOpenUntil": null,
+  "tableCount": 14,
   "tableTokens": {
     "1": "tbl_UxflwK16Xm3V",
     "2": "tbl_rJ3w5MG_F-zH",

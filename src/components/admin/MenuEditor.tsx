@@ -1055,8 +1055,8 @@ export function MenuEditor() {
               type="button"
               className={
                 selectedKind === "dishes"
-                  ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                  : "admin-switch__item menu-editor__kind-button"
+                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes"
               }
               onClick={() => {
                 setSelectedKind("dishes");
@@ -1081,8 +1081,8 @@ export function MenuEditor() {
               type="button"
               className={
                 selectedKind === "drinks"
-                  ? "admin-switch__item menu-editor__kind-button admin-switch__item--active"
-                  : "admin-switch__item menu-editor__kind-button"
+                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks"
               }
               onClick={() => {
                 setSelectedKind("drinks");

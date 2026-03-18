@@ -40,6 +40,10 @@ const barCategories = new Set<MenuCategory>([
   "non_alcoholic_drinks"
 ]);
 
+function getOrderItemDisplayName(item: { name: string; volumeLabel?: string }) {
+  return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
+}
+
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -657,7 +661,9 @@ export function OrdersList() {
                         <div className="order-item-main">
                           {isStationView ? (
                             <div className="order-item-line">
-                              <span className="order-item-name">{item.name}</span>
+                              <span className="order-item-name">
+                                {getOrderItemDisplayName(item)}
+                              </span>
                               <span className="order-item-qty">
                                 {item.quantity} pcs
                               </span>
@@ -671,7 +677,9 @@ export function OrdersList() {
                                   toggleOrderItem(order.id, item.id, event.target.checked)
                                 }
                               />
-                              <span className="order-item-name">{item.name}</span>
+                              <span className="order-item-name">
+                                {getOrderItemDisplayName(item)}
+                              </span>
                             </label>
                           )}
                         </div>

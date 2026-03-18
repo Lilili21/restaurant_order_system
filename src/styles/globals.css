@@ -443,6 +443,17 @@ button:disabled {
   color: var(--muted);
   cursor: pointer;
   font: inherit;
+  font-weight: 700;
+}
+
+.menu-editor__kind-button--dishes {
+  background: rgba(255, 250, 240, 0.92);
+  color: var(--muted);
+}
+
+.menu-editor__kind-button--drinks {
+  background: rgba(255, 250, 240, 0.92);
+  color: var(--muted);
 }
 
 .menu-editor__kind-button.admin-switch__item--active {
@@ -1297,6 +1308,31 @@ textarea.modal-input {
 .orders-filter__chip--active {
   background: var(--accent);
   color: #fffaf2;
+}
+
+.orders-filter__chip--group {
+  min-height: 44px;
+  padding: 0 16px;
+  font-weight: 700;
+  box-shadow: 0 12px 28px rgba(49, 62, 34, 0.28);
+}
+
+.orders-filter__chip--group-dishes {
+  border-color: rgba(61, 87, 35, 0.65);
+  background: linear-gradient(135deg, #8cad4e 0%, #68863a 100%);
+  color: #f9fff2;
+}
+
+.orders-filter__chip--group-drinks {
+  border-color: rgba(78, 106, 42, 0.62);
+  background: linear-gradient(135deg, #a7be61 0%, #7d9947 100%);
+  color: #f9fff2;
+}
+
+.orders-filter__chip--group.orders-filter__chip--active {
+  background: var(--accent);
+  color: #fffaf2;
+  border-color: transparent;
 }
 
 .menu-notice-control {

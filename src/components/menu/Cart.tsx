@@ -158,15 +158,14 @@ const uiText = {
     reviewOrderOk: "OK",
     reviewOrderChange: "Change",
     dessertPromptTitle: "One more thing",
-    dessertPromptText: "I noticed there is no dessert in your order. Would you like to add a dessert before we continue?",
+    dessertPromptText: "Add dessert?",
     drinksPromptTitle: "One more thing",
-    drinksPromptText:
-      "I noticed there are no drinks in your order. Would you like to add something to drink before we continue?",
+    drinksPromptText: "Add drinks?",
     dessertDrinksPromptTitle: "One more thing",
     dessertDrinksPromptText:
       "I noticed there are no drinks or desserts in your order. Would you like to add something to drink or a dessert before we continue?",
     dessertPromptLater: "Later",
-    dessertPromptNow: "Now",
+    dessertPromptNow: "Yes",
     serveModeTitle: "How should we serve your order?",
     serveModeText: "Choose the serving option that works best for you.",
     serveAll: "Serve everything together",

@@ -2,13 +2,14 @@ import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export type AdminAuthScope = "admin" | "secondary";
 
 const ADMIN_COOKIE_NAME = "admin_access";
 const ADMIN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
-const ADMIN_COOKIE_SECRET_FALLBACK = randomBytes(32).toString("hex");
+const ADMIN_COOKIE_SECRET_FALLBACK =
+  "dev-only-admin-cookie-secret-change-me";
 
 function getConfiguredCredentials(scope: AdminAuthScope) {
   if (scope === "admin") {

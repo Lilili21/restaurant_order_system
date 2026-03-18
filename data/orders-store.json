@@ -1,15 +1,102 @@
 {
   "orders": [
     {
-      "id": "ord_1773854497438",
+      "id": "ord_1773858064551",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 5,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-18T18:21:04.551Z",
+      "updatedAt": "2026-03-18T18:21:04.551Z",
+      "items": [
+        {
+          "id": "item_1773858064551_fcdlat",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 100
+    },
+    {
+      "id": "ord_1773857755773",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-18T18:15:55.773Z",
+      "updatedAt": "2026-03-18T18:15:55.773Z",
+      "items": [
+        {
+          "id": "item_1773857755772_8phy16",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1773857755772_3tqxr4",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 124
+    },
+    {
+      "id": "ord_1773856661288",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 3,
       "sessionId": 1,
       "status": "new",
       "serveMode": "as_ready",
+      "createdAt": "2026-03-18T17:57:41.288Z",
+      "updatedAt": "2026-03-18T17:57:51.215Z",
+      "items": [
+        {
+          "id": "item_1773856661287_wrlnay",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773856661287_2h7qaa",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 210
+    },
+    {
+      "id": "ord_1773854497438",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 1,
+      "status": "preparing",
+      "serveMode": "as_ready",
       "createdAt": "2026-03-18T17:21:37.438Z",
-      "updatedAt": "2026-03-18T17:21:37.438Z",
+      "updatedAt": "2026-03-18T17:37:38.519Z",
       "items": [
         {
           "id": "item_1773854497438_kak8nx",
@@ -21,9 +108,42 @@
           "price": 20,
           "quantity": 1,
           "served": false
+        },
+        {
+          "id": "item_1773855458519_tgr7ua",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_0_1L",
+          "volumeLabel": "1L",
+          "price": 10,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773855458519_q437wu",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_1_2L",
+          "volumeLabel": "2L",
+          "price": 20,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1773855458519_551n59",
+          "menuItemId": "m5",
+          "category": "non_alcoholic_drinks",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 20
+      "total": 60
     },
     {
       "id": "ord_1773842670071",
@@ -66,7 +186,7 @@
       "tableNumber": 3,
       "sessionId": 1,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-18T14:04:10.696Z",
       "updatedAt": "2026-03-18T14:04:10.696Z",
       "items": [],
@@ -79,7 +199,7 @@
       "tableNumber": 1,
       "sessionId": 5,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-18T13:56:12.780Z",
       "updatedAt": "2026-03-18T13:56:12.780Z",
       "items": [],
@@ -92,7 +212,7 @@
       "tableNumber": 2,
       "sessionId": 3,
       "kind": "bill_request",
-      "status": "new",
+      "status": "served",
       "createdAt": "2026-03-18T08:05:08.347Z",
       "updatedAt": "2026-03-18T08:05:08.347Z",
       "items": [],
@@ -383,10 +503,10 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 4,
       "sessionId": 2,
-      "status": "new",
-      "serveMode": "all_at_once",
+      "status": "preparing",
+      "serveMode": "as_ready",
       "createdAt": "2026-03-17T11:15:44.027Z",
-      "updatedAt": "2026-03-17T11:15:44.027Z",
+      "updatedAt": "2026-03-18T17:38:37.857Z",
       "items": [
         {
           "id": "item_1773746144027_5fftmc",
@@ -394,7 +514,7 @@
           "category": "starters",
           "name": "Omelette 5",
           "price": 100,
-          "quantity": 1,
+          "quantity": 2,
           "served": false
         },
         {
@@ -418,9 +538,18 @@
           "price": 20,
           "quantity": 1,
           "served": false
+        },
+        {
+          "id": "item_1773855517857_mm3gwd",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 130
+      "total": 254
     },
     {
       "id": "bill_1773740240220",

@@ -179,8 +179,8 @@ export function MenuList({
             type="button"
             className={
               selectedCategory === "dishes"
-                ? "orders-filter__chip orders-filter__chip--active"
-                : "orders-filter__chip"
+                ? "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-dishes orders-filter__chip--active"
+                : "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-dishes"
             }
             onClick={() => setSelectedCategory("dishes")}
           >
@@ -207,8 +207,8 @@ export function MenuList({
               type="button"
               className={
                 selectedCategory === "drinks"
-                  ? "orders-filter__chip orders-filter__chip--active"
-                  : "orders-filter__chip"
+                  ? "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-drinks orders-filter__chip--active"
+                  : "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-drinks"
               }
               onClick={() => setSelectedCategory("drinks")}
             >
