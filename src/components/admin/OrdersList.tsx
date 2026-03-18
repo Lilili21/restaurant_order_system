@@ -74,9 +74,12 @@ export function OrdersList() {
     );
   }
 
-  function mergeOrdersWithStoredWaiterCalls(nextOrders: Order[]) {
+  function mergeOrdersWithStoredWaiterCalls(nextOrders: unknown) {
+    const safeNextOrders = Array.isArray(nextOrders)
+      ? (nextOrders as Order[])
+      : [];
     const storedCalls = readStoredWaiterCalls();
-    const nextAlertCalls = nextOrders.filter(
+    const nextAlertCalls = safeNextOrders.filter(
       (order) => order.kind === "waiter_call" || order.kind === "bill_request"
     );
     const mergedAlertCallsMap = new Map<string, Order>();
@@ -90,7 +93,7 @@ export function OrdersList() {
     const mergedAlertCalls = [...mergedAlertCallsMap.values()];
     writeStoredWaiterCalls(mergedAlertCalls);
 
-    const nonWaiterOrders = nextOrders.filter(
+    const nonWaiterOrders = safeNextOrders.filter(
       (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
     );
 
@@ -108,9 +111,8 @@ export function OrdersList() {
       }
 
       const response = await fetch("/api/orders");
-      const data = mergeOrdersWithStoredWaiterCalls(
-        (await response.json()) as Order[]
-      );
+      const payload = response.ok ? await response.json() : [];
+      const data = mergeOrdersWithStoredWaiterCalls(payload);
 
       if (!cancelled) {
         setOrders(data);
