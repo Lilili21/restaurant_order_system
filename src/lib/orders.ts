@@ -25,6 +25,17 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
 const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
 const ORDERS_STATE_KEY = "orders-state";
+const ORDERS_STATE_CACHE_TTL_MS = 2_000;
+
+type OrdersStateCacheEntry = {
+  state: OrdersPersistence;
+  expiresAt: number;
+};
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __ordersStateCache: OrdersStateCacheEntry | undefined;
+}
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
@@ -35,6 +46,38 @@ function cloneInitialOrders() {
     ...order,
     items: order.items.map((item) => ({ ...item }))
   }));
+}
+
+function cloneOrdersPersistence(state: OrdersPersistence): OrdersPersistence {
+  return {
+    orders: state.orders.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({ ...item }))
+    })),
+    currentTableSessions: state.currentTableSessions.map(([key, value]) => [
+      key,
+      value
+    ]),
+    closedTableSummaries: state.closedTableSummaries.map((summary) => ({
+      ...summary,
+      orderIds: [...summary.orderIds],
+      orders: summary.orders.map((order) => ({
+        ...order,
+        items: order.items.map((item) => ({ ...item }))
+      }))
+    }))
+  };
+}
+
+function getOrdersStateCache() {
+  return globalThis.__ordersStateCache;
+}
+
+function setOrdersStateCache(state: OrdersPersistence) {
+  globalThis.__ordersStateCache = {
+    state: cloneOrdersPersistence(state),
+    expiresAt: Date.now() + ORDERS_STATE_CACHE_TTL_MS
+  };
 }
 
 async function getMenuLookupForRestaurant(restaurantSlug: string) {
@@ -146,10 +189,18 @@ function readRuntimeState(): RuntimeState {
 }
 
 async function loadStateAsync(): Promise<OrdersPersistence> {
+  const cached = getOrdersStateCache();
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneOrdersPersistence(cached.state);
+  }
+
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    return loadState();
+    const localState = loadState();
+    setOrdersStateCache(localState);
+    return cloneOrdersPersistence(localState);
   }
 
   try {
@@ -164,7 +215,9 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
     }
 
     if (!data?.value) {
-      return getDefaultState();
+      const defaultState = getDefaultState();
+      setOrdersStateCache(defaultState);
+      return cloneOrdersPersistence(defaultState);
     }
 
     const parsed = data.value as OrdersPersistence;
@@ -236,15 +289,19 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
         )
       : [];
 
-    return {
+    const normalizedState = {
       orders,
       currentTableSessions: Array.isArray(parsed.currentTableSessions)
         ? parsed.currentTableSessions
         : [...createDefaultTableSessions().entries()],
       closedTableSummaries
     };
+    setOrdersStateCache(normalizedState);
+    return cloneOrdersPersistence(normalizedState);
   } catch {
-    return loadState();
+    const localState = loadState();
+    setOrdersStateCache(localState);
+    return cloneOrdersPersistence(localState);
   }
 }
 
@@ -265,19 +322,14 @@ function persistState(state: RuntimeState) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  writeFileSync(
-    ORDERS_STORE_PATH,
-    JSON.stringify(
-      {
-        orders: state.ordersStore,
-        currentTableSessions: [...state.currentTableSessions.entries()],
-        closedTableSummaries: state.closedTableSummaries
-      } satisfies OrdersPersistence,
-      null,
-      2
-    ),
-    "utf8"
-  );
+  const payload = {
+    orders: state.ordersStore,
+    currentTableSessions: [...state.currentTableSessions.entries()],
+    closedTableSummaries: state.closedTableSummaries
+  } satisfies OrdersPersistence;
+
+  writeFileSync(ORDERS_STORE_PATH, JSON.stringify(payload, null, 2), "utf8");
+  setOrdersStateCache(payload);
 }
 
 async function persistStateAsync(state: RuntimeState) {
@@ -306,6 +358,8 @@ async function persistStateAsync(state: RuntimeState) {
   if (error) {
     throw new Error(`Supabase persist failed: ${error.message}`);
   }
+
+  setOrdersStateCache(payload);
 }
 
 function ensureCurrentSessionId(

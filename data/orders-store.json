@@ -6,7 +6,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 2,
       "sessionId": 3,
-      "status": "preparing",
+      "status": "cancelled",
       "serveMode": "as_ready",
       "createdAt": "2026-03-18T06:59:16.178Z",
       "updatedAt": "2026-03-18T06:59:16.178Z",

@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: "scope is required" }, { status: 400 });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     authorized: await hasAdminAccess(scope)
   });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     const response = NextResponse.json({ ok: true });
+    response.headers.set("Cache-Control", "no-store");
 
     if (body.persist) {
       setAdminAccessCookie(response, body.scope);
@@ -110,6 +113,7 @@ export async function DELETE(request: NextRequest) {
   }
 
   const response = NextResponse.json({ ok: true });
+  response.headers.set("Cache-Control", "no-store");
   clearAdminAccessCookie(response, scope);
   return response;
 }
