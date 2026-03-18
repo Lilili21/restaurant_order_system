@@ -3,11 +3,9 @@ import { notFound } from "next/navigation";
 import { Cart } from "@/components/menu/Cart";
 import { getAvailableMenuByRestaurant, getTableSession } from "@/lib/menu-store";
 import { getMenuSettings } from "@/lib/menu-settings";
-import { getTableSessionOrders } from "@/lib/orders";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 300;
 
 type MenuPageProps = {
   params: Promise<{
@@ -62,15 +60,12 @@ export default async function MenuPage({ params }: MenuPageProps) {
         tableToken={session.table.accessToken}
         menu={session.menu}
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
-        showKitchenOpen={menuSettings.kitchenOpenEnabled}
-        kitchenOpenUntil={menuSettings.kitchenOpenUntil}
-        showBarOpen={menuSettings.barOpenEnabled}
-        barOpenUntil={menuSettings.barOpenUntil}
-        initialSubmittedOrders={await getTableSessionOrders(
-          restaurantSlug,
-          session.table.number
-        )}
-      />
-    </main>
-  );
+          showKitchenOpen={menuSettings.kitchenOpenEnabled}
+          kitchenOpenUntil={menuSettings.kitchenOpenUntil}
+          showBarOpen={menuSettings.barOpenEnabled}
+          barOpenUntil={menuSettings.barOpenUntil}
+          initialSubmittedOrders={[]}
+        />
+      </main>
+    );
 }

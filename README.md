@@ -121,6 +121,18 @@ Flow:
 - private table token links instead of public table numbers
 - unit and integration tests with `Vitest`
 
+## Supabase Orders Storage (row-based)
+
+Orders are now stored in row format (`orders_store` + `order_items_store`) instead of one large JSON payload.
+
+Run this SQL in Supabase SQL Editor:
+
+```sql
+-- file: supabase/orders-row-storage.sql
+```
+
+If these tables are not created yet, the app keeps backward compatibility and falls back to legacy `app_state` storage.
+
 ## Tests
 
 Run:

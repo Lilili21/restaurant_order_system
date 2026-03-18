@@ -158,9 +158,13 @@ function parseVolumeOptions(value: string): MenuVolumeOption[] {
     .filter(Boolean)
     .map((line, index) => {
       const [rawLabel, rawPrice] = line.split("|").map((part) => part.trim());
+      if (!rawPrice) {
+        return null;
+      }
+
       const price = Number(rawPrice);
 
-      if (!Number.isFinite(price)) {
+      if (!Number.isFinite(price) || price <= 0) {
         return null;
       }
 
@@ -242,6 +246,25 @@ function getBasePriceForKind(
   }
 
   return Number(priceText);
+}
+
+function hasInvalidDrinkVolumeRows(value: string) {
+  const rows = parseVolumeRows(value);
+
+  if (rows.length === 0) {
+    return true;
+  }
+
+  return rows.some((row) => {
+    const rawPrice = row.price.trim();
+
+    if (!rawPrice) {
+      return true;
+    }
+
+    const parsedPrice = Number(rawPrice);
+    return !Number.isFinite(parsedPrice) || parsedPrice <= 0;
+  });
 }
 
 export function MenuEditor() {
@@ -687,6 +710,19 @@ export function MenuEditor() {
     );
 
     const itemKind = getItemKind(currentItem.draftCategory);
+    if (
+      itemKind === "drinks" &&
+      hasInvalidDrinkVolumeRows(currentItem.draftVolumeOptionsText)
+    ) {
+      setMessage("Add a valid price for every volume row before saving.");
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId ? { ...item, saving: false } : item
+        )
+      );
+      return;
+    }
+
     const basePrice = getBasePriceForKind(
       itemKind,
       currentItem.draftPrice,
@@ -761,6 +797,14 @@ export function MenuEditor() {
   }
 
   async function createItem() {
+    if (
+      selectedKind === "drinks" &&
+      hasInvalidDrinkVolumeRows(newItem.volumeOptionsText)
+    ) {
+      setMessage("Add a valid price for every volume row before saving.");
+      return;
+    }
+
     const basePrice = getBasePriceForKind(
       selectedKind,
       newItem.price,

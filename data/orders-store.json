@@ -1,6 +1,42 @@
 {
   "orders": [
     {
+      "id": "bill_1773821108347",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 3,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-18T08:05:08.347Z",
+      "updatedAt": "2026-03-18T08:05:08.347Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1773821100804",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-18T08:05:00.804Z",
+      "updatedAt": "2026-03-18T08:05:00.804Z",
+      "items": [
+        {
+          "id": "item_1773821100804_q7ort4",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 2,
+          "served": true
+        }
+      ],
+      "total": 200
+    },
+    {
       "id": "ord_1773817156178",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -29,7 +65,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 5,
-      "status": "new",
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-17T23:59:23.138Z",
       "updatedAt": "2026-03-17T23:59:36.109Z",
@@ -43,7 +79,7 @@
           "volumeLabel": "1L",
           "price": 10,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773791963138_cs860u",
@@ -54,7 +90,7 @@
           "volumeLabel": "",
           "price": 20,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773791963138_d5otc6",
@@ -63,7 +99,7 @@
           "name": "Shawarma plate",
           "price": 54,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773791963138_t7pho2",
@@ -72,7 +108,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1773791963138_562yy0",
@@ -81,7 +117,7 @@
           "name": "Kanafeh",
           "price": 32,
           "quantity": 2,
-          "served": false
+          "served": true
         }
       ],
       "total": 226
