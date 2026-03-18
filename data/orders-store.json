@@ -9,7 +9,7 @@
       "status": "new",
       "serveMode": "as_ready",
       "createdAt": "2026-03-18T18:21:04.551Z",
-      "updatedAt": "2026-03-18T18:21:04.551Z",
+      "updatedAt": "2026-03-18T18:24:49.416Z",
       "items": [
         {
           "id": "item_1773858064551_fcdlat",
@@ -17,11 +17,22 @@
           "category": "starters",
           "name": "Omelette 5",
           "price": 100,
-          "quantity": 1,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1773858178340_aw2o7i",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 2,
           "served": false
         }
       ],
-      "total": 100
+      "total": 240
     },
     {
       "id": "ord_1773857755773",

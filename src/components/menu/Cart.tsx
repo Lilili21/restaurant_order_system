@@ -3,6 +3,7 @@
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
+import type { MenuFilter } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
 import {
   CartItem,
@@ -229,6 +230,9 @@ export function Cart({
   const [upsellPrompt, setUpsellPrompt] = useState<
     null | "dessert" | "drinks" | "dessert_drinks"
   >(null);
+  const [selectedMenuFilter, setSelectedMenuFilter] = useState<MenuFilter | null>(
+    null
+  );
   const [language, setLanguage] = useState<MenuLanguage>("he");
   const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
@@ -820,6 +824,16 @@ export function Cart({
     return null;
   }
 
+  function handleUpsellYes() {
+    if (upsellPrompt === "dessert") {
+      setSelectedMenuFilter("desserts");
+    } else if (upsellPrompt === "drinks" || upsellPrompt === "dessert_drinks") {
+      setSelectedMenuFilter("drinks");
+    }
+
+    setUpsellPrompt(null);
+  }
+
   return (
     <>
       {dialogMessage ? (
@@ -958,7 +972,7 @@ export function Cart({
               <button
                 className="button-neutral"
                 type="button"
-                onClick={() => setUpsellPrompt(null)}
+                onClick={handleUpsellYes}
               >
                 {text.dessertPromptNow}
               </button>
@@ -1121,6 +1135,7 @@ export function Cart({
             orderingEnabled={orderingEnabled}
             onAdd={addItem}
             onDecrease={decreaseItem}
+            selectedFilter={selectedMenuFilter}
           />
 
           {orderingEnabled ? (

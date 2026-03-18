@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MenuItemCard } from "@/components/menu/MenuItemCard";
 import { MenuCategory, MenuItem, MenuLanguage } from "@/lib/types";
@@ -18,9 +18,10 @@ type MenuListProps = {
     sourceElement?: HTMLElement | null,
     volumeOptionId?: string
   ) => void;
+  selectedFilter?: MenuFilter | null;
 };
 
-type MenuFilter = MenuCategory | "dishes" | "drinks";
+export type MenuFilter = MenuCategory | "dishes" | "drinks";
 
 const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
   he: {
@@ -124,9 +125,12 @@ export function MenuList({
   quantities,
   orderingEnabled = true,
   onAdd,
-  onDecrease
+  onDecrease,
+  selectedFilter
 }: MenuListProps) {
-  const [selectedCategory, setSelectedCategory] = useState<MenuFilter>("dishes");
+  const [selectedCategory, setSelectedCategory] = useState<MenuFilter>(
+    selectedFilter ?? "dishes"
+  );
   const getQuantityKey = (menuItemId: string, volumeOptionId?: string) =>
     `${menuItemId}:${volumeOptionId ?? "base"}`;
   const grouped = useMemo(
@@ -170,6 +174,12 @@ export function MenuList({
 
     return selectedCategory === category;
   });
+
+  useEffect(() => {
+    if (selectedFilter) {
+      setSelectedCategory(selectedFilter);
+    }
+  }, [selectedFilter]);
 
   return (
     <div className="menu-sections">

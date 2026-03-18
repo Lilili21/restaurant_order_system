@@ -1,19 +1,22 @@
-import { MouseEvent } from "react";
+import { MouseEvent, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
-const badgeMeta: Record<MenuBadge, { icon: string; label: string }> = {
-  chef_special: { icon: "🔥", label: "Chef's special" },
-  most_popular: { icon: "⭐", label: "Most popular" },
-  vegan: { icon: "🌱", label: "Vegan" },
-  spicy: { icon: "🌶️", label: "Spicy" },
-  kids_favorite: { icon: "🧸", label: "Kids favorite" },
-  new: { icon: "🆕", label: "New" },
-  gluten_free: { icon: "🌾", label: "Gluten free" },
-  dairy_free: { icon: "🥛", label: "Dairy free" },
-  nut_free: { icon: "🥜", label: "Nut free" }
+const badgeMeta: Record<
+  MenuBadge,
+  { icon: string; label: { he: string; en: string } }
+> = {
+  chef_special: { icon: "🔥", label: { he: "מיוחד של השף", en: "Chef's special" } },
+  most_popular: { icon: "⭐", label: { he: "הכי פופולרי", en: "Most popular" } },
+  vegan: { icon: "🌱", label: { he: "טבעוני", en: "Vegan" } },
+  spicy: { icon: "🌶️", label: { he: "חריף", en: "Spicy" } },
+  kids_favorite: { icon: "🧸", label: { he: "אהוב על ילדים", en: "Kids favorite" } },
+  new: { icon: "🆕", label: { he: "חדש", en: "New" } },
+  gluten_free: { icon: "🌾", label: { he: "ללא גלוטן", en: "Gluten free" } },
+  dairy_free: { icon: "🥛", label: { he: "ללא חלב", en: "Dairy free" } },
+  nut_free: { icon: "🥜", label: { he: "ללא אגוזים", en: "Nut free" } }
 };
 
 const imageBadgeSet = new Set<MenuBadge>([
@@ -50,6 +53,7 @@ export function MenuItemCard({
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
+  const [activeBadge, setActiveBadge] = useState<MenuBadge | null>(null);
   const addLabel = language === "he" ? "הוסף" : "Add";
   const name =
     language === "he"
@@ -81,6 +85,10 @@ export function MenuItemCard({
     onDecrease(item.id, event.currentTarget, volumeOptionId);
   }
 
+  function getBadgeLabel(badge: MenuBadge) {
+    return badgeMeta[badge].label[language];
+  }
+
   return (
     <article className="menu-card">
       {item.showImage ? (
@@ -88,11 +96,23 @@ export function MenuItemCard({
           {imageBadges.length ? (
             <div className="menu-card__image-badges" aria-label="Dish highlights">
               {imageBadges.map((badge) => (
-                <span key={badge} className="menu-card__image-badge">
+                <button
+                  key={badge}
+                  type="button"
+                  className="menu-card__image-badge"
+                  onClick={() =>
+                    setActiveBadge((current) => (current === badge ? null : badge))
+                  }
+                  aria-label={getBadgeLabel(badge)}
+                  title={getBadgeLabel(badge)}
+                >
                   {badgeMeta[badge].icon}
-                </span>
+                </button>
               ))}
             </div>
+          ) : null}
+          {activeBadge ? (
+            <div className="menu-card__badge-hint">{getBadgeLabel(activeBadge)}</div>
           ) : null}
           <img
             className="menu-card__image"
@@ -117,7 +137,7 @@ export function MenuItemCard({
                     {badgeMeta[badge].icon}
                   </span>
                   <span className="menu-card__badge-label">
-                    {badgeMeta[badge].label}
+                    {getBadgeLabel(badge)}
                   </span>
                 </span>
               ))}
