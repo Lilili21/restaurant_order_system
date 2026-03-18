@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type MenuSettingsResponse = {
   tableCount?: number;
+  tableTokens?: Record<string, string>;
 };
 
 type SecondaryCredentials = {
@@ -13,11 +14,17 @@ type SecondaryCredentials = {
 
 type TableCountControlProps = {
   credentials: SecondaryCredentials;
+  restaurantSlug: string;
 };
 
-export function TableCountControl({ credentials }: TableCountControlProps) {
+export function TableCountControl({
+  credentials,
+  restaurantSlug
+}: TableCountControlProps) {
   const [tableCount, setTableCount] = useState(8);
   const [draftCount, setDraftCount] = useState(8);
+  const [tableTokens, setTableTokens] = useState<Record<string, string>>({});
+  const [selectedTable, setSelectedTable] = useState("1");
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -39,6 +46,15 @@ export function TableCountControl({ credentials }: TableCountControlProps) {
         const nextCount = settings.tableCount ?? 8;
         setTableCount(nextCount);
         setDraftCount(nextCount);
+        setTableTokens(settings.tableTokens ?? {});
+        setSelectedTable((current) => {
+          const next = Number.parseInt(current, 10);
+          if (Number.isFinite(next) && next >= 1 && next <= nextCount) {
+            return current;
+          }
+
+          return "1";
+        });
       }
     }
 
@@ -73,9 +89,28 @@ export function TableCountControl({ credentials }: TableCountControlProps) {
     const nextCount = settings.tableCount ?? draftCount;
     setTableCount(nextCount);
     setDraftCount(nextCount);
+    setTableTokens(settings.tableTokens ?? {});
+    setSelectedTable((current) => {
+      const next = Number.parseInt(current, 10);
+      if (Number.isFinite(next) && next >= 1 && next <= nextCount) {
+        return current;
+      }
+
+      return "1";
+    });
     setSaving(false);
     setDialogOpen(false);
     return true;
+  }
+
+  function openSelectedTable() {
+    const token = tableTokens[selectedTable];
+
+    if (!token) {
+      return;
+    }
+
+    window.open(`/${restaurantSlug}/menu/${token}`, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -88,7 +123,7 @@ export function TableCountControl({ credentials }: TableCountControlProps) {
             aria-modal="true"
             aria-labelledby="table-count-title"
           >
-            <h2 id="table-count-title">change tables number</h2>
+            <h2 id="table-count-title">Tables</h2>
             <div className="table-count-stepper">
               <button
                 className="button-neutral"
@@ -106,6 +141,34 @@ export function TableCountControl({ credentials }: TableCountControlProps) {
                 +
               </button>
             </div>
+            <label className="menu-editor__field">
+              <span>Open table</span>
+              <div className="table-count-open-row">
+                <select
+                  className="modal-input"
+                  value={selectedTable}
+                  onChange={(event) => setSelectedTable(event.target.value)}
+                >
+                  {Array.from({ length: tableCount }, (_, index) => {
+                    const number = index + 1;
+
+                    return (
+                      <option key={number} value={number}>
+                        Table {number}
+                      </option>
+                    );
+                  })}
+                </select>
+                <button
+                  className="button-neutral"
+                  type="button"
+                  onClick={openSelectedTable}
+                  disabled={!tableTokens[selectedTable]}
+                >
+                  Open
+                </button>
+              </div>
+            </label>
             <div className="modal-actions">
               <button
                 className="button-danger"
@@ -137,14 +200,18 @@ export function TableCountControl({ credentials }: TableCountControlProps) {
         type="button"
         onClick={() => {
           setDraftCount(tableCount);
+          setSelectedTable((current) => {
+            const next = Number.parseInt(current, 10);
+            if (Number.isFinite(next) && next >= 1 && next <= tableCount) {
+              return current;
+            }
+
+            return "1";
+          });
           setDialogOpen(true);
         }}
       >
-        <span>
-          Change the number
-          <br />
-          of tables
-        </span>
+        <span>Tables</span>
       </button>
     </>
   );

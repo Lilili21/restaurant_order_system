@@ -13,7 +13,8 @@ export async function GET() {
     kitchenOpenUntil: settings.kitchenOpenUntil,
     barOpenEnabled: settings.barOpenEnabled,
     barOpenUntil: settings.barOpenUntil,
-    tableCount: settings.tableCount
+    tableCount: settings.tableCount,
+    tableTokens: settings.tableTokens
   });
 }
 

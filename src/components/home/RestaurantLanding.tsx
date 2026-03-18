@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
 type RestaurantLandingProps = {
   restaurantSlug: string;
@@ -18,11 +17,8 @@ export function RestaurantLanding({
   restaurantSlug,
   restaurantName,
   restaurantDescription,
-  tableLinks
+  tableLinks: _tableLinks
 }: RestaurantLandingProps) {
-  const [tablesOpen, setTablesOpen] = useState(false);
-  const hasTableLinks = tableLinks.length > 0;
-
   return (
     <main className="page-shell">
       <section className="hero">
@@ -40,15 +36,6 @@ export function RestaurantLanding({
             >
               Admin
             </Link>
-            {hasTableLinks ? (
-              <button
-                type="button"
-                className="button-link button-link--hero"
-                onClick={() => setTablesOpen((current) => !current)}
-              >
-                Tables menu
-              </button>
-            ) : null}
           </div>
         </div>
 
@@ -58,22 +45,6 @@ export function RestaurantLanding({
           <p>{restaurantDescription}</p>
         </div>
       </section>
-
-      {tablesOpen && hasTableLinks ? (
-        <section className="table-links-panel">
-          <div className="table-links-panel__list">
-            {tableLinks.map((table) => (
-              <Link
-                key={table.label ?? table.tableNumber}
-                href={table.href}
-                className="table-links-panel__link"
-              >
-                {table.label ?? `Table ${table.tableNumber}`}
-              </Link>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </main>
   );
 }

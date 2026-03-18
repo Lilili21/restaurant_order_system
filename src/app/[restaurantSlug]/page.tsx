@@ -23,17 +23,10 @@ export default async function RestaurantLandingPage({
     process.env.PUBLIC_TABLE_LINKS_ENABLED === "true" ||
     process.env.NODE_ENV !== "production";
   const tableLinks = exposeTableLinks
-    ? [
-        {
-          label: "Menu",
-          tableNumber: 0,
-          href: `/${restaurant.slug}/menu/0`
-        },
-        ...restaurant.tables.map((table) => ({
+    ? restaurant.tables.map((table) => ({
           tableNumber: table.number,
           href: `/${restaurant.slug}/menu/${table.accessToken}`
         }))
-      ]
     : [];
 
   return (

@@ -1050,7 +1050,12 @@ export function MenuEditor() {
     <div className="orders-layout">
       <div className="menu-editor__toolbar">
         <div className="menu-editor__toolbar-row">
-          {secondaryCredentials ? <TableCountControl credentials={secondaryCredentials} /> : null}
+          {secondaryCredentials ? (
+            <TableCountControl
+              credentials={secondaryCredentials}
+              restaurantSlug={restaurantSlug}
+            />
+          ) : null}
           <Link href={menuPreviewHref} className="admin-menu-bubble">
             Menu preview
           </Link>

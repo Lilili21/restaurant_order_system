@@ -371,15 +371,15 @@ button:disabled {
 .admin-table-count-trigger {
   min-width: 132px;
   min-height: 76px;
-  padding: 12px 20px;
-  font-size: 0.82rem;
-  line-height: 1.15;
+  padding: 0 24px;
+  font-size: 1.05rem;
+  line-height: 1;
   text-align: center;
   white-space: normal;
   word-break: break-word;
-  background: rgba(249, 242, 228, 0.98);
-  border-color: rgba(180, 83, 9, 0.12);
-  color: #6d5641;
+  background: rgba(255, 250, 240, 0.96);
+  border-color: rgba(36, 23, 13, 0.08);
+  color: var(--muted);
 }
 
 .table-count-stepper {
@@ -404,6 +404,21 @@ button:disabled {
   text-align: center;
   font-weight: 700;
   font-size: 1.1rem;
+}
+
+.table-count-open-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.table-count-open-row .modal-input {
+  width: 100%;
+}
+
+.table-count-open-row .button-neutral {
+  min-width: 86px;
 }
 
 .admin-menu-tools {

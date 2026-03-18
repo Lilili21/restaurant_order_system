@@ -1,15 +1,41 @@
 {
   "orders": [
     {
+      "id": "bill_1773866036173",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 1,
+      "kind": "bill_request",
+      "status": "cancelled",
+      "createdAt": "2026-03-18T20:33:56.173Z",
+      "updatedAt": "2026-03-18T20:44:39.837Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1773866014947",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 5,
+      "kind": "waiter_call",
+      "status": "cancelled",
+      "createdAt": "2026-03-18T20:33:34.947Z",
+      "updatedAt": "2026-03-18T20:44:39.839Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "bill_1773864143358",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 5,
       "kind": "bill_request",
-      "status": "new",
+      "status": "cancelled",
       "createdAt": "2026-03-18T20:02:23.358Z",
-      "updatedAt": "2026-03-18T20:02:23.358Z",
+      "updatedAt": "2026-03-18T20:14:51.648Z",
       "items": [],
       "total": 0
     },
