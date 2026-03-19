@@ -1,5 +1,7 @@
 {
   "kitchenLoadWarningEnabled": false,
+  "workingHoursFrom": "12:00",
+  "workingHoursUntil": "02:00",
   "happyHourEnabled": true,
   "happyHourText": "blablablabla!",
   "happyHourCategories": [

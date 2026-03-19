@@ -33,6 +33,8 @@ export async function GET() {
 
   return NextResponse.json({
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
+    workingHoursFrom: settings.workingHoursFrom,
+    workingHoursUntil: settings.workingHoursUntil,
     happyHourEnabled: settings.happyHourEnabled,
     happyHourText: settings.happyHourText,
     happyHourCategories: settings.happyHourCategories,
@@ -70,6 +72,8 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       kitchenLoadWarningEnabled?: boolean;
+      workingHoursFrom?: string | null;
+      workingHoursUntil?: string | null;
       happyHourEnabled?: boolean;
       happyHourText?: string;
       happyHourCategories?: MenuCategory[];
@@ -113,6 +117,20 @@ export async function PATCH(request: NextRequest) {
         throw new Error("kitchenOpenUntil is invalid");
       }
     }
+    if (
+      body.workingHoursFrom !== undefined &&
+      body.workingHoursFrom !== null &&
+      typeof body.workingHoursFrom !== "string"
+    ) {
+      throw new Error("workingHoursFrom is invalid");
+    }
+    if (
+      body.workingHoursUntil !== undefined &&
+      body.workingHoursUntil !== null &&
+      typeof body.workingHoursUntil !== "string"
+    ) {
+      throw new Error("workingHoursUntil is invalid");
+    }
 
     if (typeof body.happyHourStartsFrom === "string") {
       const parsed = Date.parse(body.happyHourStartsFrom);
@@ -139,6 +157,8 @@ export async function PATCH(request: NextRequest) {
 
     const updates: {
       kitchenLoadWarningEnabled?: boolean;
+      workingHoursFrom?: string | null;
+      workingHoursUntil?: string | null;
       happyHourEnabled?: boolean;
       happyHourText?: string;
       happyHourCategories?: MenuCategory[];
@@ -154,6 +174,18 @@ export async function PATCH(request: NextRequest) {
 
     if (typeof body.kitchenLoadWarningEnabled === "boolean") {
       updates.kitchenLoadWarningEnabled = body.kitchenLoadWarningEnabled;
+    }
+    if (
+      body.workingHoursFrom === null ||
+      typeof body.workingHoursFrom === "string"
+    ) {
+      updates.workingHoursFrom = body.workingHoursFrom;
+    }
+    if (
+      body.workingHoursUntil === null ||
+      typeof body.workingHoursUntil === "string"
+    ) {
+      updates.workingHoursUntil = body.workingHoursUntil;
     }
 
     if (typeof body.happyHourEnabled === "boolean") {

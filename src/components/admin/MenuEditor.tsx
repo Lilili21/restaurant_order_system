@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
+import { WorkingHoursControl } from "@/components/admin/WorkingHoursControl";
 import { formatCurrency } from "@/lib/menu";
 import {
   MenuBadge,
@@ -1237,6 +1238,9 @@ export function MenuEditor() {
     <div className="orders-layout">
       <div className="menu-editor__toolbar">
         <div className="menu-editor__toolbar-row">
+          {secondaryCredentials ? (
+            <WorkingHoursControl credentials={secondaryCredentials} />
+          ) : null}
           {secondaryCredentials ? (
             <TableCountControl
               credentials={secondaryCredentials}

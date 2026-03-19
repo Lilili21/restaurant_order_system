@@ -29,6 +29,8 @@ const MENU_CATEGORIES: MenuCategory[] = [
 
 export type MenuSettings = {
   kitchenLoadWarningEnabled: boolean;
+  workingHoursFrom: string | null;
+  workingHoursUntil: string | null;
   happyHourEnabled: boolean;
   happyHourText: string;
   happyHourCategories: MenuCategory[];
@@ -50,6 +52,8 @@ const MENU_SETTINGS_CACHE_TTL_MS = 2_000;
 
 const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
+  workingHoursFrom: null,
+  workingHoursUntil: null,
   happyHourEnabled: false,
   happyHourText: "",
   happyHourCategories: [],
@@ -130,6 +134,16 @@ function normalizeSettings(
     settings.kitchenOpenUntil.trim()
       ? settings.kitchenOpenUntil
       : null;
+  const workingHoursFrom =
+    typeof settings?.workingHoursFrom === "string" &&
+    settings.workingHoursFrom.trim()
+      ? settings.workingHoursFrom
+      : null;
+  const workingHoursUntil =
+    typeof settings?.workingHoursUntil === "string" &&
+    settings.workingHoursUntil.trim()
+      ? settings.workingHoursUntil
+      : null;
   const happyHourStartsFrom =
     typeof settings?.happyHourStartsFrom === "string" &&
     settings.happyHourStartsFrom.trim()
@@ -159,6 +173,8 @@ function normalizeSettings(
 
   return {
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
+    workingHoursFrom,
+    workingHoursUntil,
     happyHourEnabled: Boolean(settings?.happyHourEnabled),
     happyHourText:
       typeof settings?.happyHourText === "string" ? settings.happyHourText.trim() : "",

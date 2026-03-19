@@ -21,6 +21,7 @@ type MenuSettingsResponse = {
   happyHourCategories?: MenuCategory[];
   happyHourStartsFrom?: string | null;
   happyHourUntil?: string | null;
+  workingHoursFrom?: string | null;
 };
 
 type SessionItemSummary = {
@@ -32,8 +33,36 @@ type SessionItemSummary = {
   hasHappyHourDiscount: boolean;
 };
 
+const DRINK_CATEGORIES = new Set<string>([
+  "drinks",
+  "non_alcoholic_drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4"
+]);
+
 function getSessionItemKey(item: { menuItemId: string; volumeOptionId?: string; volumeLabel?: string }) {
   return `${item.menuItemId}:${item.volumeOptionId ?? item.volumeLabel ?? "base"}`;
+}
+
+function getItemType(category: string | undefined) {
+  if (!category) {
+    return "dish";
+  }
+
+  return DRINK_CATEGORIES.has(category) ? "drink" : "dish";
 }
 
 function getSessionItemName(item: { name: string; volumeLabel?: string }) {
@@ -183,6 +212,49 @@ function isHappyHourActiveAt(
   return orderTime >= startTime && orderTime <= untilTime;
 }
 
+function parseWorkingHoursFrom(value: string | null | undefined) {
+  if (!value) {
+    return { hours: 0, minutes: 0 };
+  }
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return { hours: 0, minutes: 0 };
+  }
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return { hours: 0, minutes: 0 };
+  }
+
+  return { hours, minutes };
+}
+
+function getCurrentShiftStartTimestamp(workingHoursFrom: string | null | undefined) {
+  const { hours, minutes } = parseWorkingHoursFrom(workingHoursFrom);
+  const now = new Date();
+  const startToday = new Date(now);
+  startToday.setHours(hours, minutes, 0, 0);
+
+  if (now.getTime() >= startToday.getTime()) {
+    return startToday.getTime();
+  }
+
+  const previousDayStart = new Date(startToday);
+  previousDayStart.setDate(previousDayStart.getDate() - 1);
+  return previousDayStart.getTime();
+}
+
 function getHappyHourDiscountAmountFromOrder(
   order: Order,
   settings: {
@@ -232,6 +304,7 @@ export function TablesOverview() {
   const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>([]);
   const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(null);
   const [happyHourUntil, setHappyHourUntil] = useState<string | null>(null);
+  const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
 
   function normalizeTablesResponse(payload: unknown): TablesResponse {
     if (!payload || typeof payload !== "object") {
@@ -296,6 +369,10 @@ export function TablesOverview() {
         typeof menuSettingsPayload?.happyHourUntil === "string"
           ? menuSettingsPayload.happyHourUntil
           : null;
+      const nextWorkingHoursFrom =
+        typeof menuSettingsPayload?.workingHoursFrom === "string"
+          ? menuSettingsPayload.workingHoursFrom
+          : null;
 
       if (!cancelled) {
         setData(nextData);
@@ -305,6 +382,7 @@ export function TablesOverview() {
         setHappyHourCategories(nextHappyHourCategories);
         setHappyHourStartsFrom(nextHappyHourStartsFrom);
         setHappyHourUntil(nextHappyHourUntil);
+        setWorkingHoursFrom(nextWorkingHoursFrom);
         setLoading(false);
       }
     }
@@ -468,30 +546,43 @@ export function TablesOverview() {
   }
 
   function exportClosedOrdersForToday() {
-    const today = new Date().toLocaleDateString("sv-SE");
-    const sessions = data.closedSessions.filter(
-      (session) => new Date(session.closedAt).toLocaleDateString("sv-SE") === today
-    );
+    exportClosedOrdersForDay(new Date().toLocaleDateString("sv-SE"), true);
+  }
+
+  function exportClosedOrdersForDay(dayKey: string, isToday = false) {
+    const sessions = data.closedSessions.filter((session) => {
+      const sessionDay = new Date(session.closedAt).toLocaleDateString("sv-SE");
+      return sessionDay === dayKey;
+    });
 
     if (!sessions.length) {
-      setDialogMessage("There are no closed orders for export today.");
+      setDialogMessage(
+        isToday
+          ? "There are no closed orders for export today."
+          : `There are no closed orders for ${formatDayLabel(dayKey)}.`
+      );
       return;
     }
 
     const rows = sessions.flatMap((session) =>
       session.orders.flatMap((order) =>
-        order.items.map((item) => ({
-          closedAt: new Date(session.closedAt).toLocaleString("en-GB"),
+        order.items.map((item) => {
+          const closedAtDate = new Date(session.closedAt);
+          return {
+            closedDate: closedAtDate.toLocaleDateString("en-GB"),
+            closedTime: closedAtDate.toLocaleTimeString("en-GB"),
+            type: getItemType(item.category),
           restaurantName: session.restaurantName,
           tableNumber: session.tableNumber,
           sessionId: session.sessionId,
           orderId: order.id,
           status: order.status,
-          itemName: item.name,
+            itemName: item.name,
           quantity: item.quantity,
           itemTotal: item.price * item.quantity,
           sessionTotal: session.total
-        }))
+          };
+        })
       )
     );
 
@@ -509,13 +600,15 @@ export function TablesOverview() {
   <body>
     <table border="1">
       <tr>
-        <th>Closed at</th>
+        <th>Date</th>
+        <th>Time</th>
         <th>Restaurant</th>
         <th>Table</th>
         <th>Session ID</th>
         <th>Order ID</th>
         <th>Status</th>
-        <th>Dish</th>
+        <th>Type</th>
+        <th>Item</th>
         <th>Qty</th>
         <th>Item total</th>
         <th>Session total</th>
@@ -523,12 +616,14 @@ export function TablesOverview() {
       ${rows
         .map(
           (row) => `<tr>
-            <td>${escapeCell(row.closedAt)}</td>
+            <td>${escapeCell(row.closedDate)}</td>
+            <td>${escapeCell(row.closedTime)}</td>
             <td>${escapeCell(row.restaurantName)}</td>
             <td>${escapeCell(row.tableNumber)}</td>
             <td>${escapeCell(row.sessionId)}</td>
             <td>${escapeCell(row.orderId)}</td>
             <td>${escapeCell(row.status)}</td>
+            <td>${escapeCell(row.type)}</td>
             <td>${escapeCell(row.itemName)}</td>
             <td>${escapeCell(row.quantity)}</td>
             <td>${escapeCell(row.itemTotal)}</td>
@@ -546,11 +641,21 @@ export function TablesOverview() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `closed-orders-${today}.xls`;
+    link.download = `closed-orders-${dayKey}.xls`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  }
+
+  function formatDayLabel(dayKey: string) {
+    const [year, month, day] = dayKey.split("-");
+
+    if (!year || !month || !day) {
+      return dayKey;
+    }
+
+    return `${day}.${month}`;
   }
 
   if (loading) {
@@ -565,30 +670,32 @@ export function TablesOverview() {
     until: happyHourUntil
   };
 
-  const getTableDiscountAmount = (table: TableOverview) =>
-    Number(
-      (table.orders ?? [])
-        .reduce(
-          (sum, order) =>
-            sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
-          0
-        )
-        .toFixed(2)
-    );
-
-  const getClosedSessionDiscountAmount = (session: ClosedTableSummary) =>
-    Number(
-      (session.orders ?? [])
-        .reduce(
-          (sum, order) =>
-            sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
-          0
-        )
-        .toFixed(2)
-    );
   const happyHourCategoriesLabel = formatHappyHourCategoriesLabel(
     happyHourCategories
   );
+  const sortedClosedSessions = [
+    ...(Array.isArray(data.closedSessions) ? data.closedSessions : [])
+  ].sort((left, right) => {
+    const leftTime = new Date(left.closedAt).getTime();
+    const rightTime = new Date(right.closedAt).getTime();
+    const safeLeftTime = Number.isFinite(leftTime) ? leftTime : 0;
+    const safeRightTime = Number.isFinite(rightTime) ? rightTime : 0;
+    return safeRightTime - safeLeftTime;
+  });
+  const currentShiftStartTs = getCurrentShiftStartTimestamp(workingHoursFrom);
+  const currentShiftClosedSessions = sortedClosedSessions.filter((session) => {
+    const closedAtTs = new Date(session.closedAt).getTime();
+    return Number.isFinite(closedAtTs) && closedAtTs >= currentShiftStartTs;
+  });
+  const todayDayKey = new Date().toLocaleDateString("sv-SE");
+  const closedDays = [
+    ...new Set(
+      sortedClosedSessions.map((session) =>
+        new Date(session.closedAt).toLocaleDateString("sv-SE")
+      )
+    )
+  ].sort((left, right) => right.localeCompare(left));
+  const previousClosedDays = closedDays.filter((dayKey) => dayKey !== todayDayKey);
 
   return (
     <>
@@ -755,11 +862,7 @@ export function TablesOverview() {
 
                   <div className="table-summary">
                     <span>Current total</span>
-                    <strong>
-                      {formatCurrency(
-                        Math.max(0, table.total - getTableDiscountAmount(table))
-                      )}
-                    </strong>
+                    <strong>{formatCurrency(table.total)}</strong>
                   </div>
                   <div className="table-orders">
                     <div className="table-order-card">
@@ -821,13 +924,23 @@ export function TablesOverview() {
             >
               Export today to Excel
             </button>
+            {previousClosedDays.map((dayKey) => (
+              <button
+                key={dayKey}
+                className="button-neutral tables-action-button"
+                type="button"
+                onClick={() => exportClosedOrdersForDay(dayKey)}
+              >
+                Download {formatDayLabel(dayKey)}
+              </button>
+            ))}
           </div>
 
-          {!Array.isArray(data.closedSessions) || data.closedSessions.length === 0 ? (
+          {currentShiftClosedSessions.length === 0 ? (
             <p className="muted">No closed tables yet.</p>
           ) : (
             <div className="closed-grid">
-              {data.closedSessions.map((session) => {
+              {currentShiftClosedSessions.slice(0, 10).map((session) => {
                 const sessionItems = groupClosedSessionItems(
                   session,
                   happyHourSettings
@@ -846,13 +959,7 @@ export function TablesOverview() {
                         minute: "2-digit",
                         second: "2-digit"
                       })}{" "}
-                      · Total:{" "}
-                      {formatCurrency(
-                        Math.max(
-                          0,
-                          session.total - getClosedSessionDiscountAmount(session)
-                        )
-                      )}
+                      · Total: {formatCurrency(session.total)}
                     </p>
                     <details className="closed-details">
                       <summary>View order</summary>

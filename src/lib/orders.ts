@@ -59,6 +59,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
 const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
 const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
+const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
@@ -352,6 +353,28 @@ function closeServiceRequestsForSession(
   }
 
   return changed;
+}
+
+async function pruneClosedTableSummariesByWorkingDay(state: RuntimeState) {
+  const retentionCutoffTs =
+    Date.now() - CLOSED_SUMMARIES_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  const nextClosedSummaries = state.closedTableSummaries.filter((summary) => {
+    const closedAtTs = new Date(summary.closedAt).getTime();
+
+    if (!Number.isFinite(closedAtTs)) {
+      return false;
+    }
+
+    return closedAtTs >= retentionCutoffTs;
+  });
+
+  if (nextClosedSummaries.length === state.closedTableSummaries.length) {
+    return false;
+  }
+
+  state.closedTableSummaries = nextClosedSummaries;
+  return true;
 }
 
 function getDefaultState(): OrdersPersistence {
@@ -707,7 +730,12 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     closedTableSummaries: persistedState.closedTableSummaries
   };
 
-  if (autoCloseStaleServiceRequests(state)) {
+  const staleServiceRequestsClosed = autoCloseStaleServiceRequests(state);
+  const staleClosedSummariesPruned = await pruneClosedTableSummariesByWorkingDay(
+    state
+  );
+
+  if (staleServiceRequestsClosed || staleClosedSummariesPruned) {
     await persistStateAsync(state);
   }
 
