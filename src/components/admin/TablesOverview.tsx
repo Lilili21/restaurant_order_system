@@ -3,11 +3,24 @@
 import { useEffect, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
-import { ClosedTableSummary, Order, TableOverview } from "@/lib/types";
+import {
+  ClosedTableSummary,
+  MenuCategory,
+  Order,
+  TableOverview
+} from "@/lib/types";
 
 type TablesResponse = {
   tables: TableOverview[];
   closedSessions: ClosedTableSummary[];
+};
+
+type MenuSettingsResponse = {
+  happyHourEnabled?: boolean;
+  happyHourDiscountPercent?: number;
+  happyHourCategories?: MenuCategory[];
+  happyHourStartsFrom?: string | null;
+  happyHourUntil?: string | null;
 };
 
 type SessionItemSummary = {
@@ -16,6 +29,7 @@ type SessionItemSummary = {
   volumeLabel?: string;
   quantity: number;
   total: number;
+  hasHappyHourDiscount: boolean;
 };
 
 function getSessionItemKey(item: { menuItemId: string; volumeOptionId?: string; volumeLabel?: string }) {
@@ -26,17 +40,61 @@ function getSessionItemName(item: { name: string; volumeLabel?: string }) {
   return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
 }
 
-function groupSessionItems(table: TableOverview): SessionItemSummary[] {
+function formatHappyHourCategoriesLabel(categories: MenuCategory[]) {
+  if (!categories.length) {
+    return "selected categories";
+  }
+
+  return categories.map((category) => category.replace(/_/g, " ")).join(", ");
+}
+
+function isOrderItemDiscountedByHappyHour(
+  item: Order["items"][number],
+  createdAt: string,
+  settings: {
+    enabled: boolean;
+    discountPercent: number;
+    categories: Set<MenuCategory>;
+    startsFrom: string | null;
+    until: string | null;
+  }
+) {
+  return (
+    settings.discountPercent > 0 &&
+    settings.discountPercent < 100 &&
+    Boolean(item.category) &&
+    settings.categories.has(item.category as MenuCategory) &&
+    isHappyHourActiveAt(createdAt, settings)
+  );
+}
+
+function groupSessionItems(
+  table: TableOverview,
+  settings: {
+    enabled: boolean;
+    discountPercent: number;
+    categories: Set<MenuCategory>;
+    startsFrom: string | null;
+    until: string | null;
+  }
+): SessionItemSummary[] {
   const grouped = new Map<string, SessionItemSummary>();
 
   for (const order of table.orders ?? []) {
     for (const item of order.items ?? []) {
       const key = getSessionItemKey(item);
       const existing = grouped.get(key);
+      const isDiscounted = isOrderItemDiscountedByHappyHour(
+        item,
+        order.createdAt,
+        settings
+      );
 
       if (existing) {
         existing.quantity += item.quantity;
         existing.total += item.price * item.quantity;
+        existing.hasHappyHourDiscount =
+          existing.hasHappyHourDiscount || isDiscounted;
         continue;
       }
 
@@ -45,7 +103,8 @@ function groupSessionItems(table: TableOverview): SessionItemSummary[] {
         name: getSessionItemName(item),
         volumeLabel: item.volumeLabel,
         quantity: item.quantity,
-        total: item.price * item.quantity
+        total: item.price * item.quantity,
+        hasHappyHourDiscount: isDiscounted
       });
     }
   }
@@ -53,17 +112,33 @@ function groupSessionItems(table: TableOverview): SessionItemSummary[] {
   return [...grouped.values()];
 }
 
-function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummary[] {
+function groupClosedSessionItems(
+  session: ClosedTableSummary,
+  settings: {
+    enabled: boolean;
+    discountPercent: number;
+    categories: Set<MenuCategory>;
+    startsFrom: string | null;
+    until: string | null;
+  }
+): SessionItemSummary[] {
   const grouped = new Map<string, SessionItemSummary>();
 
   for (const order of session.orders ?? []) {
     for (const item of order.items ?? []) {
       const key = getSessionItemKey(item);
       const existing = grouped.get(key);
+      const isDiscounted = isOrderItemDiscountedByHappyHour(
+        item,
+        order.createdAt,
+        settings
+      );
 
       if (existing) {
         existing.quantity += item.quantity;
         existing.total += item.price * item.quantity;
+        existing.hasHappyHourDiscount =
+          existing.hasHappyHourDiscount || isDiscounted;
         continue;
       }
 
@@ -72,12 +147,70 @@ function groupClosedSessionItems(session: ClosedTableSummary): SessionItemSummar
         name: getSessionItemName(item),
         volumeLabel: item.volumeLabel,
         quantity: item.quantity,
-        total: item.price * item.quantity
+        total: item.price * item.quantity,
+        hasHappyHourDiscount: isDiscounted
       });
     }
   }
 
   return [...grouped.values()];
+}
+
+function isHappyHourActiveAt(
+  timestamp: string,
+  settings: {
+    enabled: boolean;
+    startsFrom: string | null;
+    until: string | null;
+  }
+) {
+  if (!settings.enabled || !settings.startsFrom || !settings.until) {
+    return false;
+  }
+
+  const orderTime = new Date(timestamp).getTime();
+  const startTime = new Date(settings.startsFrom).getTime();
+  const untilTime = new Date(settings.until).getTime();
+
+  if (
+    !Number.isFinite(orderTime) ||
+    !Number.isFinite(startTime) ||
+    !Number.isFinite(untilTime)
+  ) {
+    return false;
+  }
+
+  return orderTime >= startTime && orderTime <= untilTime;
+}
+
+function getHappyHourDiscountAmountFromOrder(
+  order: Order,
+  settings: {
+    enabled: boolean;
+    discountPercent: number;
+    categories: Set<MenuCategory>;
+    startsFrom: string | null;
+    until: string | null;
+  }
+) {
+  if (
+    settings.discountPercent <= 0 ||
+    settings.discountPercent >= 100 ||
+    settings.categories.size === 0 ||
+    !isHappyHourActiveAt(order.createdAt, settings)
+  ) {
+    return 0;
+  }
+
+  const ratio = settings.discountPercent / (100 - settings.discountPercent);
+  return order.items.reduce((sum, item) => {
+    if (!item.category || !settings.categories.has(item.category)) {
+      return sum;
+    }
+
+    const discountedLineTotal = item.price * item.quantity;
+    return sum + discountedLineTotal * ratio;
+  }, 0);
 }
 
 export function TablesOverview() {
@@ -94,6 +227,11 @@ export function TablesOverview() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [serviceRequests, setServiceRequests] = useState<Order[]>([]);
+  const [happyHourEnabled, setHappyHourEnabled] = useState(false);
+  const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(0);
+  const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>([]);
+  const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(null);
+  const [happyHourUntil, setHappyHourUntil] = useState<string | null>(null);
 
   function normalizeTablesResponse(payload: unknown): TablesResponse {
     if (!payload || typeof payload !== "object") {
@@ -117,24 +255,56 @@ export function TablesOverview() {
         return;
       }
 
-      const [tablesResponse, ordersResponse] = await Promise.all([
+      const [tablesResponse, ordersResponse, menuSettingsResponse] = await Promise.all([
         fetch("/api/tables"),
-        fetch("/api/orders")
+        fetch("/api/orders"),
+        fetch("/api/menu-settings")
       ]);
       const payload = tablesResponse.ok ? await tablesResponse.json() : null;
       const nextData = normalizeTablesResponse(payload);
       const nextServiceRequests = ordersResponse.ok
         ? ((await ordersResponse.json()) as Order[]).filter(
             (order) =>
-              (order.kind === "waiter_call" || order.kind === "bill_request") &&
+              order.kind === "waiter_call" &&
               order.status !== "served" &&
               order.status !== "cancelled"
           )
         : [];
+      const menuSettingsPayload: MenuSettingsResponse | null =
+        menuSettingsResponse.ok
+          ? ((await menuSettingsResponse.json()) as MenuSettingsResponse)
+          : null;
+      const parsedHappyHourDiscountPercent = Number(
+        menuSettingsPayload?.happyHourDiscountPercent ?? 0
+      );
+      const nextHappyHourEnabled = Boolean(menuSettingsPayload?.happyHourEnabled);
+      const nextHappyHourDiscountPercent = Number.isFinite(
+        parsedHappyHourDiscountPercent
+      )
+        ? Math.max(0, parsedHappyHourDiscountPercent)
+        : 0;
+      const nextHappyHourCategories = Array.isArray(
+        menuSettingsPayload?.happyHourCategories
+      )
+        ? menuSettingsPayload.happyHourCategories
+        : [];
+      const nextHappyHourStartsFrom =
+        typeof menuSettingsPayload?.happyHourStartsFrom === "string"
+          ? menuSettingsPayload.happyHourStartsFrom
+          : null;
+      const nextHappyHourUntil =
+        typeof menuSettingsPayload?.happyHourUntil === "string"
+          ? menuSettingsPayload.happyHourUntil
+          : null;
 
       if (!cancelled) {
         setData(nextData);
         setServiceRequests(nextServiceRequests);
+        setHappyHourEnabled(nextHappyHourEnabled);
+        setHappyHourDiscountPercent(nextHappyHourDiscountPercent);
+        setHappyHourCategories(nextHappyHourCategories);
+        setHappyHourStartsFrom(nextHappyHourStartsFrom);
+        setHappyHourUntil(nextHappyHourUntil);
         setLoading(false);
       }
     }
@@ -164,8 +334,20 @@ export function TablesOverview() {
     }
 
     const summary = (await response.json()) as ClosedTableSummary;
+    const discountAmount = Number(
+      (summary.orders ?? [])
+        .reduce(
+          (sum, order) => sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
+          0
+        )
+        .toFixed(2)
+    );
+    const happyHourNote =
+      discountAmount > 0
+        ? ` Happy hour discount ${happyHourDiscountPercent}% on ${happyHourCategoriesLabel}.`
+        : "";
     setDialogMessage(
-      `Table ${summary.tableNumber} closed. Session #${summary.sessionId}: ${formatCurrency(summary.total)}.`
+      `Table ${summary.tableNumber} closed. Session #${summary.sessionId}: ${formatCurrency(summary.total)}.${happyHourNote}`
     );
 
     setData((current) => ({
@@ -375,6 +557,39 @@ export function TablesOverview() {
     return <p className="muted">Loading tables...</p>;
   }
 
+  const happyHourSettings = {
+    enabled: happyHourEnabled,
+    discountPercent: happyHourDiscountPercent,
+    categories: new Set<MenuCategory>(happyHourCategories),
+    startsFrom: happyHourStartsFrom,
+    until: happyHourUntil
+  };
+
+  const getTableDiscountAmount = (table: TableOverview) =>
+    Number(
+      (table.orders ?? [])
+        .reduce(
+          (sum, order) =>
+            sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
+          0
+        )
+        .toFixed(2)
+    );
+
+  const getClosedSessionDiscountAmount = (session: ClosedTableSummary) =>
+    Number(
+      (session.orders ?? [])
+        .reduce(
+          (sum, order) =>
+            sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
+          0
+        )
+        .toFixed(2)
+    );
+  const happyHourCategoriesLabel = formatHappyHourCategoriesLabel(
+    happyHourCategories
+  );
+
   return (
     <>
       {dialogMessage ? (
@@ -525,7 +740,7 @@ export function TablesOverview() {
         ) : (
           <div className="tables-grid">
             {data.tables.map((table) => {
-              const sessionItems = groupSessionItems(table);
+              const sessionItems = groupSessionItems(table, happyHourSettings);
 
               return (
                 <article
@@ -540,15 +755,23 @@ export function TablesOverview() {
 
                   <div className="table-summary">
                     <span>Current total</span>
-                    <strong>{formatCurrency(table.total)}</strong>
+                    <strong>
+                      {formatCurrency(
+                        Math.max(0, table.total - getTableDiscountAmount(table))
+                      )}
+                    </strong>
                   </div>
-
                   <div className="table-orders">
                     <div className="table-order-card">
                       <div className="table-order-items">
                         {sessionItems.map((item) => (
                           <div key={item.key} className="table-order-item">
-                            <span className="table-order-item__name">{item.name}</span>
+                            <span className="table-order-item__name">
+                              {item.name}
+                              {item.hasHappyHourDiscount
+                                ? ` -${happyHourDiscountPercent}%`
+                                : ""}
+                            </span>
                             <span className="table-order-item__quantity">
                               {item.quantity} pcs
                             </span>
@@ -605,7 +828,10 @@ export function TablesOverview() {
           ) : (
             <div className="closed-grid">
               {data.closedSessions.map((session) => {
-                const sessionItems = groupClosedSessionItems(session);
+                const sessionItems = groupClosedSessionItems(
+                  session,
+                  happyHourSettings
+                );
 
                 return (
                   <article
@@ -620,7 +846,13 @@ export function TablesOverview() {
                         minute: "2-digit",
                         second: "2-digit"
                       })}{" "}
-                      · Total: {formatCurrency(session.total)}
+                      · Total:{" "}
+                      {formatCurrency(
+                        Math.max(
+                          0,
+                          session.total - getClosedSessionDiscountAmount(session)
+                        )
+                      )}
                     </p>
                     <details className="closed-details">
                       <summary>View order</summary>
@@ -631,6 +863,9 @@ export function TablesOverview() {
                               <div key={item.key} className="table-order-item">
                                 <span className="table-order-item__name">
                                   {item.name}
+                                  {item.hasHappyHourDiscount
+                                    ? ` -${happyHourDiscountPercent}%`
+                                    : ""}
                                 </span>
                                 <span className="table-order-item__quantity">
                                   {item.quantity} pcs

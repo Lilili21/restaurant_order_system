@@ -35,6 +35,12 @@ export default async function MenuPage({ params }: MenuPageProps) {
           orderingEnabled={false}
           menu={await getAvailableMenuByRestaurant(restaurantSlug)}
           showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
+          showHappyHour={menuSettings.happyHourEnabled}
+          happyHourText={menuSettings.happyHourText}
+          happyHourCategories={menuSettings.happyHourCategories}
+          happyHourDiscountPercent={menuSettings.happyHourDiscountPercent}
+          happyHourStartsFrom={menuSettings.happyHourStartsFrom}
+          happyHourUntil={menuSettings.happyHourUntil}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
           showBarOpen={menuSettings.barOpenEnabled}
@@ -60,6 +66,12 @@ export default async function MenuPage({ params }: MenuPageProps) {
         tableToken={session.table.accessToken}
         menu={session.menu}
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
+        showHappyHour={menuSettings.happyHourEnabled}
+          happyHourText={menuSettings.happyHourText}
+          happyHourCategories={menuSettings.happyHourCategories}
+          happyHourDiscountPercent={menuSettings.happyHourDiscountPercent}
+          happyHourStartsFrom={menuSettings.happyHourStartsFrom}
+          happyHourUntil={menuSettings.happyHourUntil}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
           showBarOpen={menuSettings.barOpenEnabled}

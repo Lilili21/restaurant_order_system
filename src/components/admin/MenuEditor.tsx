@@ -294,6 +294,13 @@ export function MenuEditor() {
   const [message, setMessage] = useState<string | null>(null);
   const [kitchenLoadWarningEnabled, setKitchenLoadWarningEnabled] = useState(false);
   const [kitchenLoadWarningSaving, setKitchenLoadWarningSaving] = useState(false);
+  const [happyHourEnabled, setHappyHourEnabled] = useState(false);
+  const [happyHourText, setHappyHourText] = useState("");
+  const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>([]);
+  const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState("0");
+  const [happyHourStartsFrom, setHappyHourStartsFrom] = useState("");
+  const [happyHourUntil, setHappyHourUntil] = useState("");
+  const [happyHourSaving, setHappyHourSaving] = useState(false);
   const [kitchenOpenEnabled, setKitchenOpenEnabled] = useState(false);
   const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
@@ -307,6 +314,13 @@ export function MenuEditor() {
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
+  const [happyHourModalOpen, setHappyHourModalOpen] = useState(false);
+  const [happyHourDraftText, setHappyHourDraftText] = useState("");
+  const [happyHourDraftCategories, setHappyHourDraftCategories] = useState<
+    MenuCategory[]
+  >([]);
+  const [happyHourDraftDiscountPercent, setHappyHourDraftDiscountPercent] =
+    useState("0");
   const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
     {}
   );
@@ -364,6 +378,12 @@ export function MenuEditor() {
       if (!cancelled && settingsResponse.ok) {
         const settings = (await settingsResponse.json()) as {
           kitchenLoadWarningEnabled?: boolean;
+          happyHourEnabled?: boolean;
+          happyHourText?: string;
+          happyHourCategories?: MenuCategory[];
+          happyHourDiscountPercent?: number;
+          happyHourStartsFrom?: string | null;
+          happyHourUntil?: string | null;
           kitchenOpenEnabled?: boolean;
           kitchenOpenUntil?: string | null;
           barOpenEnabled?: boolean;
@@ -371,6 +391,38 @@ export function MenuEditor() {
         };
 
         setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
+        setHappyHourEnabled(Boolean(settings.happyHourEnabled));
+        const nextHappyHourText =
+          typeof settings.happyHourText === "string" ? settings.happyHourText : "";
+        setHappyHourText(nextHappyHourText);
+        setHappyHourCategories(
+          Array.isArray(settings.happyHourCategories)
+            ? settings.happyHourCategories
+            : []
+        );
+        setHappyHourDiscountPercent(
+          typeof settings.happyHourDiscountPercent === "number"
+            ? String(settings.happyHourDiscountPercent)
+            : "0"
+        );
+        setHappyHourStartsFrom(
+          settings.happyHourStartsFrom
+            ? new Date(settings.happyHourStartsFrom).toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              })
+            : ""
+        );
+        setHappyHourUntil(
+          settings.happyHourUntil
+            ? new Date(settings.happyHourUntil).toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false
+              })
+            : ""
+        );
         setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
         setKitchenOpenUntil(
           settings.kitchenOpenUntil
@@ -605,6 +657,141 @@ export function MenuEditor() {
     }
 
     setKitchenLoadWarningSaving(false);
+  }
+
+  async function saveHappyHourSettings(
+    nextEnabled: boolean,
+    nextText: string,
+    nextCategories: MenuCategory[],
+    nextDiscountPercent: string,
+    nextStartTime: string,
+    nextUntilTime: string
+  ) {
+    const previousEnabled = happyHourEnabled;
+    const previousText = happyHourText;
+    const previousCategories = happyHourCategories;
+    const previousDiscountPercent = happyHourDiscountPercent;
+    const previousStartTime = happyHourStartsFrom;
+    const previousUntilTime = happyHourUntil;
+    const normalizedText = nextText.trim();
+    const normalizedDiscountPercent = Number(
+      Number.parseFloat(nextDiscountPercent || "0").toFixed(2)
+    );
+    const normalizedStartTime = nextStartTime.trim();
+    const normalizedUntilTime = nextUntilTime.trim();
+    let startIsoValue: string | null = null;
+    let untilIsoValue: string | null = null;
+
+    if (
+      !Number.isFinite(normalizedDiscountPercent) ||
+      normalizedDiscountPercent < 0 ||
+      normalizedDiscountPercent > 100
+    ) {
+      setMessage("Discount must be between 0 and 100.");
+      return;
+    }
+
+    if (nextEnabled) {
+      if (!normalizedStartTime || !normalizedUntilTime) {
+        setMessage("Select Happy hour start and end time first.");
+        return;
+      }
+      if (!nextCategories.length) {
+        setMessage("Select at least one category for Happy hour.");
+        return;
+      }
+
+      const [startHours, startMinutes] = normalizedStartTime
+        .split(":")
+        .map(Number);
+      const [untilHours, untilMinutes] = normalizedUntilTime
+        .split(":")
+        .map(Number);
+
+      if (
+        !Number.isFinite(startHours) ||
+        !Number.isFinite(startMinutes) ||
+        !Number.isFinite(untilHours) ||
+        !Number.isFinite(untilMinutes)
+      ) {
+        setMessage("Invalid Happy hour time.");
+        return;
+      }
+
+      const startTarget = new Date();
+      startTarget.setHours(startHours, startMinutes, 0, 0);
+      startIsoValue = startTarget.toISOString();
+
+      const untilTarget = new Date();
+      untilTarget.setHours(untilHours, untilMinutes, 0, 0);
+      untilIsoValue = untilTarget.toISOString();
+    }
+
+    setHappyHourEnabled(nextEnabled);
+    setHappyHourText(normalizedText);
+    setHappyHourCategories(nextCategories);
+    setHappyHourDiscountPercent(String(normalizedDiscountPercent));
+    setHappyHourStartsFrom(normalizedStartTime);
+    setHappyHourUntil(normalizedUntilTime);
+    setHappyHourSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        happyHourEnabled: nextEnabled,
+        happyHourText: normalizedText,
+        happyHourCategories: nextCategories,
+        happyHourDiscountPercent: normalizedDiscountPercent,
+        happyHourStartsFrom: nextEnabled ? startIsoValue : null,
+        happyHourUntil: nextEnabled ? untilIsoValue : null
+      })
+    });
+
+    if (!response.ok) {
+      setHappyHourEnabled(previousEnabled);
+      setHappyHourText(previousText);
+      setHappyHourCategories(previousCategories);
+      setHappyHourDiscountPercent(previousDiscountPercent);
+      setHappyHourStartsFrom(previousStartTime);
+      setHappyHourUntil(previousUntilTime);
+      setMessage("Failed to update Happy hour.");
+      setHappyHourSaving(false);
+      return;
+    }
+    setHappyHourSaving(false);
+  }
+
+  function openHappyHourModal() {
+    setHappyHourDraftText(happyHourText);
+    setHappyHourDraftCategories(happyHourCategories);
+    setHappyHourDraftDiscountPercent(happyHourDiscountPercent || "0");
+    setHappyHourModalOpen(true);
+  }
+
+  function toggleHappyHourDraftCategory(category: MenuCategory) {
+    setHappyHourDraftCategories((current) =>
+      current.includes(category)
+        ? current.filter((value) => value !== category)
+        : [...current, category]
+    );
+  }
+
+  async function saveHappyHourModal() {
+    await saveHappyHourSettings(
+      happyHourEnabled,
+      happyHourDraftText,
+      happyHourDraftCategories,
+      happyHourDraftDiscountPercent,
+      happyHourStartsFrom,
+      happyHourUntil
+    );
+
+    setHappyHourModalOpen(false);
   }
 
   async function saveKitchenOpenSettings(
@@ -1136,6 +1323,104 @@ export function MenuEditor() {
         </div>
       </div>
       {message ? <p className="status-message">{message}</p> : null}
+      {happyHourModalOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div className="modal-card modal-card--form" role="dialog" aria-modal="true">
+            <h2>Happy hour</h2>
+            <div className="menu-editor__form">
+              <label className="menu-editor__field">
+                <span>Text</span>
+                <textarea
+                  className="modal-input menu-notice-control__inline-textarea"
+                  value={happyHourDraftText}
+                  placeholder="happy hour"
+                  rows={2}
+                  disabled={happyHourSaving}
+                  onChange={(event) => setHappyHourDraftText(event.target.value)}
+                />
+              </label>
+
+              <label className="menu-editor__field">
+                <span>Discount %</span>
+                <input
+                  className="modal-input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={happyHourDraftDiscountPercent}
+                  disabled={happyHourSaving}
+                  onChange={(event) =>
+                    setHappyHourDraftDiscountPercent(event.target.value)
+                  }
+                />
+              </label>
+
+              <div className="menu-editor__field">
+                <span>Categories (multiple)</span>
+                <div className="menu-editor__field">
+                  <span>Dishes</span>
+                  <div className="orders-filter__chips">
+                    {dishCategories.map((category) => (
+                      <button
+                        key={`happy-hour-dish-${category}`}
+                        type="button"
+                        className={
+                          happyHourDraftCategories.includes(category)
+                            ? "orders-filter__chip orders-filter__chip--active"
+                            : "orders-filter__chip"
+                        }
+                        onClick={() => toggleHappyHourDraftCategory(category)}
+                        disabled={happyHourSaving}
+                      >
+                        {categoryLabels[category]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="menu-editor__field">
+                  <span>Drinks</span>
+                  <div className="orders-filter__chips">
+                    {allDrinkCategories.map((category) => (
+                      <button
+                        key={`happy-hour-drink-${category}`}
+                        type="button"
+                        className={
+                          happyHourDraftCategories.includes(category)
+                            ? "orders-filter__chip orders-filter__chip--active"
+                            : "orders-filter__chip"
+                        }
+                        onClick={() => toggleHappyHourDraftCategory(category)}
+                        disabled={happyHourSaving}
+                      >
+                        {categoryLabels[category]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="button-danger"
+                type="button"
+                onClick={() => setHappyHourModalOpen(false)}
+                disabled={happyHourSaving}
+              >
+                ✕
+              </button>
+              <button
+                className="button-success"
+                type="button"
+                onClick={() => void saveHappyHourModal()}
+                disabled={happyHourSaving}
+              >
+                ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {notificationsOpen ? (
         <>
           <div className="menu-notice-control menu-notice-control--inline">
@@ -1159,7 +1444,107 @@ export function MenuEditor() {
               </span>
             </label>
           </div>
-          <div className="menu-notice-control">
+          <div className="menu-notice-control menu-notice-control--inline">
+            <label className="menu-notice-control__toggle">
+              <input
+                type="checkbox"
+                checked={happyHourEnabled}
+                disabled={happyHourSaving}
+                onChange={(event) =>
+                  void saveHappyHourSettings(
+                    event.target.checked,
+                    happyHourText,
+                    happyHourCategories,
+                    happyHourDiscountPercent,
+                    happyHourStartsFrom,
+                    happyHourUntil
+                  )
+                }
+              />
+              <span
+                className={
+                  happyHourEnabled
+                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
+                    : "menu-notice-control__text"
+                }
+              >
+                Promo
+              </span>
+            </label>
+            <button
+              type="button"
+              className={
+                happyHourModalOpen
+                  ? "admin-menu-bubble admin-menu-bubble--active"
+                  : "admin-menu-bubble"
+              }
+              onClick={openHappyHourModal}
+              disabled={happyHourSaving}
+            >
+              Happy hour
+            </button>
+            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+              <span>Starts from</span>
+              <div className="menu-time-input">
+                <input
+                  className="modal-input"
+                  type="time"
+                  value={happyHourStartsFrom}
+                  placeholder="HH:MM"
+                  disabled={happyHourSaving}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setHappyHourStartsFrom(nextValue);
+
+                    if (happyHourEnabled) {
+                      void saveHappyHourSettings(
+                        true,
+                        happyHourText,
+                        happyHourCategories,
+                        happyHourDiscountPercent,
+                        nextValue,
+                        happyHourUntil
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </label>
+            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+              <span>Until</span>
+              <div className="menu-time-input">
+                <input
+                  className="modal-input"
+                  type="time"
+                  value={happyHourUntil}
+                  placeholder="HH:MM"
+                  disabled={happyHourSaving}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setHappyHourUntil(nextValue);
+
+                    if (happyHourEnabled) {
+                      void saveHappyHourSettings(
+                        true,
+                        happyHourText,
+                        happyHourCategories,
+                        happyHourDiscountPercent,
+                        happyHourStartsFrom,
+                        nextValue
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </label>
+            {happyHourEnabled ? (
+              <p className="muted">
+                {happyHourText || "happy hour"} · -{happyHourDiscountPercent || "0"}% ·{" "}
+                {happyHourCategories.length} categories
+              </p>
+            ) : null}
+          </div>
+          <div className="menu-notice-control menu-notice-control--inline">
             <label className="menu-notice-control__toggle">
               <input
                 type="checkbox"
@@ -1184,21 +1569,26 @@ export function MenuEditor() {
             </label>
             <label className="menu-settings-panel__field menu-settings-panel__field--compact">
               <span>Until</span>
-              <input
-                className="modal-input"
-                type="time"
-                value={kitchenOpenUntil}
-                disabled={kitchenOpenSaving}
-                onChange={(event) => setKitchenOpenUntil(event.target.value)}
-                onBlur={() => {
-                  if (kitchenOpenEnabled) {
-                    void saveKitchenOpenSettings(true, kitchenOpenUntil);
-                  }
-                }}
-              />
+              <div className="menu-time-input">
+                <input
+                  className="modal-input"
+                  type="time"
+                  value={kitchenOpenUntil}
+                  placeholder="HH:MM"
+                  disabled={kitchenOpenSaving}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setKitchenOpenUntil(nextValue);
+
+                    if (kitchenOpenEnabled) {
+                      void saveKitchenOpenSettings(true, nextValue);
+                    }
+                  }}
+                />
+              </div>
             </label>
           </div>
-          <div className="menu-notice-control">
+          <div className="menu-notice-control menu-notice-control--inline">
             <label className="menu-notice-control__toggle">
               <input
                 type="checkbox"
@@ -1220,18 +1610,23 @@ export function MenuEditor() {
             </label>
             <label className="menu-settings-panel__field menu-settings-panel__field--compact">
               <span>Until</span>
-              <input
-                className="modal-input"
-                type="time"
-                value={barOpenUntil}
-                disabled={barOpenSaving}
-                onChange={(event) => setBarOpenUntil(event.target.value)}
-                onBlur={() => {
-                  if (barOpenEnabled) {
-                    void saveBarOpenSettings(true, barOpenUntil);
-                  }
-                }}
-              />
+              <div className="menu-time-input">
+                <input
+                  className="modal-input"
+                  type="time"
+                  value={barOpenUntil}
+                  placeholder="HH:MM"
+                  disabled={barOpenSaving}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setBarOpenUntil(nextValue);
+
+                    if (barOpenEnabled) {
+                      void saveBarOpenSettings(true, nextValue);
+                    }
+                  }}
+                />
+              </div>
             </label>
           </div>
         </>

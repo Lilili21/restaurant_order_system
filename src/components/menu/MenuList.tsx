@@ -8,6 +8,9 @@ type MenuListProps = {
   language: MenuLanguage;
   quantities: Record<string, number>;
   orderingEnabled?: boolean;
+  showHappyHour?: boolean;
+  happyHourCategories?: MenuCategory[];
+  happyHourDiscountPercent?: number;
   onAdd: (
     menuItemId: string,
     sourceElement?: HTMLElement | null,
@@ -124,6 +127,9 @@ export function MenuList({
   language,
   quantities,
   orderingEnabled = true,
+  showHappyHour = false,
+  happyHourCategories = [],
+  happyHourDiscountPercent = 0,
   onAdd,
   onDecrease,
   selectedFilter
@@ -181,6 +187,24 @@ export function MenuList({
     }
   }, [selectedFilter]);
 
+  const normalizedDiscountPercent = Number.isFinite(happyHourDiscountPercent)
+    ? Math.max(0, happyHourDiscountPercent)
+    : 0;
+  const happyHourCategorySet = new Set<MenuCategory>(happyHourCategories);
+  const formatCategoryLabel = (category: MenuCategory) =>
+    categoryLabels[language][category] ?? category;
+  const formatCategorySectionLabel = (category: MenuCategory) => {
+    const baseLabel = categoryLabels[language][category] ?? category;
+    const showDiscountTag =
+      showHappyHour &&
+      normalizedDiscountPercent > 0 &&
+      happyHourCategorySet.has(category);
+
+    return showDiscountTag
+      ? `${baseLabel} -${normalizedDiscountPercent}%`
+      : baseLabel;
+  };
+
   return (
     <div className="menu-sections">
       <div className="orders-filter menu-filter">
@@ -207,7 +231,7 @@ export function MenuList({
               }
               onClick={() => setSelectedCategory(category)}
             >
-              {categoryLabels[language][category]}
+              {formatCategoryLabel(category)}
             </button>
           ))}
         </div>
@@ -235,7 +259,7 @@ export function MenuList({
                 }
                 onClick={() => setSelectedCategory(category)}
               >
-                {categoryLabels[language][category]}
+                {formatCategoryLabel(category)}
               </button>
             ))}
           </div>
@@ -248,7 +272,7 @@ export function MenuList({
           return (
             <section key={category} className="menu-section">
               <div className="section-header">
-                <h2>{categoryLabels[language][category] ?? category}</h2>
+                <h2>{formatCategorySectionLabel(category)}</h2>
               </div>
               <div className="menu-grid">
                 {sectionItems.map((item) => (

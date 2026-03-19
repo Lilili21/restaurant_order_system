@@ -732,6 +732,12 @@ button:disabled {
   font-weight: 700;
 }
 
+.menu-happy-hour {
+  margin: 8px 0 0;
+  color: #2f6a3a;
+  font-weight: 700;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1024,6 +1030,17 @@ textarea.modal-input {
   gap: 8px;
 }
 
+.menu-time-input {
+  display: block;
+  align-items: center;
+}
+
+.menu-time-input .modal-input {
+  width: 100%;
+  text-align: center;
+  cursor: default;
+}
+
 .menu-editor__volume-add {
   width: 32px;
   height: 32px;
@@ -1268,6 +1285,15 @@ textarea.modal-input {
   margin-top: 16px;
 }
 
+.order-action-preparing--active {
+  background: #c9c2b8;
+  color: #5f5850;
+  border-color: #b8b0a4;
+  box-shadow: none;
+  transform: none;
+  cursor: not-allowed;
+}
+
 .order-header-meta {
   display: grid;
   justify-items: end;
@@ -1420,6 +1446,26 @@ textarea.modal-input {
   cursor: pointer;
 }
 
+.menu-notice-control__inline-input {
+  min-width: 180px;
+  max-width: 260px;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 0.95rem;
+}
+
+.menu-notice-control__inline-textarea {
+  height: auto;
+  min-height: 66px;
+  padding: 10px 14px;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.menu-notice-control__inline-input--active {
+  font-weight: 700;
+}
+
 .menu-notice-control__text {
   color: var(--text);
 }
@@ -1445,9 +1491,13 @@ textarea.modal-input {
   flex: 1 1 auto;
 }
 
+.menu-notice-control--inline .menu-notice-control__toggle--with-textarea {
+  align-items: flex-start;
+}
+
 .menu-notice-control--inline .menu-settings-panel__field--compact {
-  min-width: 220px;
-  flex: 0 0 220px;
+  min-width: 240px;
+  flex: 0 0 240px;
   display: flex;
   align-items: center;
   gap: 10px;

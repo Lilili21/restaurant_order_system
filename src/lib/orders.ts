@@ -1,4 +1,5 @@
 import { initialOrders } from "@/lib/mock-data";
+import { getMenuSettings } from "@/lib/menu-settings";
 import {
   CartItem,
   ClosedTableSummary,
@@ -238,7 +239,7 @@ async function normalizeOrderItemForAdmin(
     category: item.category ?? menuItem?.category,
     name: menuItem?.nameEn || item.name,
     volumeLabel: item.volumeLabel ?? matchedVolumeOption?.label,
-    price: matchedVolumeOption?.price ?? item.price
+    price: item.price
   };
 }
 
@@ -814,11 +815,19 @@ if (!existsSync(ORDERS_STORE_PATH)) {
   persistState(readRuntimeState());
 }
 
-function createOrderItem(cartItem: CartItem, menuItem: MenuItem): OrderItem {
+function createOrderItem(
+  cartItem: CartItem,
+  menuItem: MenuItem,
+  menuSettings?: Awaited<ReturnType<typeof getMenuSettings>>
+): OrderItem {
 
   const matchedVolumeOption = menuItem.volumeOptions?.find(
     (option) => option.id === cartItem.volumeOptionId
   );
+  const basePrice = matchedVolumeOption?.price ?? menuItem.price;
+  const finalPrice = menuSettings
+    ? applyHappyHourDiscount(basePrice, menuItem.category, menuSettings)
+    : basePrice;
 
   return {
     id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -827,14 +836,63 @@ function createOrderItem(cartItem: CartItem, menuItem: MenuItem): OrderItem {
     name: menuItem.nameEn || menuItem.name,
     volumeOptionId: cartItem.volumeOptionId,
     volumeLabel: cartItem.volumeLabel ?? matchedVolumeOption?.label,
-    price:
-      matchedVolumeOption?.price ??
-      cartItem.priceOverride ??
-      menuItem.price,
+    price: finalPrice,
     quantity: cartItem.quantity,
     note: cartItem.note?.trim() || undefined,
     served: false
   };
+}
+
+function isHappyHourActiveNow(settings: Awaited<ReturnType<typeof getMenuSettings>>) {
+  if (!settings.happyHourEnabled) {
+    return false;
+  }
+
+  if (!settings.happyHourStartsFrom || !settings.happyHourUntil) {
+    return true;
+  }
+
+  const startDate = new Date(settings.happyHourStartsFrom);
+  const untilDate = new Date(settings.happyHourUntil);
+
+  if (
+    Number.isNaN(startDate.getTime()) ||
+    Number.isNaN(untilDate.getTime())
+  ) {
+    return false;
+  }
+
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
+  const untilMinutes = untilDate.getHours() * 60 + untilDate.getMinutes();
+
+  if (startMinutes <= untilMinutes) {
+    return nowMinutes >= startMinutes && nowMinutes <= untilMinutes;
+  }
+
+  return nowMinutes >= startMinutes || nowMinutes <= untilMinutes;
+}
+
+function applyHappyHourDiscount(
+  price: number,
+  category: MenuItem["category"],
+  settings: Awaited<ReturnType<typeof getMenuSettings>>
+) {
+  if (!isHappyHourActiveNow(settings)) {
+    return price;
+  }
+
+  if (!settings.happyHourCategories.includes(category)) {
+    return price;
+  }
+
+  if (settings.happyHourDiscountPercent <= 0) {
+    return price;
+  }
+
+  const discountMultiplier = 1 - settings.happyHourDiscountPercent / 100;
+  return Number(Math.max(0, price * discountMultiplier).toFixed(2));
 }
 
 async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
@@ -1115,6 +1173,7 @@ export async function createOrder(input: {
   }
 
   const menuLookup = await getMenuLookupForRestaurant(input.restaurantSlug);
+  const menuSettings = await getMenuSettings();
   const items = input.items.map((cartItem) => {
     const menuItem = menuLookup.get(cartItem.menuItemId);
 
@@ -1122,7 +1181,7 @@ export async function createOrder(input: {
       throw new Error(`Menu item ${cartItem.menuItemId} not found`);
     }
 
-    return createOrderItem(cartItem, menuItem);
+    return createOrderItem(cartItem, menuItem, menuSettings);
   });
   const total = items.reduce(
     (sum, item) => sum + item.price * item.quantity,

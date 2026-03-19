@@ -584,6 +584,7 @@ export function OrdersList() {
         <div className="orders-grid">
           {filteredOrders.map((order) => {
             const isHallView = selectedZone === "hall";
+            const isKitchenView = selectedZone === "kitchen";
             const isStationView = !isHallView;
             const isBarView = selectedZone === "bar";
             const highlightTimestamp = order.updatedAt || order.createdAt;
@@ -703,15 +704,21 @@ export function OrdersList() {
                     >
                       OK
                     </button>
+                  ) : isKitchenView ? (
+                    <button
+                      className={
+                        order.status === "preparing"
+                          ? "button-neutral order-action-preparing order-action-preparing--active"
+                          : "button-neutral order-action-preparing"
+                      }
+                      type="button"
+                      disabled={order.status === "preparing"}
+                      onClick={() => changeStatus(order.id, "preparing")}
+                    >
+                      {order.status === "preparing" ? "Preparing" : "New"}
+                    </button>
                   ) : isStationView ? null : (
                     <>
-                      <button
-                        className="button-neutral"
-                        type="button"
-                        onClick={() => changeStatus(order.id, "preparing")}
-                      >
-                        Preparing
-                      </button>
                       <button
                         className="button-success"
                         type="button"

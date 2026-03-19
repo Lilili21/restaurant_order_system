@@ -22,6 +22,12 @@ type CartProps = {
   orderingEnabled?: boolean;
   menu: MenuItem[];
   showKitchenLoadWarning: boolean;
+  showHappyHour: boolean;
+  happyHourText?: string | null;
+  happyHourCategories?: MenuCategory[];
+  happyHourDiscountPercent?: number;
+  happyHourStartsFrom: string | null;
+  happyHourUntil: string | null;
   showKitchenOpen: boolean;
   kitchenOpenUntil: string | null;
   showBarOpen: boolean;
@@ -113,6 +119,7 @@ const uiText = {
     newOrder: "הזמנה חדשה",
     emptyCart: "הסל עדיין ריק. הוסיפו מנות מהתפריט.",
     total: "סה\"כ",
+    happyHourDiscount: "הנחת Happy hour",
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
@@ -137,6 +144,9 @@ const uiText = {
     waiterAvailable: "המלצר עדיין זמין עבורכם אם תצטרכו עזרה.",
     kitchenLoadWarning:
       "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
+    happyHour: "Happy hour",
+    happyHourStartsFrom: "מתחיל ב־",
+    happyHourUntil: "עד",
     addDish: "הוסיפו לפחות מנה אחת.",
     submitError: "לא ניתן היה לשלוח את ההזמנה",
     waiterError: "לא ניתן היה לקרוא למלצר",
@@ -168,8 +178,7 @@ const uiText = {
     drinksPromptTitle: "One more thing",
     drinksPromptText: "Add drinks?",
     dessertDrinksPromptTitle: "One more thing",
-    dessertDrinksPromptText:
-      "I noticed there are no drinks or desserts in your order. Would you like to add something to drink or a dessert before we continue?",
+    dessertDrinksPromptText: "Add a drink or dessert?",
     dessertPromptLater: "Later",
     dessertPromptNow: "Yes",
     serveModeTitle: "How should we serve your order?",
@@ -179,6 +188,7 @@ const uiText = {
     newOrder: "New order",
     emptyCart: "It is empty for now. Add dishes from the menu.",
     total: "Total",
+    happyHourDiscount: "Happy hour discount",
     submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
@@ -203,6 +213,9 @@ const uiText = {
     waiterAvailable: "A waiter is still available if you need any assistance.",
     kitchenLoadWarning:
       "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
+    happyHour: "Happy hour",
+    happyHourStartsFrom: "starts from",
+    happyHourUntil: "until",
     addDish: "Add at least one dish.",
     submitError: "Failed to send the order",
     waiterError: "Failed to call the waiter",
@@ -225,6 +238,12 @@ export function Cart({
   orderingEnabled = true,
   menu,
   showKitchenLoadWarning,
+  showHappyHour,
+  happyHourText,
+  happyHourCategories,
+  happyHourDiscountPercent,
+  happyHourStartsFrom,
+  happyHourUntil,
   showKitchenOpen,
   kitchenOpenUntil,
   showBarOpen,
@@ -312,6 +331,56 @@ export function Cart({
   const isKitchenClosed = showKitchenClosedBanner;
   const isBarClosed = showBarClosedBanner;
   const areKitchenAndBarClosed = isKitchenClosed && isBarClosed;
+  const parsedHappyHourDiscountPercent = Number(happyHourDiscountPercent ?? 0);
+  const normalizedHappyHourDiscountPercent = Number.isFinite(
+    parsedHappyHourDiscountPercent
+  )
+    ? Math.max(0, parsedHappyHourDiscountPercent)
+    : 0;
+  const baseHappyHourText = (happyHourText?.trim() || text.happyHour).replace(
+    /\s*-\s*\d+%/gi,
+    ""
+  );
+  const happyHourBannerText =
+    normalizedHappyHourDiscountPercent > 0
+      ? `${baseHappyHourText} -${normalizedHappyHourDiscountPercent}%`
+      : baseHappyHourText;
+  const happyHourCategorySet = new Set<MenuCategory>(
+    (happyHourCategories ?? []).filter(
+      (category): category is MenuCategory => Boolean(category)
+    )
+  );
+  const happyHourStartMs = happyHourStartsFrom
+    ? new Date(happyHourStartsFrom).getTime()
+    : NaN;
+  const happyHourUntilMs = happyHourUntil ? new Date(happyHourUntil).getTime() : NaN;
+  const isHappyHourActiveNow =
+    showHappyHour &&
+    normalizedHappyHourDiscountPercent > 0 &&
+    Number.isFinite(happyHourStartMs) &&
+    Number.isFinite(happyHourUntilMs) &&
+    Date.now() >= happyHourStartMs &&
+    Date.now() <= happyHourUntilMs;
+  const currentOrderDiscountAmount = Number(
+    detailedItems
+      .reduce((sum, { cartItem, menuItem }) => {
+        if (!isHappyHourActiveNow || !happyHourCategorySet.has(menuItem.category)) {
+          return sum;
+        }
+
+        const unitPrice = cartItem.priceOverride ?? menuItem.price;
+        return (
+          sum +
+          unitPrice *
+            cartItem.quantity *
+            (normalizedHappyHourDiscountPercent / 100)
+        );
+      }, 0)
+      .toFixed(2)
+  );
+  const currentOrderTotalAfterDiscount = Number(
+    Math.max(0, total - currentOrderDiscountAmount).toFixed(2)
+  );
 
   function getMenuItemDisplayName(
     menuItemId: string,
@@ -924,8 +993,13 @@ export function Cart({
             </div>
             <div className="cart-summary">
               <span>{text.total}</span>
-              <strong>{formatCurrency(total)}</strong>
+              <strong>{formatCurrency(currentOrderTotalAfterDiscount)}</strong>
             </div>
+            {currentOrderDiscountAmount > 0 ? (
+              <p className="muted">
+                {text.happyHourDiscount}: -{formatCurrency(currentOrderDiscountAmount)}
+              </p>
+            ) : null}
             <div className="modal-actions">
               <button
                 className="button-success"
@@ -1106,6 +1180,28 @@ export function Cart({
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}
+            {showHappyHour ? (
+              <p className="menu-happy-hour">
+                {happyHourBannerText}
+                {happyHourStartsFrom
+                  ? ` ${text.happyHourStartsFrom} ${new Date(happyHourStartsFrom).toLocaleTimeString(
+                      "en-GB",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false
+                      }
+                    )}`
+                  : ""}
+                {happyHourUntil
+                  ? ` ${text.happyHourUntil} ${new Date(happyHourUntil).toLocaleTimeString("en-GB", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false
+                    })}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
           {orderingEnabled ? (
             <div
@@ -1143,6 +1239,9 @@ export function Cart({
             language={language}
             quantities={quantities}
             orderingEnabled={orderingEnabled}
+            showHappyHour={showHappyHour}
+            happyHourCategories={happyHourCategories}
+            happyHourDiscountPercent={normalizedHappyHourDiscountPercent}
             onAdd={addItem}
             onDecrease={decreaseItem}
             selectedFilter={selectedMenuFilter}
@@ -1205,8 +1304,13 @@ export function Cart({
 
             <div className="cart-summary">
               <span>{text.total}</span>
-              <strong>{formatCurrency(total)}</strong>
+              <strong>{formatCurrency(currentOrderTotalAfterDiscount)}</strong>
             </div>
+            {currentOrderDiscountAmount > 0 ? (
+              <p className="muted">
+                {text.happyHourDiscount}: -{formatCurrency(currentOrderDiscountAmount)}
+              </p>
+            ) : null}
 
             <button
               className="cart-submit"

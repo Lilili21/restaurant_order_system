@@ -2,9 +2,39 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import type { MenuCategory } from "@/lib/types";
+
+const MENU_CATEGORIES: MenuCategory[] = [
+  "starters",
+  "mains",
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks",
+  "desserts"
+];
 
 export type MenuSettings = {
   kitchenLoadWarningEnabled: boolean;
+  happyHourEnabled: boolean;
+  happyHourText: string;
+  happyHourCategories: MenuCategory[];
+  happyHourDiscountPercent: number;
+  happyHourStartsFrom: string | null;
+  happyHourUntil: string | null;
   kitchenOpenEnabled: boolean;
   kitchenOpenUntil: string | null;
   barOpenEnabled: boolean;
@@ -20,6 +50,12 @@ const MENU_SETTINGS_CACHE_TTL_MS = 2_000;
 
 const DEFAULT_SETTINGS: MenuSettings = {
   kitchenLoadWarningEnabled: false,
+  happyHourEnabled: false,
+  happyHourText: "",
+  happyHourCategories: [],
+  happyHourDiscountPercent: 0,
+  happyHourStartsFrom: null,
+  happyHourUntil: null,
   kitchenOpenEnabled: false,
   kitchenOpenUntil: null,
   barOpenEnabled: false,
@@ -94,13 +130,42 @@ function normalizeSettings(
     settings.kitchenOpenUntil.trim()
       ? settings.kitchenOpenUntil
       : null;
+  const happyHourStartsFrom =
+    typeof settings?.happyHourStartsFrom === "string" &&
+    settings.happyHourStartsFrom.trim()
+      ? settings.happyHourStartsFrom
+      : null;
+  const happyHourUntil =
+    typeof settings?.happyHourUntil === "string" &&
+    settings.happyHourUntil.trim()
+      ? settings.happyHourUntil
+      : null;
   const barOpenUntil =
     typeof settings?.barOpenUntil === "string" && settings.barOpenUntil.trim()
       ? settings.barOpenUntil
       : null;
+  const happyHourCategories = Array.isArray(settings?.happyHourCategories)
+    ? settings.happyHourCategories.filter((value): value is MenuCategory =>
+        MENU_CATEGORIES.includes(value as MenuCategory)
+      )
+    : [];
+  const happyHourDiscountPercentRaw =
+    typeof settings?.happyHourDiscountPercent === "number"
+      ? settings.happyHourDiscountPercent
+      : Number(settings?.happyHourDiscountPercent ?? 0);
+  const happyHourDiscountPercent = Number.isFinite(happyHourDiscountPercentRaw)
+    ? Math.min(100, Math.max(0, happyHourDiscountPercentRaw))
+    : 0;
 
   return {
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
+    happyHourEnabled: Boolean(settings?.happyHourEnabled),
+    happyHourText:
+      typeof settings?.happyHourText === "string" ? settings.happyHourText.trim() : "",
+    happyHourCategories,
+    happyHourDiscountPercent,
+    happyHourStartsFrom,
+    happyHourUntil,
     kitchenOpenEnabled: Boolean(settings?.kitchenOpenEnabled),
     kitchenOpenUntil,
     barOpenEnabled: Boolean(settings?.barOpenEnabled),
