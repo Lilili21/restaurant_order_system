@@ -1,29 +1,50 @@
 {
-  "kitchenLoadWarningEnabled": false,
+  "workingHoursRules": [
+    {
+      "id": "hours-1774046570092-qzbo61",
+      "days": [
+        1,
+        2
+      ],
+      "from": "12:00",
+      "until": "02:00"
+    },
+    {
+      "id": "hours-1774047095064-8yf4xp",
+      "days": [
+        3,
+        4,
+        5
+      ],
+      "from": "12:00",
+      "until": "00:36"
+    }
+  ],
+  "kitchenLoadWarningEnabled": true,
   "workingHoursFrom": "12:00",
   "workingHoursUntil": "02:00",
   "happyHourEnabled": true,
-  "happyHourText": "blablablabla!",
+  "happyHourText": "Happy hour! 50% discount on all alcoholic drinks",
   "happyHourCategories": [
     "fluids",
     "draft",
-    "whiskey",
-    "fuel",
     "bottled",
+    "fuel",
+    "whiskey",
     "vodka",
     "rum",
     "cognac",
-    "absent",
     "gin",
+    "tequila",
+    "absent",
     "ouzo",
-    "two_component_mixture",
-    "dot4",
     "likers",
-    "tequila"
+    "two_component_mixture",
+    "dot4"
   ],
-  "happyHourDiscountPercent": 20,
-  "happyHourStartsFrom": "2026-03-19T08:28:00.000Z",
-  "happyHourUntil": "2026-03-19T12:28:00.000Z",
+  "happyHourDiscountPercent": 50,
+  "happyHourStartsFrom": "2026-03-21T08:28:00.000Z",
+  "happyHourUntil": "2026-03-21T12:28:00.000Z",
   "kitchenOpenEnabled": false,
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,

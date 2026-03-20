@@ -6,8 +6,8 @@ export default function AdminPage() {
       <section className="hero hero--compact">
         <div>
           <h1 className="hero-title-stacked">
-            <span>Menu</span>
-            <span>editor</span>
+            <span>Control</span>
+            <span>Center</span>
           </h1>
         </div>
       </section>

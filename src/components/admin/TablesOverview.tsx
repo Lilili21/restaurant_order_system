@@ -16,6 +16,12 @@ type TablesResponse = {
 };
 
 type MenuSettingsResponse = {
+  workingHoursRules?: Array<{
+    id?: string;
+    days?: number[];
+    from?: string | null;
+    until?: string | null;
+  }>;
   happyHourEnabled?: boolean;
   happyHourDiscountPercent?: number;
   happyHourCategories?: MenuCategory[];
@@ -255,6 +261,23 @@ function getCurrentShiftStartTimestamp(workingHoursFrom: string | null | undefin
   return previousDayStart.getTime();
 }
 
+function getCurrentShiftStartTimestampByRules(
+  workingHoursRules: MenuSettingsResponse["workingHoursRules"],
+  fallbackFrom: string | null | undefined
+) {
+  const today = new Date();
+  const day = today.getDay();
+  const matchedRule = (workingHoursRules ?? []).find((rule) =>
+    Array.isArray(rule.days) ? rule.days.includes(day) : false
+  );
+  const fromValue =
+    typeof matchedRule?.from === "string" && matchedRule.from.trim()
+      ? matchedRule.from
+      : fallbackFrom;
+
+  return getCurrentShiftStartTimestamp(fromValue);
+}
+
 function getHappyHourDiscountAmountFromOrder(
   order: Order,
   settings: {
@@ -305,6 +328,8 @@ export function TablesOverview() {
   const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(null);
   const [happyHourUntil, setHappyHourUntil] = useState<string | null>(null);
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
+  const [workingHoursRules, setWorkingHoursRules] =
+    useState<MenuSettingsResponse["workingHoursRules"]>([]);
 
   function normalizeTablesResponse(payload: unknown): TablesResponse {
     if (!payload || typeof payload !== "object") {
@@ -373,6 +398,11 @@ export function TablesOverview() {
         typeof menuSettingsPayload?.workingHoursFrom === "string"
           ? menuSettingsPayload.workingHoursFrom
           : null;
+      const nextWorkingHoursRules = Array.isArray(
+        menuSettingsPayload?.workingHoursRules
+      )
+        ? menuSettingsPayload.workingHoursRules
+        : [];
 
       if (!cancelled) {
         setData(nextData);
@@ -383,6 +413,7 @@ export function TablesOverview() {
         setHappyHourStartsFrom(nextHappyHourStartsFrom);
         setHappyHourUntil(nextHappyHourUntil);
         setWorkingHoursFrom(nextWorkingHoursFrom);
+        setWorkingHoursRules(nextWorkingHoursRules);
         setLoading(false);
       }
     }
@@ -682,7 +713,10 @@ export function TablesOverview() {
     const safeRightTime = Number.isFinite(rightTime) ? rightTime : 0;
     return safeRightTime - safeLeftTime;
   });
-  const currentShiftStartTs = getCurrentShiftStartTimestamp(workingHoursFrom);
+  const currentShiftStartTs = getCurrentShiftStartTimestampByRules(
+    workingHoursRules,
+    workingHoursFrom
+  );
   const currentShiftClosedSessions = sortedClosedSessions.filter((session) => {
     const closedAtTs = new Date(session.closedAt).getTime();
     return Number.isFinite(closedAtTs) && closedAtTs >= currentShiftStartTs;

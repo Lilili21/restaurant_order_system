@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
@@ -315,6 +314,9 @@ export function MenuEditor() {
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
+  const [menuButtonsOpen, setMenuButtonsOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [happyHourModalOpen, setHappyHourModalOpen] = useState(false);
   const [happyHourDraftText, setHappyHourDraftText] = useState("");
   const [happyHourDraftCategories, setHappyHourDraftCategories] = useState<
@@ -1233,6 +1235,19 @@ export function MenuEditor() {
       ? pathSegments[0]
       : "olive-bistro";
   const menuPreviewHref = `/${restaurantSlug}/menu/0`;
+  function toggleMenuBlock() {
+    setMenuButtonsOpen((current) => {
+      const nextOpen = !current;
+
+      if (!nextOpen) {
+        setPreviewOpen(false);
+        setMenuOpen(false);
+        setNotificationsOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }
 
   return (
     <div className="orders-layout">
@@ -1247,9 +1262,6 @@ export function MenuEditor() {
               restaurantSlug={restaurantSlug}
             />
           ) : null}
-          <Link href={menuPreviewHref} className="admin-menu-bubble">
-            Menu preview
-          </Link>
           <button
             className="admin-menu-bubble"
             type="button"
@@ -1258,75 +1270,124 @@ export function MenuEditor() {
           >
             Waiter
           </button>
-        </div>
-        <div className="menu-editor__toolbar-row">
-          <div className="admin-switch menu-editor__kind-switch">
-            <button
-              type="button"
-              className={
-                selectedKind === "dishes"
-                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes admin-switch__item--active"
-                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes"
-              }
-              onClick={() => {
-                setSelectedKind("dishes");
-                setSelectedCategories([]);
-                setNewItem((current) => ({
-                  ...current,
-                  category: dishCategories.includes(current.category)
-                    ? current.category
-                    : "starters",
-                  volumeOptionsText: "",
-                  badges: current.badges.filter((badge) =>
-                    getBadgeOptionsForKind("dishes").some(
-                      (option) => option.value === badge
-                    )
-                  )
-                }));
-              }}
-            >
-              Dishes
-            </button>
-            <button
-              type="button"
-              className={
-                selectedKind === "drinks"
-                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks admin-switch__item--active"
-                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks"
-              }
-              onClick={() => {
-                setSelectedKind("drinks");
-                setSelectedCategories([]);
-                setNewItem((current) => ({
-                  ...current,
-                  category: drinkCategories.includes(current.category)
-                    ? current.category
-                    : drinkCategories[0],
-                  badges: current.badges.filter((badge) =>
-                    getBadgeOptionsForKind("drinks").some(
-                      (option) => option.value === badge
-                    )
-                  )
-                }));
-              }}
-            >
-              Drinks
-            </button>
-          </div>
           <button
             className={
-              notificationsOpen
+              menuButtonsOpen
                 ? "admin-menu-bubble admin-menu-bubble--active"
                 : "admin-menu-bubble"
             }
             type="button"
-            onClick={() => setNotificationsOpen((current) => !current)}
+            onClick={toggleMenuBlock}
           >
-            Notifications
+            Menu
           </button>
+          {menuButtonsOpen ? (
+            <>
+              <button
+                className={
+                  previewOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={() => setPreviewOpen((current) => !current)}
+              >
+                Preview
+              </button>
+              <button
+                className={
+                  menuOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={() => setMenuOpen((current) => !current)}
+              >
+                Edit
+              </button>
+            </>
+          ) : null}
         </div>
+        {menuOpen ? (
+          <div className="menu-editor__toolbar-row">
+            <div className="admin-switch menu-editor__kind-switch">
+              <button
+                type="button"
+                className={
+                  selectedKind === "dishes"
+                    ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes admin-switch__item--active"
+                    : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes"
+                }
+                onClick={() => {
+                  setSelectedKind("dishes");
+                  setSelectedCategories([]);
+                  setNewItem((current) => ({
+                    ...current,
+                    category: dishCategories.includes(current.category)
+                      ? current.category
+                      : "starters",
+                    volumeOptionsText: "",
+                    badges: current.badges.filter((badge) =>
+                      getBadgeOptionsForKind("dishes").some(
+                        (option) => option.value === badge
+                      )
+                    )
+                  }));
+                }}
+              >
+                Dishes
+              </button>
+              <button
+                type="button"
+                className={
+                  selectedKind === "drinks"
+                    ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks admin-switch__item--active"
+                    : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks"
+                }
+                onClick={() => {
+                  setSelectedKind("drinks");
+                  setSelectedCategories([]);
+                  setNewItem((current) => ({
+                    ...current,
+                    category: drinkCategories.includes(current.category)
+                      ? current.category
+                      : drinkCategories[0],
+                    badges: current.badges.filter((badge) =>
+                      getBadgeOptionsForKind("drinks").some(
+                        (option) => option.value === badge
+                      )
+                    )
+                  }));
+                }}
+              >
+                Drinks
+              </button>
+            </div>
+            <button
+              className={
+                notificationsOpen
+                  ? "admin-menu-bubble admin-menu-bubble--active"
+                  : "admin-menu-bubble"
+              }
+              type="button"
+              onClick={() => setNotificationsOpen((current) => !current)}
+            >
+              Alerts
+            </button>
+          </div>
+        ) : null}
       </div>
       {message ? <p className="status-message">{message}</p> : null}
+      {previewOpen ? (
+        <section className="menu-editor__preview">
+          <iframe
+            className="menu-editor__preview-frame"
+            src={menuPreviewHref}
+            title="Menu preview"
+            loading="lazy"
+          />
+        </section>
+      ) : null}
       {happyHourModalOpen ? (
         <div className="modal-backdrop" role="presentation">
           <div className="modal-card modal-card--form" role="dialog" aria-modal="true">
@@ -1635,45 +1696,47 @@ export function MenuEditor() {
           </div>
         </>
       ) : null}
-      <div className="menu-editor__create">
-        <button
-          className="button-success"
-          type="button"
-          onClick={() => setShowCreateForm((current) => !current)}
-        >
-          {showCreateForm ? "Hide form" : "Add new"}
-        </button>
-      </div>
-      <div className="orders-filter">
-        <div className="orders-filter__chips">
-          <button
-            type="button"
-            className={
-              selectedCategories.length === 0
-                ? "orders-filter__chip orders-filter__chip--active"
-                : "orders-filter__chip"
-            }
-            onClick={() => setSelectedCategories([])}
-          >
-            {selectedKind === "drinks" ? "All drinks" : "All dishes"}
-          </button>
-          {visibleCategories.map(([value, label]) => (
+      {menuOpen ? (
+        <>
+          <div className="menu-editor__create">
+            <button
+              className="button-success"
+              type="button"
+              onClick={() => setShowCreateForm((current) => !current)}
+            >
+              {showCreateForm ? "Hide form" : "Add new"}
+            </button>
+          </div>
+          <div className="orders-filter">
+            <div className="orders-filter__chips">
               <button
-                key={value}
                 type="button"
                 className={
-                  selectedCategories.includes(value)
+                  selectedCategories.length === 0
                     ? "orders-filter__chip orders-filter__chip--active"
                     : "orders-filter__chip"
                 }
-                onClick={() => toggleCategory(value)}
+                onClick={() => setSelectedCategories([])}
               >
-                {label}
+                {selectedKind === "drinks" ? "All drinks" : "All dishes"}
               </button>
-            ))}
-        </div>
-      </div>
-      <div className="orders-grid">
+              {visibleCategories.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={
+                      selectedCategories.includes(value)
+                        ? "orders-filter__chip orders-filter__chip--active"
+                        : "orders-filter__chip"
+                    }
+                    onClick={() => toggleCategory(value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+            </div>
+          </div>
+          <div className="orders-grid">
         {showCreateForm ? (
         <article className="order-card">
           <h3>Add new</h3>
@@ -2318,7 +2381,9 @@ export function MenuEditor() {
             })()}
           </article>
         ))}
-      </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

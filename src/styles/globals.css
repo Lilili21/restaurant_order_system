@@ -437,6 +437,90 @@ button:disabled {
   align-items: center;
 }
 
+.table-count-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.divider-line {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 6px 0;
+}
+
+.hours-rule-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #fffdf7;
+}
+
+.hours-rule-days {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hours-rule-time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.hours-rule-remove {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  background: rgba(185, 28, 28, 0.08);
+  color: #8a1b1b;
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.hours-rule-remove:disabled {
+  opacity: 0.5;
+}
+
+.hours-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hours-quick-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 250, 240, 0.94);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .hours-rule-days {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hours-rule-time-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hours-rule-remove {
+    width: 100%;
+  }
+}
+
 .table-count-open-row .modal-input {
   width: 100%;
 }
@@ -766,6 +850,13 @@ button:disabled {
   text-align: left;
 }
 
+.modal-card--hours {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .modal-card--review {
   text-align: left;
 }
@@ -960,6 +1051,22 @@ textarea.modal-input {
 .menu-editor__create {
   display: flex;
   justify-content: flex-start;
+}
+
+.menu-editor__preview {
+  background: rgba(255, 252, 245, 0.84);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 10px;
+  box-shadow: 0 18px 40px rgba(74, 48, 24, 0.1);
+}
+
+.menu-editor__preview-frame {
+  width: 100%;
+  min-height: 520px;
+  border: 0;
+  border-radius: 20px;
+  background: #fffdf7;
 }
 
 .menu-editor__field {

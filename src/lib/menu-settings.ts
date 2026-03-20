@@ -28,6 +28,12 @@ const MENU_CATEGORIES: MenuCategory[] = [
 ];
 
 export type MenuSettings = {
+  workingHoursRules: Array<{
+    id: string;
+    days: number[];
+    from: string | null;
+    until: string | null;
+  }>;
   kitchenLoadWarningEnabled: boolean;
   workingHoursFrom: string | null;
   workingHoursUntil: string | null;
@@ -51,6 +57,7 @@ const MENU_SETTINGS_KEY = "menu-settings";
 const MENU_SETTINGS_CACHE_TTL_MS = 2_000;
 
 const DEFAULT_SETTINGS: MenuSettings = {
+  workingHoursRules: [],
   kitchenLoadWarningEnabled: false,
   workingHoursFrom: null,
   workingHoursUntil: null,
@@ -129,6 +136,40 @@ function normalizeSettings(
     }
   }
 
+  const normalizeRuleTime = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : null;
+
+  const workingHoursRules = Array.isArray(settings?.workingHoursRules)
+    ? settings.workingHoursRules
+        .map((rule, index) => {
+          const rawDays = Array.isArray(rule?.days) ? rule.days : [];
+          const days = [...new Set(
+            rawDays.filter(
+              (day): day is number =>
+                typeof day === "number" &&
+                Number.isInteger(day) &&
+                day >= 0 &&
+                day <= 6
+            )
+          )].sort((left, right) => left - right);
+
+          if (days.length === 0) {
+            return null;
+          }
+
+          return {
+            id:
+              typeof rule?.id === "string" && rule.id.trim()
+                ? rule.id
+                : `rule-${index + 1}`,
+            days,
+            from: normalizeRuleTime(rule?.from),
+            until: normalizeRuleTime(rule?.until)
+          };
+        })
+        .filter(Boolean) as MenuSettings["workingHoursRules"]
+    : [];
+
   const kitchenOpenUntil =
     typeof settings?.kitchenOpenUntil === "string" &&
     settings.kitchenOpenUntil.trim()
@@ -172,6 +213,7 @@ function normalizeSettings(
     : 0;
 
   return {
+    workingHoursRules,
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
     workingHoursFrom,
     workingHoursUntil,

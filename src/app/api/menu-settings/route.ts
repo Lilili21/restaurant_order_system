@@ -33,6 +33,7 @@ export async function GET() {
 
   return NextResponse.json({
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
+    workingHoursRules: settings.workingHoursRules,
     workingHoursFrom: settings.workingHoursFrom,
     workingHoursUntil: settings.workingHoursUntil,
     happyHourEnabled: settings.happyHourEnabled,
@@ -72,6 +73,12 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = (await request.json()) as {
       kitchenLoadWarningEnabled?: boolean;
+      workingHoursRules?: Array<{
+        id?: string;
+        days?: number[];
+        from?: string | null;
+        until?: string | null;
+      }>;
       workingHoursFrom?: string | null;
       workingHoursUntil?: string | null;
       happyHourEnabled?: boolean;
@@ -118,6 +125,52 @@ export async function PATCH(request: NextRequest) {
       }
     }
     if (
+      body.workingHoursRules !== undefined &&
+      !Array.isArray(body.workingHoursRules)
+    ) {
+      throw new Error("workingHoursRules is invalid");
+    }
+
+    if (Array.isArray(body.workingHoursRules)) {
+      for (const rule of body.workingHoursRules) {
+        if (!rule || typeof rule !== "object") {
+          throw new Error("workingHoursRules contains invalid rule");
+        }
+
+        if (rule.days !== undefined) {
+          if (
+            !Array.isArray(rule.days) ||
+            rule.days.some(
+              (day) =>
+                typeof day !== "number" ||
+                !Number.isInteger(day) ||
+                day < 0 ||
+                day > 6
+            )
+          ) {
+            throw new Error("workingHoursRules days must be integers from 0 to 6");
+          }
+        }
+
+        if (
+          rule.from !== undefined &&
+          rule.from !== null &&
+          typeof rule.from !== "string"
+        ) {
+          throw new Error("workingHoursRules from is invalid");
+        }
+
+        if (
+          rule.until !== undefined &&
+          rule.until !== null &&
+          typeof rule.until !== "string"
+        ) {
+          throw new Error("workingHoursRules until is invalid");
+        }
+      }
+    }
+
+    if (
       body.workingHoursFrom !== undefined &&
       body.workingHoursFrom !== null &&
       typeof body.workingHoursFrom !== "string"
@@ -157,6 +210,12 @@ export async function PATCH(request: NextRequest) {
 
     const updates: {
       kitchenLoadWarningEnabled?: boolean;
+      workingHoursRules?: Array<{
+        id?: string;
+        days?: number[];
+        from?: string | null;
+        until?: string | null;
+      }>;
       workingHoursFrom?: string | null;
       workingHoursUntil?: string | null;
       happyHourEnabled?: boolean;
@@ -174,6 +233,9 @@ export async function PATCH(request: NextRequest) {
 
     if (typeof body.kitchenLoadWarningEnabled === "boolean") {
       updates.kitchenLoadWarningEnabled = body.kitchenLoadWarningEnabled;
+    }
+    if (Array.isArray(body.workingHoursRules)) {
+      updates.workingHoursRules = body.workingHoursRules;
     }
     if (
       body.workingHoursFrom === null ||
