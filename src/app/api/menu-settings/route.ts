@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin-auth";
 import { getMenuSettings, updateMenuSettings } from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import type { MenuCategory } from "@/lib/types";
+import type { MenuSettings } from "@/lib/menu-settings";
 
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
@@ -208,34 +209,27 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const updates: {
-      kitchenLoadWarningEnabled?: boolean;
-      workingHoursRules?: Array<{
-        id?: string;
-        days?: number[];
-        from?: string | null;
-        until?: string | null;
-      }>;
-      workingHoursFrom?: string | null;
-      workingHoursUntil?: string | null;
-      happyHourEnabled?: boolean;
-      happyHourText?: string;
-      happyHourCategories?: MenuCategory[];
-      happyHourDiscountPercent?: number;
-      happyHourStartsFrom?: string | null;
-      happyHourUntil?: string | null;
-      kitchenOpenEnabled?: boolean;
-      kitchenOpenUntil?: string | null;
-      barOpenEnabled?: boolean;
-      barOpenUntil?: string | null;
-      tableCount?: number;
-    } = {};
+    const updates: Partial<MenuSettings> = {};
 
     if (typeof body.kitchenLoadWarningEnabled === "boolean") {
       updates.kitchenLoadWarningEnabled = body.kitchenLoadWarningEnabled;
     }
     if (Array.isArray(body.workingHoursRules)) {
-      updates.workingHoursRules = body.workingHoursRules;
+      updates.workingHoursRules = body.workingHoursRules.map((rule, index) => ({
+        id:
+          typeof rule.id === "string" && rule.id.trim()
+            ? rule.id.trim()
+            : `rule-${index + 1}`,
+        days: Array.isArray(rule.days) ? rule.days : [],
+        from:
+          typeof rule.from === "string" && rule.from.trim()
+            ? rule.from.trim()
+            : null,
+        until:
+          typeof rule.until === "string" && rule.until.trim()
+            ? rule.until.trim()
+            : null
+      }));
     }
     if (
       body.workingHoursFrom === null ||
