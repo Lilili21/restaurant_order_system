@@ -1,29 +1,22 @@
 {
   "workingHoursRules": [
     {
-      "id": "hours-1774046570092-qzbo61",
-      "days": [
-        1,
-        2
-      ],
-      "from": "12:00",
-      "until": "02:00"
-    },
-    {
       "id": "hours-1774047095064-8yf4xp",
       "days": [
+        1,
+        2,
         3,
         4,
         5
       ],
-      "from": "12:00",
-      "until": "00:36"
+      "from": "14:00",
+      "until": "02:00"
     }
   ],
-  "kitchenLoadWarningEnabled": true,
-  "workingHoursFrom": "12:00",
+  "kitchenLoadWarningEnabled": false,
+  "workingHoursFrom": "14:00",
   "workingHoursUntil": "02:00",
-  "happyHourEnabled": true,
+  "happyHourEnabled": false,
   "happyHourText": "Happy hour! 50% discount on all alcoholic drinks",
   "happyHourCategories": [
     "fluids",
@@ -43,8 +36,8 @@
     "dot4"
   ],
   "happyHourDiscountPercent": 50,
-  "happyHourStartsFrom": "2026-03-21T08:28:00.000Z",
-  "happyHourUntil": "2026-03-21T12:28:00.000Z",
+  "happyHourStartsFrom": null,
+  "happyHourUntil": null,
   "kitchenOpenEnabled": false,
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,

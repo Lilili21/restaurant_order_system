@@ -315,6 +315,7 @@ export function MenuEditor() {
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
   const [menuButtonsOpen, setMenuButtonsOpen] = useState(false);
+  const [settingsButtonsOpen, setSettingsButtonsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [happyHourModalOpen, setHappyHourModalOpen] = useState(false);
@@ -1243,6 +1244,25 @@ export function MenuEditor() {
         setPreviewOpen(false);
         setMenuOpen(false);
         setNotificationsOpen(false);
+      } else {
+        setSettingsButtonsOpen(false);
+        setNotificationsOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }
+
+  function toggleSettingsBlock() {
+    setSettingsButtonsOpen((current) => {
+      const nextOpen = !current;
+
+      if (!nextOpen) {
+        setNotificationsOpen(false);
+      } else {
+        setMenuButtonsOpen(false);
+        setPreviewOpen(false);
+        setMenuOpen(false);
       }
 
       return nextOpen;
@@ -1253,23 +1273,20 @@ export function MenuEditor() {
     <div className="orders-layout">
       <div className="menu-editor__toolbar">
         <div className="menu-editor__toolbar-row">
-          {secondaryCredentials ? (
-            <WorkingHoursControl credentials={secondaryCredentials} />
-          ) : null}
-          {secondaryCredentials ? (
-            <TableCountControl
-              credentials={secondaryCredentials}
-              restaurantSlug={restaurantSlug}
-            />
-          ) : null}
           <button
             className="admin-menu-bubble"
             type="button"
             disabled={waiterRedirecting}
             onClick={() => void openWaiterPanel()}
           >
-            Waiter
+            Live Orders
           </button>
+          {secondaryCredentials ? (
+            <TableCountControl
+              credentials={secondaryCredentials}
+              restaurantSlug={restaurantSlug}
+            />
+          ) : null}
           <button
             className={
               menuButtonsOpen
@@ -1281,33 +1298,62 @@ export function MenuEditor() {
           >
             Menu
           </button>
-          {menuButtonsOpen ? (
-            <>
-              <button
-                className={
-                  previewOpen
-                    ? "admin-menu-bubble admin-menu-bubble--active"
-                    : "admin-menu-bubble"
-                }
-                type="button"
-                onClick={() => setPreviewOpen((current) => !current)}
-              >
-                Preview
-              </button>
-              <button
-                className={
-                  menuOpen
-                    ? "admin-menu-bubble admin-menu-bubble--active"
-                    : "admin-menu-bubble"
-                }
-                type="button"
-                onClick={() => setMenuOpen((current) => !current)}
-              >
-                Edit
-              </button>
-            </>
-          ) : null}
+          <button
+            className={
+              settingsButtonsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={toggleSettingsBlock}
+          >
+            Settings
+          </button>
         </div>
+        {menuButtonsOpen ? (
+          <div className="menu-editor__toolbar-row">
+            <button
+              className={
+                previewOpen
+                  ? "admin-menu-bubble admin-menu-bubble--active"
+                  : "admin-menu-bubble"
+              }
+              type="button"
+              onClick={() => setPreviewOpen((current) => !current)}
+            >
+              Preview
+            </button>
+            <button
+              className={
+                menuOpen
+                  ? "admin-menu-bubble admin-menu-bubble--active"
+                  : "admin-menu-bubble"
+              }
+              type="button"
+              onClick={() => setMenuOpen((current) => !current)}
+            >
+              Edit
+            </button>
+          </div>
+        ) : null}
+        {settingsButtonsOpen ? (
+          <div className="menu-editor__toolbar-row">
+            {secondaryCredentials ? (
+              <WorkingHoursControl credentials={secondaryCredentials} />
+            ) : null}
+            <button
+              className={
+                notificationsOpen
+                  ? "admin-menu-bubble admin-menu-bubble--active"
+                  : "admin-menu-bubble"
+              }
+              type="button"
+              onClick={() => setNotificationsOpen((current) => !current)}
+            >
+              Alarm
+            </button>
+          </div>
+        ) : null}
         {menuOpen ? (
           <div className="menu-editor__toolbar-row">
             <div className="admin-switch menu-editor__kind-switch">
@@ -1363,17 +1409,6 @@ export function MenuEditor() {
                 Drinks
               </button>
             </div>
-            <button
-              className={
-                notificationsOpen
-                  ? "admin-menu-bubble admin-menu-bubble--active"
-                  : "admin-menu-bubble"
-              }
-              type="button"
-              onClick={() => setNotificationsOpen((current) => !current)}
-            >
-              Alerts
-            </button>
           </div>
         ) : null}
       </div>

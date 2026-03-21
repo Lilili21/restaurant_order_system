@@ -150,8 +150,8 @@ export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
       },
       body: JSON.stringify({
         workingHoursRules: normalizedRules,
-        workingHoursFrom: fallbackRule?.from ?? draftFrom || null,
-        workingHoursUntil: fallbackRule?.until ?? draftUntil || null
+        workingHoursFrom: (fallbackRule?.from ?? draftFrom) || null,
+        workingHoursUntil: (fallbackRule?.until ?? draftUntil) || null
       })
     });
 

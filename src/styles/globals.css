@@ -546,6 +546,31 @@ button:disabled {
   margin-bottom: 56px;
 }
 
+.menu-editor__toolbar .admin-menu-bubble {
+  background: #eae3d9;
+  color: #5b4636;
+}
+
+.menu-editor__toolbar .admin-menu-bubble:hover {
+  background: #e4dbcf;
+  color: #5b4636;
+}
+
+.menu-editor__toolbar .admin-menu-bubble--active {
+  background: #b45309;
+  color: #ffffff;
+}
+
+.menu-editor__toolbar .admin-switch__item {
+  background: #eae3d9;
+  color: #5b4636;
+}
+
+.menu-editor__toolbar .admin-switch__item--active {
+  background: #b45309;
+  color: #ffffff;
+}
+
 .menu-editor__toolbar-row {
   display: flex;
   align-items: center;
