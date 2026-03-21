@@ -1,6 +1,145 @@
 {
   "orders": [
     {
+      "id": "ord_dash_20260321_2350",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-21T23:50:00.000Z",
+      "updatedAt": "2026-03-21T23:55:00.000Z",
+      "items": [
+        {
+          "id": "item_dash_20260321_2350_1",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 2,
+          "served": true
+        }
+      ],
+      "total": 64
+    },
+    {
+      "id": "ord_dash_20260321_2342",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-21T23:42:00.000Z",
+      "updatedAt": "2026-03-21T23:47:00.000Z",
+      "items": [
+        {
+          "id": "item_dash_20260321_2342_1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_dash_20260321_2342_2",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 78
+    },
+    {
+      "id": "ord_dash_20260321_2335",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-21T23:35:00.000Z",
+      "updatedAt": "2026-03-21T23:40:00.000Z",
+      "items": [
+        {
+          "id": "item_dash_20260321_2335_1",
+          "menuItemId": "m_1773255842139",
+          "category": "starters",
+          "name": "Omelette 5",
+          "price": 100,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 100
+    },
+    {
+      "id": "call_dash_20260321_1224",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "kind": "waiter_call",
+      "status": "cancelled",
+      "createdAt": "2026-03-21T12:24:00.000Z",
+      "updatedAt": "2026-03-21T12:55:36.374Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_dash_active_20260321_1218",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-21T12:18:00.000Z",
+      "updatedAt": "2026-03-21T12:22:00.000Z",
+      "items": [
+        {
+          "id": "item_dash_active_20260321_1218_1",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "orange juice2",
+          "volumeOptionId": "volume_0_1L",
+          "volumeLabel": "1L",
+          "price": 10,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 20
+    },
+    {
+      "id": "ord_dash_active_20260321_1210",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-21T12:10:00.000Z",
+      "updatedAt": "2026-03-21T12:10:00.000Z",
+      "items": [
+        {
+          "id": "item_dash_active_20260321_1210_1",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 78
+    },
+    {
       "id": "ord_1774079537668",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

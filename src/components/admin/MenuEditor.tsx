@@ -76,7 +76,7 @@ const allDrinkCategories = [...drinkCategories];
 const analyticsBlocks = [
   {
     icon: "🟢",
-    title: "Active",
+    title: "Live status",
     stats: [
       { label: "Revenue", value: "—" },
       { label: "Avg Check", value: "—" },
@@ -85,7 +85,7 @@ const analyticsBlocks = [
       { label: "Waiter Calls", value: "—" }
     ]
   },
-  { icon: "🟡", title: "Today" }
+  { icon: "🟡", title: "Daily status" }
 ] as const;
 
 type InsightStats = {
@@ -1566,7 +1566,7 @@ export function MenuEditor() {
                   </span>
                   <h2>{block.title}</h2>
                 </header>
-                {block.title === "Active" && "stats" in block ? (
+              {block.title === "Live status" && "stats" in block ? (
                   <div className="control-center-analytics__stats">
                     {block.stats.map((stat) => (
                       <div
@@ -1598,7 +1598,7 @@ export function MenuEditor() {
                       </div>
                     ))}
                   </div>
-                ) : block.title === "Today" ? (
+              ) : block.title === "Daily status" ? (
                 <div className="control-center-analytics__stats">
                   <div className="control-center-analytics__stat">
                     <span className="control-center-analytics__stat-label">Top Dish</span>
