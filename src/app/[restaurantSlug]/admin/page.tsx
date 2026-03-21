@@ -23,7 +23,7 @@ export default async function RestaurantAdminPage({
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <h1 className="hero-title-stacked">
+          <h1 className="hero-title-stacked control-center-title">
             <span>Control</span>
             <span>Center</span>
           </h1>

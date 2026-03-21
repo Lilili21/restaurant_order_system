@@ -15,11 +15,13 @@ type SecondaryCredentials = {
 type TableCountControlProps = {
   credentials: SecondaryCredentials;
   restaurantSlug: string;
+  onOpen?: () => void;
 };
 
 export function TableCountControl({
   credentials,
-  restaurantSlug
+  restaurantSlug,
+  onOpen
 }: TableCountControlProps) {
   const [tableCount, setTableCount] = useState(8);
   const [draftCount, setDraftCount] = useState(8);
@@ -199,6 +201,7 @@ export function TableCountControl({
         className="admin-menu-bubble admin-table-count-trigger"
         type="button"
         onClick={() => {
+          onOpen?.();
           setDraftCount(tableCount);
           setSelectedTable((current) => {
             const next = Number.parseInt(current, 10);

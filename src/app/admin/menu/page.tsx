@@ -7,7 +7,10 @@ export default function AdminMenuPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <h1>Control Center</h1>
+          <h1 className="hero-title-stacked control-center-title">
+            <span>Control</span>
+            <span>Center</span>
+          </h1>
         </div>
         <div className="admin-nav" aria-label="Admin navigation">
           <div className="admin-switch">

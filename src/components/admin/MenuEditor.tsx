@@ -73,6 +73,35 @@ const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
   (category) => category !== "drinks" && !drinkCategories.includes(category)
 );
 const allDrinkCategories = [...drinkCategories];
+const analyticsBlocks = [
+  {
+    icon: "🟢",
+    title: "Active",
+    stats: [
+      { label: "Revenue", value: "—" },
+      { label: "Avg Check", value: "—" },
+      { label: "Orders", value: "—" },
+      { label: "Active Orders", value: "—" },
+      { label: "Waiter Calls", value: "—" }
+    ]
+  },
+  { icon: "🟡", title: "Today" }
+] as const;
+
+type InsightStats = {
+  orders: string;
+  activeOrders: string;
+  topDish: string;
+  lowDish: string;
+  peakHour: string;
+  waiterCalls: string;
+};
+
+type DashboardCharts = {
+  labels: string[];
+  ordersByHour: number[];
+  revenueTrend: number[];
+};
 
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
@@ -308,12 +337,26 @@ export function MenuEditor() {
   const [barOpenUntil, setBarOpenUntil] = useState("");
   const [barOpenSaving, setBarOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [insightStats, setInsightStats] = useState<InsightStats>({
+    orders: "—",
+    activeOrders: "—",
+    topDish: "—",
+    lowDish: "—",
+    peakHour: "—",
+    waiterCalls: "—"
+  });
+  const [dashboardCharts, setDashboardCharts] = useState<DashboardCharts>({
+    labels: [],
+    ordersByHour: [],
+    revenueTrend: []
+  });
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
+  const [dashboardOpen, setDashboardOpen] = useState(true);
   const [menuButtonsOpen, setMenuButtonsOpen] = useState(false);
   const [settingsButtonsOpen, setSettingsButtonsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -345,6 +388,12 @@ export function MenuEditor() {
     available: true,
     saving: false
   });
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const restaurantSlug =
+    pathSegments.length >= 2 && pathSegments[1] === "admin"
+      ? pathSegments[0]
+      : "olive-bistro";
+  const menuPreviewHref = `/${restaurantSlug}/menu/0`;
 
   useEffect(() => {
     if (!isAuthorized || !secondaryCredentials) {
@@ -358,13 +407,17 @@ export function MenuEditor() {
     let cancelled = false;
 
     async function load() {
-      const [menuResponse, settingsResponse] = await Promise.all([
+      const [menuResponse, settingsResponse, analyticsResponse] = await Promise.all([
         fetch("/api/menu?restaurantSlug=olive-bistro", {
           cache: "no-store",
           headers: authHeaders
         }),
         fetch("/api/menu-settings", {
           cache: "no-store"
+        }),
+        fetch(`/api/admin-analytics?restaurantSlug=${restaurantSlug}`, {
+          cache: "no-store",
+          headers: authHeaders
         })
       ]);
 
@@ -447,6 +500,40 @@ export function MenuEditor() {
               })
             : ""
         );
+      }
+
+      if (!cancelled && analyticsResponse.ok) {
+        const analytics = (await analyticsResponse.json()) as {
+          insights?: Partial<InsightStats>;
+          charts?: Partial<DashboardCharts>;
+        };
+
+        setInsightStats({
+          orders:
+            analytics.insights?.orders !== undefined
+              ? String(analytics.insights.orders)
+              : "—",
+          activeOrders:
+            analytics.insights?.activeOrders !== undefined
+              ? String(analytics.insights.activeOrders)
+              : "—",
+          topDish: analytics.insights?.topDish || "—",
+          lowDish: analytics.insights?.lowDish || "—",
+          peakHour: analytics.insights?.peakHour || "—",
+          waiterCalls:
+            analytics.insights?.waiterCalls !== undefined
+              ? String(analytics.insights.waiterCalls)
+              : "—"
+        });
+        setDashboardCharts({
+          labels: Array.isArray(analytics.charts?.labels) ? analytics.charts.labels : [],
+          ordersByHour: Array.isArray(analytics.charts?.ordersByHour)
+            ? analytics.charts.ordersByHour
+            : [],
+          revenueTrend: Array.isArray(analytics.charts?.revenueTrend)
+            ? analytics.charts.revenueTrend
+            : []
+        });
       }
     }
 
@@ -1230,12 +1317,15 @@ export function MenuEditor() {
     }));
   }
 
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const restaurantSlug =
-    pathSegments.length >= 2 && pathSegments[1] === "admin"
-      ? pathSegments[0]
-      : "olive-bistro";
-  const menuPreviewHref = `/${restaurantSlug}/menu/0`;
+  function closeControlCenterPanels() {
+    setDashboardOpen(false);
+    setMenuButtonsOpen(false);
+    setSettingsButtonsOpen(false);
+    setPreviewOpen(false);
+    setMenuOpen(false);
+    setNotificationsOpen(false);
+  }
+
   function toggleMenuBlock() {
     setMenuButtonsOpen((current) => {
       const nextOpen = !current;
@@ -1245,6 +1335,7 @@ export function MenuEditor() {
         setMenuOpen(false);
         setNotificationsOpen(false);
       } else {
+        setDashboardOpen(false);
         setSettingsButtonsOpen(false);
         setNotificationsOpen(false);
       }
@@ -1260,9 +1351,26 @@ export function MenuEditor() {
       if (!nextOpen) {
         setNotificationsOpen(false);
       } else {
+        setDashboardOpen(false);
         setMenuButtonsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }
+
+  function toggleDashboardBlock() {
+    setDashboardOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen) {
+        setMenuButtonsOpen(false);
+        setSettingsButtonsOpen(false);
+        setPreviewOpen(false);
+        setMenuOpen(false);
+        setNotificationsOpen(false);
       }
 
       return nextOpen;
@@ -1274,10 +1382,24 @@ export function MenuEditor() {
       <div className="menu-editor__toolbar">
         <div className="menu-editor__toolbar-row">
           <button
-            className="admin-menu-bubble"
+            className={
+              dashboardOpen
+                ? "admin-menu-bubble admin-menu-bubble--active admin-menu-bubble--dashboard"
+                : "admin-menu-bubble admin-menu-bubble--dashboard"
+            }
+            type="button"
+            onClick={toggleDashboardBlock}
+          >
+            Dashboard
+          </button>
+          <button
+            className="admin-menu-bubble admin-menu-bubble--live-orders"
             type="button"
             disabled={waiterRedirecting}
-            onClick={() => void openWaiterPanel()}
+            onClick={() => {
+              closeControlCenterPanels();
+              void openWaiterPanel();
+            }}
           >
             Live Orders
           </button>
@@ -1285,6 +1407,7 @@ export function MenuEditor() {
             <TableCountControl
               credentials={secondaryCredentials}
               restaurantSlug={restaurantSlug}
+              onOpen={closeControlCenterPanels}
             />
           ) : null}
           <button
@@ -1319,7 +1442,17 @@ export function MenuEditor() {
                   : "admin-menu-bubble"
               }
               type="button"
-              onClick={() => setPreviewOpen((current) => !current)}
+              onClick={() => {
+                setPreviewOpen((current) => {
+                  const nextOpen = !current;
+
+                  if (nextOpen) {
+                    setMenuOpen(false);
+                  }
+
+                  return nextOpen;
+                });
+              }}
             >
               Preview
             </button>
@@ -1330,7 +1463,17 @@ export function MenuEditor() {
                   : "admin-menu-bubble"
               }
               type="button"
-              onClick={() => setMenuOpen((current) => !current)}
+              onClick={() => {
+                setMenuOpen((current) => {
+                  const nextOpen = !current;
+
+                  if (nextOpen) {
+                    setPreviewOpen(false);
+                  }
+
+                  return nextOpen;
+                });
+              }}
             >
               Edit
             </button>
@@ -1412,6 +1555,147 @@ export function MenuEditor() {
           </div>
         ) : null}
       </div>
+      {dashboardOpen ? (
+        <>
+          <section className="control-center-analytics" aria-label="Control Center analytics">
+            {analyticsBlocks.map((block) => (
+              <article key={block.title} className="control-center-analytics__card">
+                <header className="control-center-analytics__header">
+                  <span className="control-center-analytics__icon" aria-hidden="true">
+                    {block.icon}
+                  </span>
+                  <h2>{block.title}</h2>
+                </header>
+                {block.title === "Active" && "stats" in block ? (
+                  <div className="control-center-analytics__stats">
+                    {block.stats.map((stat) => (
+                      <div
+                        key={stat.label}
+                        className={
+                          stat.label === "Revenue" || stat.label === "Orders"
+                            ? "control-center-analytics__stat control-center-analytics__stat--kpi"
+                            : "control-center-analytics__stat"
+                        }
+                      >
+                        <span className="control-center-analytics__stat-label">
+                          {stat.label}
+                        </span>
+                        <strong
+                          className={
+                            stat.label === "Revenue" || stat.label === "Orders"
+                              ? "control-center-analytics__stat-value control-center-analytics__stat-value--kpi"
+                              : "control-center-analytics__stat-value"
+                          }
+                        >
+                          {stat.label === "Orders"
+                            ? insightStats.orders || "—"
+                            : stat.label === "Active Orders"
+                              ? insightStats.activeOrders || "—"
+                            : stat.label === "Waiter Calls"
+                              ? insightStats.waiterCalls || "—"
+                              : stat.value || "—"}
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : block.title === "Today" ? (
+                <div className="control-center-analytics__stats">
+                  <div className="control-center-analytics__stat">
+                    <span className="control-center-analytics__stat-label">Top Dish</span>
+                    <strong className="control-center-analytics__stat-value control-center-analytics__stat-value--small">
+                      {insightStats.topDish || "—"}
+                    </strong>
+                    </div>
+                  <div className="control-center-analytics__stat">
+                    <span className="control-center-analytics__stat-label">Low Dish</span>
+                    <strong className="control-center-analytics__stat-value control-center-analytics__stat-value--small">
+                      {insightStats.lowDish || "—"}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="control-center-analytics__body" />
+                )}
+              </article>
+            ))}
+          </section>
+          <section className="control-center-charts" aria-label="Control Center charts">
+            <article className="control-center-chart">
+              <header className="control-center-analytics__header">
+                <span className="control-center-analytics__icon" aria-hidden="true">
+                  🟠
+                </span>
+                <h2>Orders by Hour</h2>
+              </header>
+              <div className="control-center-chart__plot">
+                {dashboardCharts.labels.length ? (
+                  dashboardCharts.labels.map((label, index) => {
+                    const value = dashboardCharts.ordersByHour[index] ?? 0;
+                    const maxValue = Math.max(...dashboardCharts.ordersByHour, 1);
+                    const height = value > 0 ? Math.max(12, (value / maxValue) * 100) : 8;
+
+                    return (
+                      <div key={label} className="control-center-chart__column">
+                        <span className="control-center-chart__value">{value}</span>
+                        <div
+                          className="control-center-chart__bar control-center-chart__bar--orders"
+                          style={{ height: `${height}%` }}
+                        />
+                        <span className="control-center-chart__label">{label}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="control-center-chart__empty">—</div>
+                )}
+              </div>
+            </article>
+            <article className="control-center-chart">
+              <header className="control-center-analytics__header">
+                <span className="control-center-analytics__icon" aria-hidden="true">
+                  🔵
+                </span>
+                <h2>Revenue Trend</h2>
+              </header>
+              <div className="control-center-chart__plot">
+                {dashboardCharts.labels.length ? (
+                  dashboardCharts.labels.map((label, index) => {
+                    const value = dashboardCharts.revenueTrend[index] ?? 0;
+                    const maxValue = Math.max(...dashboardCharts.revenueTrend, 1);
+                    const height = value > 0 ? Math.max(12, (value / maxValue) * 100) : 8;
+
+                    return (
+                      <div key={label} className="control-center-chart__column">
+                        <span className="control-center-chart__value">
+                          {value ? formatCurrency(value) : "—"}
+                        </span>
+                        <div
+                          className="control-center-chart__bar control-center-chart__bar--revenue"
+                          style={{ height: `${height}%` }}
+                        />
+                        <span className="control-center-chart__label">{label}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="control-center-chart__empty">—</div>
+                )}
+              </div>
+            </article>
+          </section>
+          <section className="control-center-suggestions" aria-label="Dashboard suggestions">
+            <article className="control-center-analytics__card">
+              <header className="control-center-analytics__header">
+                <span className="control-center-analytics__icon" aria-hidden="true">
+                  🧠
+                </span>
+                <h2>Suggestions</h2>
+              </header>
+              <div className="control-center-analytics__body" />
+            </article>
+          </section>
+        </>
+      ) : null}
       {message ? <p className="status-message">{message}</p> : null}
       {previewOpen ? (
         <section className="menu-editor__preview">

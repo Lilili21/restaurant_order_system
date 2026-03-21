@@ -6,7 +6,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 7,
-      "status": "new",
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T07:52:17.668Z",
       "updatedAt": "2026-03-21T07:52:17.668Z",
@@ -20,7 +20,7 @@
           "volumeLabel": "",
           "price": 50,
           "quantity": 2,
-          "served": false
+          "served": true
         }
       ],
       "total": 100
