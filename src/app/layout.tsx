@@ -14,15 +14,22 @@ export default function RootLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const shouldLoadVercelScripts =
+    process.env.NODE_ENV === "production" && process.env.VERCEL === "1";
+
   return (
     <html lang="ru">
       <body>
         {children}
-        <Script src="/_vercel/insights/script.js" strategy="afterInteractive" />
-        <Script
-          src="/_vercel/speed-insights/script.js"
-          strategy="afterInteractive"
-        />
+        {shouldLoadVercelScripts ? (
+          <>
+            <Script src="/_vercel/insights/script.js" strategy="afterInteractive" />
+            <Script
+              src="/_vercel/speed-insights/script.js"
+              strategy="afterInteractive"
+            />
+          </>
+        ) : null}
       </body>
     </html>
   );

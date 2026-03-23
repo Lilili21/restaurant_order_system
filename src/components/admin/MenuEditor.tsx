@@ -1,10 +1,13 @@
 "use client";
 
-import { ChangeEvent, useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
-import { TableCountControl } from "@/components/admin/TableCountControl";
-import { WorkingHoursControl } from "@/components/admin/WorkingHoursControl";
+import { ControlCenterDashboard } from "@/components/admin/ControlCenterDashboard";
+import { MenuAlertsPanel } from "@/components/admin/MenuAlertsPanel";
+import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
+import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
+import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
 import {
   MenuBadge,
@@ -73,22 +76,9 @@ const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
   (category) => category !== "drinks" && !drinkCategories.includes(category)
 );
 const allDrinkCategories = [...drinkCategories];
-const analyticsBlocks = [
-  {
-    icon: "🟢",
-    title: "Live status",
-    stats: [
-      { label: "Revenue", value: "—" },
-      { label: "Avg Check", value: "—" },
-      { label: "Orders", value: "—" },
-      { label: "Active Orders", value: "—" },
-      { label: "Waiter Calls", value: "—" }
-    ]
-  },
-  { icon: "🟡", title: "Daily status" }
-] as const;
-
 type InsightStats = {
+  revenue: string;
+  avgCheck: string;
   orders: string;
   activeOrders: string;
   topDish: string;
@@ -307,7 +297,7 @@ function hasInvalidDrinkVolumeRows(value: string) {
 }
 
 export function MenuEditor() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [authOpen, setAuthOpen] = useState(true);
   const [login, setLogin] = useState("");
@@ -338,6 +328,8 @@ export function MenuEditor() {
   const [barOpenSaving, setBarOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [insightStats, setInsightStats] = useState<InsightStats>({
+    revenue: "—",
+    avgCheck: "—",
     orders: "—",
     activeOrders: "—",
     topDish: "—",
@@ -388,12 +380,18 @@ export function MenuEditor() {
     available: true,
     saving: false
   });
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const restaurantSlug =
-    pathSegments.length >= 2 && pathSegments[1] === "admin"
-      ? pathSegments[0]
-      : "olive-bistro";
-  const menuPreviewHref = `/${restaurantSlug}/menu/0`;
+  const pathSegments = useMemo(
+    () => pathname.split("/").filter(Boolean),
+    [pathname]
+  );
+  const restaurantSlug = useMemo(
+    () =>
+      pathSegments.length >= 2 && pathSegments[1] === "admin"
+        ? pathSegments[0]
+        : "olive-bistro",
+    [pathSegments]
+  );
+  const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
 
   useEffect(() => {
     if (!isAuthorized || !secondaryCredentials) {
@@ -509,6 +507,14 @@ export function MenuEditor() {
         };
 
         setInsightStats({
+          revenue:
+            typeof analytics.insights?.revenue === "number"
+              ? formatCurrency(analytics.insights.revenue)
+              : "—",
+          avgCheck:
+            typeof analytics.insights?.avgCheck === "number"
+              ? formatCurrency(analytics.insights.avgCheck)
+              : "—",
           orders:
             analytics.insights?.orders !== undefined
               ? String(analytics.insights.orders)
@@ -539,8 +545,13 @@ export function MenuEditor() {
 
     load();
 
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, 60_000);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [isAuthorized, secondaryCredentials]);
 
@@ -606,7 +617,7 @@ export function MenuEditor() {
     window.location.href = `/${restaurantSlug}/waiter/orders`;
   }
 
-  function updateDraft(
+  const updateDraft = useCallback(function updateDraft(
     itemId: string,
     field:
       | "draftNameHe"
@@ -627,9 +638,9 @@ export function MenuEditor() {
         item.id === itemId ? { ...item, [field]: value } : item
       )
     );
-  }
+  }, []);
 
-  function updateNewItem(
+  const updateNewItem = useCallback(function updateNewItem(
     field: keyof NewMenuItemDraft,
     value: string | boolean | MenuBadge[]
   ) {
@@ -637,23 +648,29 @@ export function MenuEditor() {
       ...current,
       [field]: value
     }));
-  }
+  }, []);
 
-  function clearExistingImage(itemId: string) {
+  const clearExistingImage = useCallback(
+    function clearExistingImage(itemId: string) {
     updateDraft(itemId, "draftImage", "");
     setMessage("Image removed.");
-  }
+    },
+    [updateDraft]
+  );
 
-  function toggleNewBadge(badge: MenuBadge) {
+  const toggleNewBadge = useCallback(function toggleNewBadge(badge: MenuBadge) {
     setNewItem((current) => ({
       ...current,
       badges: current.badges.includes(badge)
         ? current.badges.filter((value) => value !== badge)
         : [...current.badges, badge]
     }));
-  }
+  }, []);
 
-  function toggleItemBadge(itemId: string, badge: MenuBadge) {
+  const toggleItemBadge = useCallback(function toggleItemBadge(
+    itemId: string,
+    badge: MenuBadge
+  ) {
     setItems((current) =>
       current.map((item) =>
         item.id === itemId
@@ -666,14 +683,14 @@ export function MenuEditor() {
           : item
       )
     );
-  }
+  }, []);
 
-  function clearNewImage() {
+  const clearNewImage = useCallback(function clearNewImage() {
     updateNewItem("image", "");
     setMessage("Image removed.");
-  }
+  }, [updateNewItem]);
 
-  async function uploadExistingImage(
+  const uploadExistingImage = useCallback(async function uploadExistingImage(
     itemId: string,
     event: ChangeEvent<HTMLInputElement>
   ) {
@@ -694,9 +711,11 @@ export function MenuEditor() {
     } finally {
       event.target.value = "";
     }
-  }
+  }, [updateDraft]);
 
-  async function uploadNewImage(event: ChangeEvent<HTMLInputElement>) {
+  const uploadNewImage = useCallback(async function uploadNewImage(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -714,15 +733,15 @@ export function MenuEditor() {
     } finally {
       event.target.value = "";
     }
-  }
+  }, [updateNewItem]);
 
-  function toggleAvailability(itemId: string) {
+  const toggleAvailability = useCallback(function toggleAvailability(itemId: string) {
     setItems((current) =>
       current.map((item) =>
         item.id === itemId ? { ...item, available: !item.available } : item
       )
     );
-  }
+  }, []);
 
   async function toggleKitchenLoadWarning(nextValue: boolean) {
     setKitchenLoadWarningEnabled(nextValue);
@@ -857,20 +876,23 @@ export function MenuEditor() {
     setHappyHourSaving(false);
   }
 
-  function openHappyHourModal() {
+  const openHappyHourModal = useCallback(function openHappyHourModal() {
     setHappyHourDraftText(happyHourText);
     setHappyHourDraftCategories(happyHourCategories);
     setHappyHourDraftDiscountPercent(happyHourDiscountPercent || "0");
     setHappyHourModalOpen(true);
-  }
+  }, [happyHourCategories, happyHourDiscountPercent, happyHourText]);
 
-  function toggleHappyHourDraftCategory(category: MenuCategory) {
+  const toggleHappyHourDraftCategory = useCallback(
+    function toggleHappyHourDraftCategory(category: MenuCategory) {
     setHappyHourDraftCategories((current) =>
       current.includes(category)
         ? current.filter((value) => value !== category)
         : [...current, category]
     );
-  }
+    },
+    []
+  );
 
   async function saveHappyHourModal() {
     await saveHappyHourSettings(
@@ -1196,6 +1218,217 @@ export function MenuEditor() {
     setMessage("Dish deleted.");
   }
 
+  const visibleCategories = useMemo(
+    () =>
+      (Object.entries(categoryLabels) as Array<[MenuCategory, string]>).filter(
+        ([value]) =>
+          selectedKind === "drinks"
+            ? drinkCategories.includes(value)
+            : value !== "drinks" && !drinkCategories.includes(value)
+      ),
+    [selectedKind]
+  );
+
+  const filteredItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          (selectedKind === "drinks"
+            ? drinkCategories.includes(item.category)
+            : !drinkCategories.includes(item.category)) &&
+          (selectedCategories.length === 0 ||
+            selectedCategories.includes(item.category))
+      ),
+    [items, selectedCategories, selectedKind]
+  );
+
+  const toggleCategory = useCallback(function toggleCategory(category: MenuCategory) {
+    setSelectedCategories((current) =>
+      current.includes(category)
+        ? current.filter((value) => value !== category)
+        : [...current, category]
+    );
+  }, []);
+
+  const getItemLanguage = useCallback(function getItemLanguage(itemId: string) {
+    return itemLanguages[itemId] ?? "he";
+  }, [itemLanguages]);
+
+  const setItemLanguage = useCallback(function setItemLanguage(
+    itemId: string,
+    language: "he" | "en"
+  ) {
+    setItemLanguages((current) => ({ ...current, [itemId]: language }));
+  }, []);
+
+  const setItemsCategoryDraft = useCallback(function setItemsCategoryDraft(
+    itemId: string,
+    nextCategory: MenuCategory
+  ) {
+    const nextKind = getItemKind(nextCategory);
+    const allowedBadges = getBadgeOptionsForKind(nextKind).map(
+      (badge) => badge.value
+    );
+
+    setItems((current) =>
+      current.map((currentItem) =>
+        currentItem.id === itemId
+          ? {
+              ...currentItem,
+              draftCategory: nextCategory,
+              draftVolumeOptionsText:
+                nextKind === "drinks" ? currentItem.draftVolumeOptionsText : "",
+              draftBadges: currentItem.draftBadges.filter((badge) =>
+                allowedBadges.includes(badge)
+              )
+            }
+          : currentItem
+      )
+    );
+  }, []);
+
+  const toggleItemDescription = useCallback(function toggleItemDescription(
+    itemId: string
+  ) {
+    setExpandedDescriptions((current) => ({
+      ...current,
+      [itemId]: !current[itemId]
+    }));
+  }, []);
+
+  const closeControlCenterPanels = useCallback(function closeControlCenterPanels() {
+    setDashboardOpen(false);
+    setMenuButtonsOpen(false);
+    setSettingsButtonsOpen(false);
+    setPreviewOpen(false);
+    setMenuOpen(false);
+    setNotificationsOpen(false);
+  }, []);
+
+  const toggleMenuBlock = useCallback(function toggleMenuBlock() {
+    setMenuButtonsOpen((current) => {
+      const nextOpen = !current;
+
+      if (!nextOpen) {
+        setPreviewOpen(false);
+        setMenuOpen(false);
+        setNotificationsOpen(false);
+      } else {
+        setDashboardOpen(false);
+        setSettingsButtonsOpen(false);
+        setNotificationsOpen(false);
+        setPreviewOpen(true);
+        setMenuOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const toggleSettingsBlock = useCallback(function toggleSettingsBlock() {
+    setSettingsButtonsOpen((current) => {
+      const nextOpen = !current;
+
+      if (!nextOpen) {
+        setNotificationsOpen(false);
+      } else {
+        setDashboardOpen(false);
+        setMenuButtonsOpen(false);
+        setPreviewOpen(false);
+        setMenuOpen(false);
+        setNotificationsOpen(true);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const toggleDashboardBlock = useCallback(function toggleDashboardBlock() {
+    setDashboardOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen) {
+        setMenuButtonsOpen(false);
+        setSettingsButtonsOpen(false);
+        setPreviewOpen(false);
+        setMenuOpen(false);
+        setNotificationsOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const selectDishes = useCallback(() => {
+    setSelectedKind("dishes");
+    setSelectedCategories([]);
+    setNewItem((current) => ({
+      ...current,
+      category: dishCategories.includes(current.category)
+        ? current.category
+        : "starters",
+      volumeOptionsText: "",
+      badges: current.badges.filter((badge) =>
+        getBadgeOptionsForKind("dishes").some((option) => option.value === badge)
+      )
+    }));
+  }, []);
+
+  const selectDrinks = useCallback(() => {
+    setSelectedKind("drinks");
+    setSelectedCategories([]);
+    setNewItem((current) => ({
+      ...current,
+      category: drinkCategories.includes(current.category)
+        ? current.category
+        : drinkCategories[0],
+      badges: current.badges.filter((badge) =>
+        getBadgeOptionsForKind("drinks").some((option) => option.value === badge)
+      )
+    }));
+  }, []);
+
+  const togglePreview = useCallback(() => {
+    setPreviewOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen) {
+        setMenuOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const toggleEdit = useCallback(() => {
+    setMenuOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen) {
+        setPreviewOpen(false);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const toggleNotifications = useCallback(
+    () => setNotificationsOpen((current) => !current),
+    []
+  );
+
+  const toggleCreateForm = useCallback(
+    () => setShowCreateForm((current) => !current),
+    []
+  );
+
+  const clearSelectedCategories = useCallback(() => setSelectedCategories([]), []);
+
+  const toggleNewDescription = useCallback(
+    () => setNewDescriptionExpanded((current) => !current),
+    []
+  );
+
   if (!isAuthorized && authOpen) {
     return (
       <div className="modal-backdrop" role="presentation">
@@ -1277,1432 +1510,120 @@ export function MenuEditor() {
     return <p className="muted">Loading menu...</p>;
   }
 
-  const visibleCategories = (Object.entries(categoryLabels) as Array<
-    [MenuCategory, string]
-  >).filter(([value]) =>
-    selectedKind === "drinks"
-      ? drinkCategories.includes(value)
-      : value !== "drinks" && !drinkCategories.includes(value)
-  );
-
-  const filteredItems = items.filter((item) =>
-    (selectedKind === "drinks"
-      ? drinkCategories.includes(item.category)
-      : !drinkCategories.includes(item.category)) &&
-    (selectedCategories.length === 0
-      ? true
-      : selectedCategories.includes(item.category))
-  );
-
-  function toggleCategory(category: MenuCategory) {
-    setSelectedCategories((current) =>
-      current.includes(category)
-        ? current.filter((value) => value !== category)
-        : [...current, category]
-    );
-  }
-
-  function getItemLanguage(itemId: string) {
-    return itemLanguages[itemId] ?? "he";
-  }
-
-  function setItemLanguage(itemId: string, language: "he" | "en") {
-    setItemLanguages((current) => ({ ...current, [itemId]: language }));
-  }
-
-  function toggleItemDescription(itemId: string) {
-    setExpandedDescriptions((current) => ({
-      ...current,
-      [itemId]: !current[itemId]
-    }));
-  }
-
-  function closeControlCenterPanels() {
-    setDashboardOpen(false);
-    setMenuButtonsOpen(false);
-    setSettingsButtonsOpen(false);
-    setPreviewOpen(false);
-    setMenuOpen(false);
-    setNotificationsOpen(false);
-  }
-
-  function toggleMenuBlock() {
-    setMenuButtonsOpen((current) => {
-      const nextOpen = !current;
-
-      if (!nextOpen) {
-        setPreviewOpen(false);
-        setMenuOpen(false);
-        setNotificationsOpen(false);
-      } else {
-        setDashboardOpen(false);
-        setSettingsButtonsOpen(false);
-        setNotificationsOpen(false);
-      }
-
-      return nextOpen;
-    });
-  }
-
-  function toggleSettingsBlock() {
-    setSettingsButtonsOpen((current) => {
-      const nextOpen = !current;
-
-      if (!nextOpen) {
-        setNotificationsOpen(false);
-      } else {
-        setDashboardOpen(false);
-        setMenuButtonsOpen(false);
-        setPreviewOpen(false);
-        setMenuOpen(false);
-      }
-
-      return nextOpen;
-    });
-  }
-
-  function toggleDashboardBlock() {
-    setDashboardOpen((current) => {
-      const nextOpen = !current;
-
-      if (nextOpen) {
-        setMenuButtonsOpen(false);
-        setSettingsButtonsOpen(false);
-        setPreviewOpen(false);
-        setMenuOpen(false);
-        setNotificationsOpen(false);
-      }
-
-      return nextOpen;
-    });
-  }
-
   return (
     <div className="orders-layout">
-      <div className="menu-editor__toolbar">
-        <div className="menu-editor__toolbar-row">
-          <button
-            className={
-              dashboardOpen
-                ? "admin-menu-bubble admin-menu-bubble--active admin-menu-bubble--dashboard"
-                : "admin-menu-bubble admin-menu-bubble--dashboard"
-            }
-            type="button"
-            onClick={toggleDashboardBlock}
-          >
-            Dashboard
-          </button>
-          <button
-            className="admin-menu-bubble admin-menu-bubble--live-orders"
-            type="button"
-            disabled={waiterRedirecting}
-            onClick={() => {
-              closeControlCenterPanels();
-              void openWaiterPanel();
-            }}
-          >
-            Live Orders
-          </button>
-          {secondaryCredentials ? (
-            <TableCountControl
-              credentials={secondaryCredentials}
-              restaurantSlug={restaurantSlug}
-              onOpen={closeControlCenterPanels}
-            />
-          ) : null}
-          <button
-            className={
-              menuButtonsOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={toggleMenuBlock}
-          >
-            Menu
-          </button>
-          <button
-            className={
-              settingsButtonsOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={toggleSettingsBlock}
-          >
-            Settings
-          </button>
-        </div>
-        {menuButtonsOpen ? (
-          <div className="menu-editor__toolbar-row">
-            <button
-              className={
-                previewOpen
-                  ? "admin-menu-bubble admin-menu-bubble--active"
-                  : "admin-menu-bubble"
-              }
-              type="button"
-              onClick={() => {
-                setPreviewOpen((current) => {
-                  const nextOpen = !current;
-
-                  if (nextOpen) {
-                    setMenuOpen(false);
-                  }
-
-                  return nextOpen;
-                });
-              }}
-            >
-              Preview
-            </button>
-            <button
-              className={
-                menuOpen
-                  ? "admin-menu-bubble admin-menu-bubble--active"
-                  : "admin-menu-bubble"
-              }
-              type="button"
-              onClick={() => {
-                setMenuOpen((current) => {
-                  const nextOpen = !current;
-
-                  if (nextOpen) {
-                    setPreviewOpen(false);
-                  }
-
-                  return nextOpen;
-                });
-              }}
-            >
-              Edit
-            </button>
-          </div>
-        ) : null}
-        {settingsButtonsOpen ? (
-          <div className="menu-editor__toolbar-row">
-            {secondaryCredentials ? (
-              <WorkingHoursControl credentials={secondaryCredentials} />
-            ) : null}
-            <button
-              className={
-                notificationsOpen
-                  ? "admin-menu-bubble admin-menu-bubble--active"
-                  : "admin-menu-bubble"
-              }
-              type="button"
-              onClick={() => setNotificationsOpen((current) => !current)}
-            >
-              Alarm
-            </button>
-          </div>
-        ) : null}
-        {menuOpen ? (
-          <div className="menu-editor__toolbar-row">
-            <div className="admin-switch menu-editor__kind-switch">
-              <button
-                type="button"
-                className={
-                  selectedKind === "dishes"
-                    ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes admin-switch__item--active"
-                    : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes"
-                }
-                onClick={() => {
-                  setSelectedKind("dishes");
-                  setSelectedCategories([]);
-                  setNewItem((current) => ({
-                    ...current,
-                    category: dishCategories.includes(current.category)
-                      ? current.category
-                      : "starters",
-                    volumeOptionsText: "",
-                    badges: current.badges.filter((badge) =>
-                      getBadgeOptionsForKind("dishes").some(
-                        (option) => option.value === badge
-                      )
-                    )
-                  }));
-                }}
-              >
-                Dishes
-              </button>
-              <button
-                type="button"
-                className={
-                  selectedKind === "drinks"
-                    ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks admin-switch__item--active"
-                    : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks"
-                }
-                onClick={() => {
-                  setSelectedKind("drinks");
-                  setSelectedCategories([]);
-                  setNewItem((current) => ({
-                    ...current,
-                    category: drinkCategories.includes(current.category)
-                      ? current.category
-                      : drinkCategories[0],
-                    badges: current.badges.filter((badge) =>
-                      getBadgeOptionsForKind("drinks").some(
-                        (option) => option.value === badge
-                      )
-                    )
-                  }));
-                }}
-              >
-                Drinks
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      <ControlCenterToolbar
+        dashboardOpen={dashboardOpen}
+        onToggleDashboard={toggleDashboardBlock}
+        waiterRedirecting={waiterRedirecting}
+        onOpenLiveOrders={() => {
+          closeControlCenterPanels();
+          void openWaiterPanel();
+        }}
+        menuButtonsOpen={menuButtonsOpen}
+        onToggleMenu={toggleMenuBlock}
+        settingsButtonsOpen={settingsButtonsOpen}
+        onToggleSettings={toggleSettingsBlock}
+        previewOpen={previewOpen}
+        onTogglePreview={togglePreview}
+        menuOpen={menuOpen}
+        onToggleEdit={toggleEdit}
+        secondaryCredentials={secondaryCredentials}
+        restaurantSlug={restaurantSlug}
+        notificationsOpen={notificationsOpen}
+        onToggleNotifications={toggleNotifications}
+        selectedKind={selectedKind}
+        onSelectDishes={selectDishes}
+        onSelectDrinks={selectDrinks}
+      />
       {dashboardOpen ? (
-        <>
-          <section className="control-center-analytics" aria-label="Control Center analytics">
-            {analyticsBlocks.map((block) => (
-              <article key={block.title} className="control-center-analytics__card">
-                <header className="control-center-analytics__header">
-                  <span className="control-center-analytics__icon" aria-hidden="true">
-                    {block.icon}
-                  </span>
-                  <h2>{block.title}</h2>
-                </header>
-              {block.title === "Live status" && "stats" in block ? (
-                  <div className="control-center-analytics__stats">
-                    {block.stats.map((stat) => (
-                      <div
-                        key={stat.label}
-                        className={
-                          stat.label === "Revenue" || stat.label === "Orders"
-                            ? "control-center-analytics__stat control-center-analytics__stat--kpi"
-                            : "control-center-analytics__stat"
-                        }
-                      >
-                        <span className="control-center-analytics__stat-label">
-                          {stat.label}
-                        </span>
-                        <strong
-                          className={
-                            stat.label === "Revenue" || stat.label === "Orders"
-                              ? "control-center-analytics__stat-value control-center-analytics__stat-value--kpi"
-                              : "control-center-analytics__stat-value"
-                          }
-                        >
-                          {stat.label === "Orders"
-                            ? insightStats.orders || "—"
-                            : stat.label === "Active Orders"
-                              ? insightStats.activeOrders || "—"
-                            : stat.label === "Waiter Calls"
-                              ? insightStats.waiterCalls || "—"
-                              : stat.value || "—"}
-                        </strong>
-                      </div>
-                    ))}
-                  </div>
-              ) : block.title === "Daily status" ? (
-                <div className="control-center-analytics__stats">
-                  <div className="control-center-analytics__stat">
-                    <span className="control-center-analytics__stat-label">Top Dish</span>
-                    <strong className="control-center-analytics__stat-value control-center-analytics__stat-value--small">
-                      {insightStats.topDish || "—"}
-                    </strong>
-                    </div>
-                  <div className="control-center-analytics__stat">
-                    <span className="control-center-analytics__stat-label">Low Dish</span>
-                    <strong className="control-center-analytics__stat-value control-center-analytics__stat-value--small">
-                      {insightStats.lowDish || "—"}
-                    </strong>
-                  </div>
-                </div>
-              ) : (
-                <div className="control-center-analytics__body" />
-                )}
-              </article>
-            ))}
-          </section>
-          <section className="control-center-charts" aria-label="Control Center charts">
-            <article className="control-center-chart">
-              <header className="control-center-analytics__header">
-                <span className="control-center-analytics__icon" aria-hidden="true">
-                  🟠
-                </span>
-                <h2>Orders by Hour</h2>
-              </header>
-              <div className="control-center-chart__plot">
-                {dashboardCharts.labels.length ? (
-                  dashboardCharts.labels.map((label, index) => {
-                    const value = dashboardCharts.ordersByHour[index] ?? 0;
-                    const maxValue = Math.max(...dashboardCharts.ordersByHour, 1);
-                    const height = value > 0 ? Math.max(12, (value / maxValue) * 100) : 8;
-
-                    return (
-                      <div key={label} className="control-center-chart__column">
-                        <span className="control-center-chart__value">{value}</span>
-                        <div
-                          className="control-center-chart__bar control-center-chart__bar--orders"
-                          style={{ height: `${height}%` }}
-                        />
-                        <span className="control-center-chart__label">{label}</span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="control-center-chart__empty">—</div>
-                )}
-              </div>
-            </article>
-            <article className="control-center-chart">
-              <header className="control-center-analytics__header">
-                <span className="control-center-analytics__icon" aria-hidden="true">
-                  🔵
-                </span>
-                <h2>Revenue Trend</h2>
-              </header>
-              <div className="control-center-chart__plot">
-                {dashboardCharts.labels.length ? (
-                  dashboardCharts.labels.map((label, index) => {
-                    const value = dashboardCharts.revenueTrend[index] ?? 0;
-                    const maxValue = Math.max(...dashboardCharts.revenueTrend, 1);
-                    const height = value > 0 ? Math.max(12, (value / maxValue) * 100) : 8;
-
-                    return (
-                      <div key={label} className="control-center-chart__column">
-                        <span className="control-center-chart__value">
-                          {value ? formatCurrency(value) : "—"}
-                        </span>
-                        <div
-                          className="control-center-chart__bar control-center-chart__bar--revenue"
-                          style={{ height: `${height}%` }}
-                        />
-                        <span className="control-center-chart__label">{label}</span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="control-center-chart__empty">—</div>
-                )}
-              </div>
-            </article>
-          </section>
-          <section className="control-center-suggestions" aria-label="Dashboard suggestions">
-            <article className="control-center-analytics__card">
-              <header className="control-center-analytics__header">
-                <span className="control-center-analytics__icon" aria-hidden="true">
-                  🧠
-                </span>
-                <h2>Suggestions</h2>
-              </header>
-              <div className="control-center-analytics__body" />
-            </article>
-          </section>
-        </>
+        <ControlCenterDashboard
+          insightStats={insightStats}
+          dashboardCharts={dashboardCharts}
+        />
       ) : null}
       {message ? <p className="status-message">{message}</p> : null}
-      {previewOpen ? (
-        <section className="menu-editor__preview">
-          <iframe
-            className="menu-editor__preview-frame"
-            src={menuPreviewHref}
-            title="Menu preview"
-            loading="lazy"
-          />
-        </section>
-      ) : null}
-      {happyHourModalOpen ? (
-        <div className="modal-backdrop" role="presentation">
-          <div className="modal-card modal-card--form" role="dialog" aria-modal="true">
-            <h2>Happy hour</h2>
-            <div className="menu-editor__form">
-              <label className="menu-editor__field">
-                <span>Text</span>
-                <textarea
-                  className="modal-input menu-notice-control__inline-textarea"
-                  value={happyHourDraftText}
-                  placeholder="happy hour"
-                  rows={2}
-                  disabled={happyHourSaving}
-                  onChange={(event) => setHappyHourDraftText(event.target.value)}
-                />
-              </label>
-
-              <label className="menu-editor__field">
-                <span>Discount %</span>
-                <input
-                  className="modal-input"
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  value={happyHourDraftDiscountPercent}
-                  disabled={happyHourSaving}
-                  onChange={(event) =>
-                    setHappyHourDraftDiscountPercent(event.target.value)
-                  }
-                />
-              </label>
-
-              <div className="menu-editor__field">
-                <span>Categories (multiple)</span>
-                <div className="menu-editor__field">
-                  <span>Dishes</span>
-                  <div className="orders-filter__chips">
-                    {dishCategories.map((category) => (
-                      <button
-                        key={`happy-hour-dish-${category}`}
-                        type="button"
-                        className={
-                          happyHourDraftCategories.includes(category)
-                            ? "orders-filter__chip orders-filter__chip--active"
-                            : "orders-filter__chip"
-                        }
-                        onClick={() => toggleHappyHourDraftCategory(category)}
-                        disabled={happyHourSaving}
-                      >
-                        {categoryLabels[category]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="menu-editor__field">
-                  <span>Drinks</span>
-                  <div className="orders-filter__chips">
-                    {allDrinkCategories.map((category) => (
-                      <button
-                        key={`happy-hour-drink-${category}`}
-                        type="button"
-                        className={
-                          happyHourDraftCategories.includes(category)
-                            ? "orders-filter__chip orders-filter__chip--active"
-                            : "orders-filter__chip"
-                        }
-                        onClick={() => toggleHappyHourDraftCategory(category)}
-                        disabled={happyHourSaving}
-                      >
-                        {categoryLabels[category]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button
-                className="button-danger"
-                type="button"
-                onClick={() => setHappyHourModalOpen(false)}
-                disabled={happyHourSaving}
-              >
-                ✕
-              </button>
-              <button
-                className="button-success"
-                type="button"
-                onClick={() => void saveHappyHourModal()}
-                disabled={happyHourSaving}
-              >
-                ✓
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {notificationsOpen ? (
-        <>
-          <div className="menu-notice-control menu-notice-control--inline">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={kitchenLoadWarningEnabled}
-                disabled={kitchenLoadWarningSaving}
-                onChange={(event) =>
-                  void toggleKitchenLoadWarning(event.target.checked)
-                }
-              />
-              <span
-                className={
-                  kitchenLoadWarningEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.
-              </span>
-            </label>
-          </div>
-          <div className="menu-notice-control menu-notice-control--inline">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={happyHourEnabled}
-                disabled={happyHourSaving}
-                onChange={(event) =>
-                  void saveHappyHourSettings(
-                    event.target.checked,
-                    happyHourText,
-                    happyHourCategories,
-                    happyHourDiscountPercent,
-                    happyHourStartsFrom,
-                    happyHourUntil
-                  )
-                }
-              />
-              <span
-                className={
-                  happyHourEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Promo
-              </span>
-            </label>
-            <button
-              type="button"
-              className={
-                happyHourModalOpen
-                  ? "admin-menu-bubble admin-menu-bubble--active"
-                  : "admin-menu-bubble"
-              }
-              onClick={openHappyHourModal}
-              disabled={happyHourSaving}
-            >
-              Happy hour
-            </button>
-            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
-              <span>Starts from</span>
-              <div className="menu-time-input">
-                <input
-                  className="modal-input"
-                  type="time"
-                  value={happyHourStartsFrom}
-                  placeholder="HH:MM"
-                  disabled={happyHourSaving}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setHappyHourStartsFrom(nextValue);
-
-                    if (happyHourEnabled) {
-                      void saveHappyHourSettings(
-                        true,
-                        happyHourText,
-                        happyHourCategories,
-                        happyHourDiscountPercent,
-                        nextValue,
-                        happyHourUntil
-                      );
-                    }
-                  }}
-                />
-              </div>
-            </label>
-            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
-              <span>Until</span>
-              <div className="menu-time-input">
-                <input
-                  className="modal-input"
-                  type="time"
-                  value={happyHourUntil}
-                  placeholder="HH:MM"
-                  disabled={happyHourSaving}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setHappyHourUntil(nextValue);
-
-                    if (happyHourEnabled) {
-                      void saveHappyHourSettings(
-                        true,
-                        happyHourText,
-                        happyHourCategories,
-                        happyHourDiscountPercent,
-                        happyHourStartsFrom,
-                        nextValue
-                      );
-                    }
-                  }}
-                />
-              </div>
-            </label>
-            {happyHourEnabled ? (
-              <p className="muted">
-                {happyHourText || "happy hour"} · -{happyHourDiscountPercent || "0"}% ·{" "}
-                {happyHourCategories.length} categories
-              </p>
-            ) : null}
-          </div>
-          <div className="menu-notice-control menu-notice-control--inline">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={kitchenOpenEnabled}
-                disabled={kitchenOpenSaving}
-                onChange={(event) =>
-                  void saveKitchenOpenSettings(
-                    event.target.checked,
-                    kitchenOpenUntil
-                  )
-                }
-              />
-              <span
-                className={
-                  kitchenOpenEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Kitchen open
-              </span>
-            </label>
-            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
-              <span>Until</span>
-              <div className="menu-time-input">
-                <input
-                  className="modal-input"
-                  type="time"
-                  value={kitchenOpenUntil}
-                  placeholder="HH:MM"
-                  disabled={kitchenOpenSaving}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setKitchenOpenUntil(nextValue);
-
-                    if (kitchenOpenEnabled) {
-                      void saveKitchenOpenSettings(true, nextValue);
-                    }
-                  }}
-                />
-              </div>
-            </label>
-          </div>
-          <div className="menu-notice-control menu-notice-control--inline">
-            <label className="menu-notice-control__toggle">
-              <input
-                type="checkbox"
-                checked={barOpenEnabled}
-                disabled={barOpenSaving}
-                onChange={(event) =>
-                  void saveBarOpenSettings(event.target.checked, barOpenUntil)
-                }
-              />
-              <span
-                className={
-                  barOpenEnabled
-                    ? "menu-notice-control__text menu-notice-control__text--neutral-active"
-                    : "menu-notice-control__text"
-                }
-              >
-                Bar open
-              </span>
-            </label>
-            <label className="menu-settings-panel__field menu-settings-panel__field--compact">
-              <span>Until</span>
-              <div className="menu-time-input">
-                <input
-                  className="modal-input"
-                  type="time"
-                  value={barOpenUntil}
-                  placeholder="HH:MM"
-                  disabled={barOpenSaving}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setBarOpenUntil(nextValue);
-
-                    if (barOpenEnabled) {
-                      void saveBarOpenSettings(true, nextValue);
-                    }
-                  }}
-                />
-              </div>
-            </label>
-          </div>
-        </>
-      ) : null}
-      {menuOpen ? (
-        <>
-          <div className="menu-editor__create">
-            <button
-              className="button-success"
-              type="button"
-              onClick={() => setShowCreateForm((current) => !current)}
-            >
-              {showCreateForm ? "Hide form" : "Add new"}
-            </button>
-          </div>
-          <div className="orders-filter">
-            <div className="orders-filter__chips">
-              <button
-                type="button"
-                className={
-                  selectedCategories.length === 0
-                    ? "orders-filter__chip orders-filter__chip--active"
-                    : "orders-filter__chip"
-                }
-                onClick={() => setSelectedCategories([])}
-              >
-                {selectedKind === "drinks" ? "All drinks" : "All dishes"}
-              </button>
-              {visibleCategories.map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={
-                      selectedCategories.includes(value)
-                        ? "orders-filter__chip orders-filter__chip--active"
-                        : "orders-filter__chip"
-                    }
-                    onClick={() => toggleCategory(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-            </div>
-          </div>
-          <div className="orders-grid">
-        {showCreateForm ? (
-        <article className="order-card">
-          <h3>Add new</h3>
-
-          <div className="menu-editor__form">
-            <div className="menu-editor__top-row">
-              <div className="menu-editor__language-block">
-                <div className="menu-editor__language-toggle" role="tablist" aria-label="Dish language">
-                  <button
-                    type="button"
-                    className={
-                      newItemLanguage === "he"
-                        ? "menu-editor__language-chip menu-editor__language-chip--active"
-                        : "menu-editor__language-chip"
-                    }
-                    onClick={() => setNewItemLanguage("he")}
-                  >
-                    HE
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      newItemLanguage === "en"
-                        ? "menu-editor__language-chip menu-editor__language-chip--active"
-                        : "menu-editor__language-chip"
-                    }
-                    onClick={() => setNewItemLanguage("en")}
-                  >
-                    EN
-                  </button>
-                </div>
-                <input
-                  className="modal-input"
-                  type="text"
-                  placeholder={newItemLanguage === "he" ? "שם המנה" : "Dish name"}
-                  value={newItemLanguage === "he" ? newItem.nameHe : newItem.nameEn}
-                  onChange={(event) =>
-                    updateNewItem(
-                      newItemLanguage === "he" ? "nameHe" : "nameEn",
-                      event.target.value
-                    )
-                  }
-                  dir={newItemLanguage === "he" ? "rtl" : "ltr"}
-                />
-              </div>
-              <label className="menu-editor__availability-toggle">
-                <input
-                  type="checkbox"
-                  checked={newItem.available}
-                  onChange={(event) =>
-                    updateNewItem("available", event.target.checked)
-                  }
-                />
-                <span className="status-pill menu-editor__availability status-pill--served">
-                  Available
-                </span>
-              </label>
-            </div>
-
-            <select
-              className="modal-input"
-              value={newItem.category}
-              onChange={(event) =>
-                updateNewItem("category", event.target.value as MenuCategory)
-              }
-            >
-              {getCategoryOptions(selectedKind).map((value) => (
-                  <option key={value} value={value}>
-                    {categoryLabels[value]}
-                  </option>
-                ))}
-            </select>
-
-            <div className="menu-editor__description-block">
-              <button
-                className="menu-editor__description-toggle"
-                type="button"
-                onClick={() => setNewDescriptionExpanded((current) => !current)}
-              >
-                {newDescriptionExpanded ? "Hide description" : "Show description"}
-              </button>
-            {newDescriptionExpanded ? (
-                <textarea
-                  className="modal-input menu-editor__textarea"
-                  placeholder={newItemLanguage === "he" ? "תיאור" : "Description"}
-                  value={
-                    newItemLanguage === "he"
-                      ? newItem.descriptionHe
-                      : newItem.descriptionEn
-                  }
-                  dir={newItemLanguage === "he" ? "rtl" : "ltr"}
-                  onChange={(event) =>
-                    updateNewItem(
-                      newItemLanguage === "he"
-                        ? "descriptionHe"
-                        : "descriptionEn",
-                      event.target.value
-                    )
-                  }
-                />
-              ) : null}
-            </div>
-
-            <label className="menu-editor__toggle">
-              <input
-                type="checkbox"
-                checked={newItem.showImage}
-                onChange={(event) =>
-                  updateNewItem("showImage", event.target.checked)
-                }
-              />
-              <span>Image</span>
-            </label>
-
-            {newItem.showImage ? (
-              <div className="menu-editor__upload">
-                <label className="button-neutral menu-editor__upload-icon">
-                  <svg
-                    className="menu-editor__upload-svg"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <input
-                    className="menu-editor__file-input"
-                    type="file"
-                    accept="image/*"
-                    onChange={uploadNewImage}
-                  />
-                </label>
-                <div className="menu-editor__upload-state" />
-                <button
-                  className="button-neutral menu-editor__upload-icon"
-                  type="button"
-                  onClick={clearNewImage}
-                  disabled={!newItem.image}
-                >
-                  <svg
-                    className="menu-editor__upload-svg"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ) : null}
-
-            {selectedKind === "drinks" ? (
-              <div className="menu-editor__volume-options">
-                <div className="menu-editor__field">
-                  <span className="menu-editor__volume-label">
-                    <span>Volumes and prices</span>
-                    <span className="menu-editor__volume-actions">
-                      <button
-                        className="menu-editor__volume-add"
-                        type="button"
-                        onClick={() =>
-                          updateNewItem(
-                            "volumeOptionsText",
-                            removeVolumeRow(newItem.volumeOptionsText)
-                          )
-                        }
-                      >
-                        -
-                      </button>
-                      <button
-                        className="menu-editor__volume-add"
-                        type="button"
-                        onClick={() =>
-                          updateNewItem(
-                            "volumeOptionsText",
-                            addVolumeRow(newItem.volumeOptionsText)
-                          )
-                        }
-                      >
-                        +
-                      </button>
-                    </span>
-                  </span>
-                  <div className="menu-editor__volume-grid">
-                    {(parseVolumeRows(newItem.volumeOptionsText).length
-                      ? parseVolumeRows(newItem.volumeOptionsText)
-                      : [{ label: "", price: "" }]
-                    ).map((row, index) => (
-                      <div key={`new-volume-${index}`} className="menu-editor__volume-row">
-                        <input
-                          className="modal-input"
-                          type="text"
-                          placeholder="Volume"
-                          value={row.label}
-                          onChange={(event) =>
-                            updateNewItem(
-                              "volumeOptionsText",
-                              updateVolumeRow(
-                                newItem.volumeOptionsText,
-                                index,
-                                "label",
-                                event.target.value
-                              )
-                            )
-                          }
-                        />
-                        <div className="menu-editor__price-input menu-editor__volume-price">
-                          <input
-                            className="modal-input"
-                            type="text"
-                            inputMode="numeric"
-                            placeholder="Price"
-                            value={row.price}
-                            onChange={(event) =>
-                              updateNewItem(
-                                "volumeOptionsText",
-                                updateVolumeRow(
-                                  newItem.volumeOptionsText,
-                                  index,
-                                  "price",
-                                  event.target.value
-                                )
-                              )
-                            }
-                          />
-                          <span className="menu-editor__price-currency">₪</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-              {selectedKind === "drinks" ? null : (
-                <label className="menu-editor__field">
-                  <span>Price</span>
-                  <div className="menu-editor__price-input">
-                    <input
-                      className="modal-input"
-                      type="text"
-                      inputMode="numeric"
-                      value={newItem.price}
-                      onChange={(event) =>
-                        updateNewItem(
-                          "price",
-                          event.target.value.replace(/[^\d]/g, "")
-                        )
-                      }
-                    />
-                    <span className="menu-editor__price-currency">₪</span>
-                  </div>
-                </label>
-              )}
-          </div>
-
-          <div className="menu-editor__badges">
-            {getBadgeOptionsForKind(selectedKind).map((badge) => (
-              <label key={badge.value} className="menu-editor__badge-option">
-                <input
-                  type="checkbox"
-                  checked={newItem.badges.includes(badge.value)}
-                  onChange={() => toggleNewBadge(badge.value)}
-                />
-                <span>{badge.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="order-actions">
-            <button
-              className="button-success"
-              type="button"
-              disabled={newItem.saving}
-              onClick={() => void createItem()}
-            >
-              {newItem.saving ? "Adding..." : "Add"}
-            </button>
-          </div>
-        </article>
-        ) : null}
-
-        {filteredItems.map((item) => (
-          <article key={item.id} className="order-card">
-            {(() => {
-              const itemKind = getItemKind(item.draftCategory);
-              const itemCategoryOptions = getCategoryOptions(itemKind);
-              const itemBadgeOptions = getBadgeOptionsForKind(itemKind);
-
-              return (
-                <>
-            <div className="menu-editor__top-row">
-              <div className="menu-editor__language-block">
-                <div className="menu-editor__language-toggle" role="tablist" aria-label="Dish language">
-                  <button
-                    type="button"
-                    className={
-                      getItemLanguage(item.id) === "he"
-                        ? "menu-editor__language-chip menu-editor__language-chip--active"
-                        : "menu-editor__language-chip"
-                    }
-                    onClick={() => setItemLanguage(item.id, "he")}
-                  >
-                    HE
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      getItemLanguage(item.id) === "en"
-                        ? "menu-editor__language-chip menu-editor__language-chip--active"
-                        : "menu-editor__language-chip"
-                    }
-                    onClick={() => setItemLanguage(item.id, "en")}
-                  >
-                    EN
-                  </button>
-                </div>
-                <input
-                  className="modal-input"
-                  type="text"
-                  placeholder={getItemLanguage(item.id) === "he" ? "שם המנה" : "Dish name"}
-                  value={
-                    getItemLanguage(item.id) === "he"
-                      ? item.draftNameHe
-                      : item.draftNameEn
-                  }
-                  dir={getItemLanguage(item.id) === "he" ? "rtl" : "ltr"}
-                  onChange={(event) =>
-                    updateDraft(
-                      item.id,
-                      getItemLanguage(item.id) === "he"
-                        ? "draftNameHe"
-                        : "draftNameEn",
-                      event.target.value
-                    )
-                  }
-                />
-              </div>
-              <label className="menu-editor__availability-toggle">
-                <input
-                  type="checkbox"
-                  checked={item.available}
-                  onChange={() => toggleAvailability(item.id)}
-                />
-                <span
-                  className={`status-pill menu-editor__availability ${
-                    item.available ? "status-pill--served" : "status-pill--cancelled"
-                  }`}
-                >
-                  {item.available ? "Available" : "Unavailable"}
-                </span>
-              </label>
-            </div>
-
-            <div className="menu-editor__form">
-              <select
-                className="modal-input"
-                value={item.draftCategory}
-                onChange={(event) => {
-                  const nextCategory = event.target.value as MenuCategory;
-                  const nextKind = getItemKind(nextCategory);
-                  const allowedBadges = getBadgeOptionsForKind(nextKind).map(
-                    (badge) => badge.value
-                  );
-
-                  setItems((current) =>
-                    current.map((currentItem) =>
-                      currentItem.id === item.id
-                        ? {
-                            ...currentItem,
-                            draftCategory: nextCategory,
-                            draftVolumeOptionsText:
-                              nextKind === "drinks"
-                                ? currentItem.draftVolumeOptionsText
-                                : "",
-                            draftBadges: currentItem.draftBadges.filter((badge) =>
-                              allowedBadges.includes(badge)
-                            )
-                          }
-                        : currentItem
-                    )
-                  );
-                }}
-              >
-                {itemCategoryOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {categoryLabels[value]}
-                    </option>
-                ))}
-              </select>
-
-              <div className="menu-editor__description-block">
-                <button
-                  className="menu-editor__description-toggle"
-                  type="button"
-                  onClick={() => toggleItemDescription(item.id)}
-                >
-                  {expandedDescriptions[item.id]
-                    ? "Hide description"
-                    : "Show description"}
-                </button>
-                {expandedDescriptions[item.id] ? (
-                  <textarea
-                    className="modal-input menu-editor__textarea"
-                    placeholder={
-                      getItemLanguage(item.id) === "he" ? "תיאור" : "Description"
-                    }
-                    value={
-                      getItemLanguage(item.id) === "he"
-                        ? item.draftDescriptionHe
-                        : item.draftDescriptionEn
-                    }
-                    dir={getItemLanguage(item.id) === "he" ? "rtl" : "ltr"}
-                    onChange={(event) =>
-                      updateDraft(
-                        item.id,
-                        getItemLanguage(item.id) === "he"
-                          ? "draftDescriptionHe"
-                          : "draftDescriptionEn",
-                        event.target.value
-                      )
-                    }
-                  />
-                ) : null}
-              </div>
-
-              <label className="menu-editor__toggle">
-                <input
-                  type="checkbox"
-                  checked={item.draftShowImage}
-                  onChange={(event) =>
-                    updateDraft(item.id, "draftShowImage", event.target.checked)
-                  }
-                />
-                <span>Image</span>
-              </label>
-
-              {item.draftShowImage ? (
-                <div className="menu-editor__upload">
-                  <label className="button-neutral menu-editor__upload-icon">
-                    <svg
-                      className="menu-editor__upload-svg"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M15 7l-6.5 6.5a3.5 3.5 0 104.95 4.95L21 11a5 5 0 10-7.07-7.07L6.4 11.46"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <input
-                      className="menu-editor__file-input"
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) => void uploadExistingImage(item.id, event)}
-                    />
-                  </label>
-                  <div className="menu-editor__upload-state" />
-                  <button
-                    className="button-neutral menu-editor__upload-icon"
-                    type="button"
-                    onClick={() => clearExistingImage(item.id)}
-                    disabled={!item.draftImage}
-                  >
-                    <svg
-                      className="menu-editor__upload-svg"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M3 6h18M8 6V4h8v2m-9 0l1 14h8l1-14"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ) : null}
-
-              {itemKind === "drinks" ? (
-                <div className="menu-editor__volume-options">
-                  <div className="menu-editor__field">
-                    <span className="menu-editor__volume-label">
-                      <span>Volumes and prices</span>
-                      <span className="menu-editor__volume-actions">
-                        <button
-                          className="menu-editor__volume-add"
-                          type="button"
-                          onClick={() =>
-                            updateDraft(
-                              item.id,
-                              "draftVolumeOptionsText",
-                              removeVolumeRow(item.draftVolumeOptionsText)
-                            )
-                          }
-                        >
-                          -
-                        </button>
-                        <button
-                          className="menu-editor__volume-add"
-                          type="button"
-                          onClick={() =>
-                            updateDraft(
-                              item.id,
-                              "draftVolumeOptionsText",
-                              addVolumeRow(item.draftVolumeOptionsText)
-                            )
-                          }
-                        >
-                          +
-                        </button>
-                      </span>
-                    </span>
-                    <div className="menu-editor__volume-grid">
-                      {(parseVolumeRows(item.draftVolumeOptionsText).length
-                        ? parseVolumeRows(item.draftVolumeOptionsText)
-                        : [{ label: "", price: "" }]
-                      ).map((row, index) => (
-                        <div key={`${item.id}-volume-${index}`} className="menu-editor__volume-row">
-                          <input
-                            className="modal-input"
-                            type="text"
-                            placeholder="Volume"
-                            value={row.label}
-                            onChange={(event) =>
-                              updateDraft(
-                                item.id,
-                                "draftVolumeOptionsText",
-                                updateVolumeRow(
-                                  item.draftVolumeOptionsText,
-                                  index,
-                                  "label",
-                                  event.target.value
-                                )
-                              )
-                            }
-                          />
-                        <div className="menu-editor__price-input menu-editor__volume-price">
-                          <input
-                              className="modal-input"
-                              type="text"
-                              inputMode="numeric"
-                              placeholder="Price"
-                              value={row.price}
-                              onChange={(event) =>
-                                updateDraft(
-                                  item.id,
-                                  "draftVolumeOptionsText",
-                                  updateVolumeRow(
-                                    item.draftVolumeOptionsText,
-                                    index,
-                                    "price",
-                                    event.target.value
-                                  )
-                                )
-                              }
-                            />
-                            <span className="menu-editor__price-currency">₪</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {itemKind === "drinks" ? null : (
-                <label className="menu-editor__field">
-                  <span>Price</span>
-                  <div className="menu-editor__price-input">
-                    <input
-                      className="modal-input"
-                      type="text"
-                      inputMode="numeric"
-                      value={item.draftPrice}
-                      onChange={(event) =>
-                        updateDraft(
-                          item.id,
-                          "draftPrice",
-                          event.target.value.replace(/[^\d]/g, "")
-                        )
-                      }
-                    />
-                    <span className="menu-editor__price-currency">₪</span>
-                  </div>
-                </label>
-              )}
-
-            </div>
-
-            <div className="menu-editor__badges">
-              {itemBadgeOptions.map((badge) => (
-                <label key={badge.value} className="menu-editor__badge-option">
-                  <input
-                    type="checkbox"
-                    checked={item.draftBadges.includes(badge.value)}
-                    onChange={() => toggleItemBadge(item.id, badge.value)}
-                  />
-                  <span>{badge.label}</span>
-                </label>
-              ))}
-            </div>
-
-            <div className="order-actions">
-              <button
-                className="button-danger"
-                type="button"
-                onClick={() => void removeItem(item.id)}
-              >
-                Delete
-              </button>
-              <button
-                className="button-success"
-                type="button"
-                disabled={item.saving}
-                onClick={() => void saveItem(item.id)}
-              >
-                {item.saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-                </>
-              );
-            })()}
-          </article>
-        ))}
-          </div>
-        </>
-      ) : null}
+      {previewOpen ? <MenuPreviewPanel src={menuPreviewHref} /> : null}
+      <MenuAlertsPanel
+        notificationsOpen={notificationsOpen}
+        kitchenLoadWarningEnabled={kitchenLoadWarningEnabled}
+        kitchenLoadWarningSaving={kitchenLoadWarningSaving}
+        toggleKitchenLoadWarning={toggleKitchenLoadWarning}
+        happyHourEnabled={happyHourEnabled}
+        happyHourSaving={happyHourSaving}
+        happyHourModalOpen={happyHourModalOpen}
+        happyHourText={happyHourText}
+        happyHourCategories={happyHourCategories}
+        happyHourDiscountPercent={happyHourDiscountPercent}
+        happyHourStartsFrom={happyHourStartsFrom}
+        happyHourUntil={happyHourUntil}
+        openHappyHourModal={openHappyHourModal}
+        saveHappyHourSettings={saveHappyHourSettings}
+        setHappyHourStartsFrom={setHappyHourStartsFrom}
+        setHappyHourUntil={setHappyHourUntil}
+        kitchenOpenEnabled={kitchenOpenEnabled}
+        kitchenOpenSaving={kitchenOpenSaving}
+        kitchenOpenUntil={kitchenOpenUntil}
+        saveKitchenOpenSettings={saveKitchenOpenSettings}
+        setKitchenOpenUntil={setKitchenOpenUntil}
+        barOpenEnabled={barOpenEnabled}
+        barOpenSaving={barOpenSaving}
+        barOpenUntil={barOpenUntil}
+        saveBarOpenSettings={saveBarOpenSettings}
+        setBarOpenUntil={setBarOpenUntil}
+        happyHourDraftText={happyHourDraftText}
+        setHappyHourDraftText={setHappyHourDraftText}
+        happyHourDraftDiscountPercent={happyHourDraftDiscountPercent}
+        setHappyHourDraftDiscountPercent={setHappyHourDraftDiscountPercent}
+        happyHourDraftCategories={happyHourDraftCategories}
+        toggleHappyHourDraftCategory={toggleHappyHourDraftCategory}
+        setHappyHourModalOpen={setHappyHourModalOpen}
+        saveHappyHourModal={saveHappyHourModal}
+        dishCategories={dishCategories}
+        allDrinkCategories={allDrinkCategories}
+        categoryLabels={categoryLabels}
+      />
+      <MenuEditPanel
+        menuOpen={menuOpen}
+        showCreateForm={showCreateForm}
+        onToggleCreateForm={toggleCreateForm}
+        selectedKind={selectedKind}
+        selectedCategories={selectedCategories}
+        categoryLabels={categoryLabels}
+        visibleCategories={visibleCategories}
+        onToggleCategory={toggleCategory}
+        onClearSelectedCategories={clearSelectedCategories}
+        filteredItems={filteredItems}
+        newItemLanguage={newItemLanguage}
+        onSetNewItemLanguage={setNewItemLanguage}
+        newDescriptionExpanded={newDescriptionExpanded}
+        onToggleNewDescription={toggleNewDescription}
+        newItem={newItem}
+        updateNewItem={updateNewItem}
+        clearNewImage={clearNewImage}
+        uploadNewImage={uploadNewImage}
+        toggleNewBadge={toggleNewBadge}
+        createItem={createItem}
+        getCategoryOptions={getCategoryOptions}
+        getBadgeOptionsForKind={getBadgeOptionsForKind}
+        parseVolumeRows={parseVolumeRows}
+        addVolumeRow={addVolumeRow}
+        removeVolumeRow={removeVolumeRow}
+        updateVolumeRow={updateVolumeRow}
+        getItemKind={getItemKind}
+        getItemLanguage={getItemLanguage}
+        setItemLanguage={setItemLanguage}
+        expandedDescriptions={expandedDescriptions}
+        toggleItemDescription={toggleItemDescription}
+        updateDraft={updateDraft}
+        setItemsCategoryDraft={setItemsCategoryDraft}
+        toggleAvailability={toggleAvailability}
+        uploadExistingImage={uploadExistingImage}
+        clearExistingImage={clearExistingImage}
+        toggleItemBadge={toggleItemBadge}
+        removeItem={removeItem}
+        saveItem={saveItem}
+      />
     </div>
   );
 }

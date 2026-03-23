@@ -125,7 +125,7 @@ export function TableCountControl({
             aria-modal="true"
             aria-labelledby="table-count-title"
           >
-            <h2 id="table-count-title">Tables</h2>
+            <h2 id="table-count-title">Tables QR links</h2>
             <div className="table-count-stepper">
               <button
                 className="button-neutral"
@@ -214,7 +214,7 @@ export function TableCountControl({
           setDialogOpen(true);
         }}
       >
-        <span>Tables</span>
+        <span>Tables QR links</span>
       </button>
     </>
   );

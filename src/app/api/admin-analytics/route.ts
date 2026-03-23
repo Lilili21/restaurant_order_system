@@ -103,6 +103,35 @@ function getAnalyticsDayBounds(
   return { start, end };
 }
 
+function getCurrentShiftStartTimestamp(
+  rules: Array<{
+    id: string;
+    days: number[];
+    from: string | null;
+    until: string | null;
+  }>,
+  fallbackFrom: string | null
+) {
+  const fromValue = getCurrentDayRuleTime(rules, "from", fallbackFrom);
+  const fromTime = parseTime(fromValue);
+
+  if (!fromTime) {
+    return null;
+  }
+
+  const now = new Date();
+  const startToday = new Date(now);
+  startToday.setHours(fromTime.hours, fromTime.minutes, 0, 0);
+
+  if (now.getTime() >= startToday.getTime()) {
+    return startToday.getTime();
+  }
+
+  const previousDayStart = new Date(startToday);
+  previousDayStart.setDate(previousDayStart.getDate() - 1);
+  return previousDayStart.getTime();
+}
+
 function getWindowBounds(
   rules: Array<{
     id: string;
@@ -260,6 +289,10 @@ export async function GET(request: NextRequest) {
     settings.workingHoursFrom,
     settings.workingHoursUntil
   );
+  const currentShiftStartTs = getCurrentShiftStartTimestamp(
+    settings.workingHoursRules,
+    settings.workingHoursFrom
+  );
   const [activeOrders, tables, closedSessions] = await Promise.all([
     getOrders(restaurantSlug ?? undefined),
     getTableOverviews(restaurantSlug ?? undefined),
@@ -272,10 +305,75 @@ export async function GET(request: NextRequest) {
     settings.workingHoursUntil
   );
 
-  const currentActiveDishOrders = tables.flatMap((table) => table.orders ?? []);
-  const currentClosedOrders = closedSessions.flatMap((session) => session.orders ?? []);
-  const analyticsOrders = [...currentActiveDishOrders, ...currentClosedOrders].filter(
-    (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
+  const currentClosedOrders = closedSessions
+    .filter((session) => {
+      if (!currentShiftStartTs) {
+        return false;
+      }
+
+      const closedAtTs = new Date(session.closedAt).getTime();
+      return (
+        Number.isFinite(closedAtTs) &&
+        closedAtTs >= currentShiftStartTs &&
+        closedAtTs <= Date.now()
+      );
+    })
+    .flatMap((session) => session.orders ?? [])
+    .filter(
+      (order) =>
+        order.kind !== "waiter_call" &&
+        order.kind !== "bill_request" &&
+        order.status !== "cancelled"
+    );
+  const currentSessionVisibleOrders = tables
+    .flatMap((table) => table.orders ?? [])
+    .filter(
+      (order) =>
+        order.kind !== "waiter_call" &&
+        order.kind !== "bill_request" &&
+        order.status !== "cancelled"
+    );
+  const currentShiftLiveOrders = currentShiftStartTs
+    ? activeOrders.filter((order) => {
+        if (
+          order.kind === "waiter_call" ||
+          order.kind === "bill_request" ||
+          order.status === "cancelled"
+        ) {
+          return false;
+        }
+
+        const createdAt = new Date(order.createdAt).getTime();
+        return createdAt >= currentShiftStartTs && createdAt <= Date.now();
+      })
+    : [];
+  const analyticsOrders = [...currentShiftLiveOrders, ...currentClosedOrders];
+  const currentShiftTrackedOrders = [...currentShiftLiveOrders, ...currentClosedOrders];
+  const uniqueCurrentShiftTrackedOrders = [
+    ...new Map(currentShiftTrackedOrders.map((order) => [order.id, order])).values()
+  ];
+  const revenueTrackedOrders = [
+    ...new Map(
+      [...currentSessionVisibleOrders, ...currentClosedOrders].map((order) => [
+        order.id,
+        order
+      ])
+    ).values()
+  ];
+  const currentShiftRevenue = revenueTrackedOrders.reduce(
+    (sum, order) => sum + order.total,
+    0
+  );
+  const currentShiftAvgCheck =
+    uniqueCurrentShiftTrackedOrders.length > 0
+      ? currentShiftRevenue / uniqueCurrentShiftTrackedOrders.length
+      : 0;
+  const liveOrders = activeOrders.filter(
+    (order) =>
+      order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
+      order.status !== "served" &&
+      order.status !== "cancelled"
   );
 
   const recentDishItems = currentShiftWindow
@@ -287,17 +385,14 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     insights: {
-      orders: currentShiftWindow
-        ? analyticsOrders.filter((order) => {
-            const createdAt = new Date(order.createdAt).getTime();
-            return createdAt >= currentShiftWindow.start.getTime() &&
-              createdAt <= currentShiftWindow.end.getTime();
-          }).length || "—"
+      revenue: revenueTrackedOrders.length
+        ? Number(currentShiftRevenue.toFixed(2))
         : "—",
-      activeOrders:
-        currentActiveDishOrders.filter(
-          (order) => order.status !== "served" && order.status !== "cancelled"
-        ).length || "—",
+      avgCheck: uniqueCurrentShiftTrackedOrders.length
+        ? Number(currentShiftAvgCheck.toFixed(2))
+        : "—",
+      orders: uniqueCurrentShiftTrackedOrders.length || "—",
+      activeOrders: liveOrders.length || "—",
       topDish: currentShiftWindow
         ? getUniqueDishNames(recentDishItems, "desc")
         : "—",

@@ -7,7 +7,6 @@ export default function NotFound() {
         placeItems: "center",
         padding: "24px",
         fontFamily: "Georgia, serif",
-        background: "#f5efe6",
         color: "#2d1d14"
       }}
     >

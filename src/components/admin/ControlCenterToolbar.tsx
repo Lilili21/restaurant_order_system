@@ -1,0 +1,183 @@
+"use client";
+
+import { memo } from "react";
+
+import { TableCountControl } from "@/components/admin/TableCountControl";
+import { WorkingHoursControl } from "@/components/admin/WorkingHoursControl";
+
+type SecondaryCredentials = {
+  login: string;
+  password: string;
+};
+
+type Props = {
+  dashboardOpen: boolean;
+  onToggleDashboard: () => void;
+  waiterRedirecting: boolean;
+  onOpenLiveOrders: () => void;
+  menuButtonsOpen: boolean;
+  onToggleMenu: () => void;
+  settingsButtonsOpen: boolean;
+  onToggleSettings: () => void;
+  previewOpen: boolean;
+  onTogglePreview: () => void;
+  menuOpen: boolean;
+  onToggleEdit: () => void;
+  secondaryCredentials: SecondaryCredentials | null;
+  restaurantSlug: string;
+  notificationsOpen: boolean;
+  onToggleNotifications: () => void;
+  selectedKind: "dishes" | "drinks";
+  onSelectDishes: () => void;
+  onSelectDrinks: () => void;
+};
+
+function ControlCenterToolbarComponent({
+  dashboardOpen,
+  onToggleDashboard,
+  waiterRedirecting,
+  onOpenLiveOrders,
+  menuButtonsOpen,
+  onToggleMenu,
+  settingsButtonsOpen,
+  onToggleSettings,
+  previewOpen,
+  onTogglePreview,
+  menuOpen,
+  onToggleEdit,
+  secondaryCredentials,
+  restaurantSlug,
+  notificationsOpen,
+  onToggleNotifications,
+  selectedKind,
+  onSelectDishes,
+  onSelectDrinks
+}: Props) {
+  return (
+    <div className="menu-editor__toolbar">
+      <div className="menu-editor__toolbar-row">
+        <button
+          className={
+            dashboardOpen
+              ? "admin-menu-bubble admin-menu-bubble--active admin-menu-bubble--dashboard"
+              : "admin-menu-bubble admin-menu-bubble--dashboard"
+          }
+          type="button"
+          onClick={onToggleDashboard}
+        >
+          Dashboard
+        </button>
+        <button
+          className="admin-menu-bubble admin-menu-bubble--live-orders"
+          type="button"
+          disabled={waiterRedirecting}
+          onClick={onOpenLiveOrders}
+        >
+          Live Orders
+        </button>
+        <button
+          className={
+            menuButtonsOpen
+              ? "admin-menu-bubble admin-menu-bubble--active"
+              : "admin-menu-bubble"
+          }
+          type="button"
+          onClick={onToggleMenu}
+        >
+          Menu
+        </button>
+        <button
+          className={
+            settingsButtonsOpen
+              ? "admin-menu-bubble admin-menu-bubble--active"
+              : "admin-menu-bubble"
+          }
+          type="button"
+          onClick={onToggleSettings}
+        >
+          Settings
+        </button>
+      </div>
+      {menuButtonsOpen ? (
+        <div className="menu-editor__toolbar-row">
+          <button
+            className={
+              previewOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={onTogglePreview}
+          >
+            Preview (customer view)
+          </button>
+          <button
+            className={
+              menuOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={onToggleEdit}
+          >
+            Edit
+          </button>
+        </div>
+      ) : null}
+      {settingsButtonsOpen ? (
+        <div className="menu-editor__toolbar-row">
+          {secondaryCredentials ? (
+            <TableCountControl
+              credentials={secondaryCredentials}
+              restaurantSlug={restaurantSlug}
+            />
+          ) : null}
+          {secondaryCredentials ? (
+            <WorkingHoursControl credentials={secondaryCredentials} />
+          ) : null}
+          <button
+            className={
+              notificationsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={onToggleNotifications}
+          >
+            Alarm
+          </button>
+        </div>
+      ) : null}
+      {menuOpen ? (
+        <div className="menu-editor__toolbar-row">
+          <div className="admin-switch menu-editor__kind-switch">
+            <button
+              type="button"
+              className={
+                selectedKind === "dishes"
+                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--dishes"
+              }
+              onClick={onSelectDishes}
+            >
+              Dishes
+            </button>
+            <button
+              type="button"
+              className={
+                selectedKind === "drinks"
+                  ? "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks admin-switch__item--active"
+                  : "admin-switch__item menu-editor__kind-button menu-editor__kind-button--drinks"
+              }
+              onClick={onSelectDrinks}
+            >
+              Drinks
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export const ControlCenterToolbar = memo(ControlCenterToolbarComponent);
