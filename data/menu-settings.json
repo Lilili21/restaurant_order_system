@@ -1,6 +1,6 @@
 {
   "workingHoursRules": [],
-  "kitchenLoadWarningEnabled": true,
+  "kitchenLoadWarningEnabled": false,
   "workingHoursFrom": null,
   "workingHoursUntil": null,
   "happyHourEnabled": false,
@@ -53,8 +53,8 @@
       "until": null
     }
   ],
-  "kitchenOpenEnabled": false,
-  "kitchenOpenUntil": null,
+  "kitchenOpenEnabled": true,
+  "kitchenOpenUntil": "2026-03-25T22:50:00.000Z",
   "barOpenEnabled": false,
   "barOpenUntil": null,
   "tableCount": 8,

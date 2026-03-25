@@ -7,9 +7,9 @@
       "tableNumber": 1,
       "sessionId": 7,
       "kind": "bill_request",
-      "status": "new",
+      "status": "cancelled",
       "createdAt": "2026-03-25T20:23:51.514Z",
-      "updatedAt": "2026-03-25T20:23:51.514Z",
+      "updatedAt": "2026-03-25T20:34:27.809Z",
       "items": [],
       "total": 0
     },

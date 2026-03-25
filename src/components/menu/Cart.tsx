@@ -124,7 +124,6 @@ const uiText = {
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
-    totalOrders: "סכום כולל",
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
@@ -198,7 +197,6 @@ const uiText = {
     submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
-    totalOrders: "Total amount",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
@@ -325,6 +323,7 @@ export function Cart({
     (sum, order) => sum + order.total,
     0
   );
+  const OPEN_COUNTDOWN_VISIBILITY_MS = 30 * 60 * 1000;
   const serviceRequestDisabled =
     hasActiveServiceRequest || serviceRequestBlockedUntil > Date.now();
   const text = uiText[language];
@@ -332,13 +331,19 @@ export function Cart({
     ? new Date(kitchenOpenUntil).getTime() - countdownNow
     : 0;
   const hasKitchenOpenTimer = showKitchenOpen && Boolean(kitchenOpenUntil);
-  const showKitchenOpenBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs > 0;
+  const showKitchenOpenBanner =
+    hasKitchenOpenTimer &&
+    kitchenOpenRemainingMs > 0 &&
+    kitchenOpenRemainingMs <= OPEN_COUNTDOWN_VISIBILITY_MS;
   const showKitchenClosedBanner = hasKitchenOpenTimer && kitchenOpenRemainingMs <= 0;
   const barOpenRemainingMs = barOpenUntil
     ? new Date(barOpenUntil).getTime() - countdownNow
     : 0;
   const hasBarOpenTimer = showBarOpen && Boolean(barOpenUntil);
-  const showBarOpenBanner = hasBarOpenTimer && barOpenRemainingMs > 0;
+  const showBarOpenBanner =
+    hasBarOpenTimer &&
+    barOpenRemainingMs > 0 &&
+    barOpenRemainingMs <= OPEN_COUNTDOWN_VISIBILITY_MS;
   const showBarClosedBanner = hasBarOpenTimer && barOpenRemainingMs <= 0;
   const isKitchenClosed = showKitchenClosedBanner;
   const isBarClosed = showBarClosedBanner;
