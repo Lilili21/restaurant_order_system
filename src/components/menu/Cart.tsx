@@ -5,6 +5,10 @@ import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { MenuList } from "@/components/menu/MenuList";
 import type { MenuFilter } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
+import type {
+  BusinessLunchSettings,
+  PromotionSettings
+} from "@/lib/menu-settings";
 import {
   CartItem,
   MenuCategory,
@@ -22,12 +26,8 @@ type CartProps = {
   orderingEnabled?: boolean;
   menu: MenuItem[];
   showKitchenLoadWarning: boolean;
-  showHappyHour: boolean;
-  happyHourText?: string | null;
-  happyHourCategories?: MenuCategory[];
-  happyHourDiscountPercent?: number;
-  happyHourStartsFrom: string | null;
-  happyHourUntil: string | null;
+  promotions?: PromotionSettings[];
+  businessLunches?: BusinessLunchSettings[];
   showKitchenOpen: boolean;
   kitchenOpenUntil: string | null;
   showBarOpen: boolean;
@@ -88,6 +88,7 @@ const drinkCategories = new Set<MenuCategory>([
 ]);
 
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
+const ORDER_SUBMIT_THROTTLE_MS = 3 * 1000;
 
 const uiText = {
   he: {
@@ -145,9 +146,14 @@ const uiText = {
     kitchenLoadWarning:
       "עקב עומס בהזמנות, זמן ההכנה עשוי להיות ארוך מהרגיל. תודה על הסבלנות.",
     happyHour: "Happy hour",
+    businessLunchNow: "Business lunch available now",
     happyHourStartsFrom: "מתחיל ב־",
     happyHourUntil: "עד",
     addDish: "הוסיפו לפחות מנה אחת.",
+    submitCooldown: "ההזמנה הזו כבר נשלחה.",
+    submitRetrySafe:
+      "לא הצלחנו לאשר שההזמנה התקבלה. הסל נשמר, ואפשר לנסות שוב בבטחה בלי ליצור כפילות.",
+    submitLoadingNote: "שולחים… נא לא לסגור את הדף.",
     submitError: "לא ניתן היה לשלוח את ההזמנה",
     waiterError: "לא ניתן היה לקרוא למלצר",
     billError: "לא ניתן היה לבקש חשבון",
@@ -214,9 +220,14 @@ const uiText = {
     kitchenLoadWarning:
       "Due to a high volume of orders, preparation time may be longer than usual. Thank you for your patience.",
     happyHour: "Happy hour",
+    businessLunchNow: "Business lunch available now",
     happyHourStartsFrom: "starts from",
     happyHourUntil: "until",
     addDish: "Add at least one dish.",
+    submitCooldown: "This order was already sent.",
+    submitRetrySafe:
+      "We could not confirm that the order was received. Your cart is still here, and you can safely try again without creating a duplicate.",
+    submitLoadingNote: "Sending… Please do not close the page.",
     submitError: "Failed to send the order",
     waiterError: "Failed to call the waiter",
     billError: "Failed to request the bill",
@@ -238,12 +249,8 @@ export function Cart({
   orderingEnabled = true,
   menu,
   showKitchenLoadWarning,
-  showHappyHour,
-  happyHourText,
-  happyHourCategories,
-  happyHourDiscountPercent,
-  happyHourStartsFrom,
-  happyHourUntil,
+  promotions = [],
+  businessLunches = [],
   showKitchenOpen,
   kitchenOpenUntil,
   showBarOpen,
@@ -277,6 +284,11 @@ export function Cart({
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
+  const pendingOrderRequestIdRef = useRef<string | null>(null);
+  const lastSuccessfulOrderSignatureRef = useRef<{
+    signature: string;
+    submittedAt: number;
+  } | null>(null);
 
   const detailedItems = useMemo(() => {
     return items
@@ -331,55 +343,195 @@ export function Cart({
   const isKitchenClosed = showKitchenClosedBanner;
   const isBarClosed = showBarClosedBanner;
   const areKitchenAndBarClosed = isKitchenClosed && isBarClosed;
-  const parsedHappyHourDiscountPercent = Number(happyHourDiscountPercent ?? 0);
-  const normalizedHappyHourDiscountPercent = Number.isFinite(
-    parsedHappyHourDiscountPercent
-  )
-    ? Math.max(0, parsedHappyHourDiscountPercent)
-    : 0;
-  const baseHappyHourText = (happyHourText?.trim() || text.happyHour).replace(
-    /\s*-\s*\d+%/gi,
-    ""
+  const promoCategoryLabels = useMemo<Record<MenuCategory, string>>(
+    () => ({
+      starters: language === "he" ? "מנות פתיחה" : "starters",
+      mains: language === "he" ? "עיקריות" : "main courses",
+      drinks: language === "he" ? "drinks" : "drinks",
+      fluids: language === "he" ? "fluids" : "fluids",
+      draft: language === "he" ? "draft" : "draft",
+      bottled: language === "he" ? "bottled" : "bottled",
+      fuel: language === "he" ? "fuel" : "fuel",
+      whiskey: language === "he" ? "whiskey" : "whiskey",
+      vodka: language === "he" ? "vodka" : "vodka",
+      rum: language === "he" ? "rum" : "rum",
+      cognac: language === "he" ? "cognac" : "cognac",
+      gin: language === "he" ? "gin" : "gin",
+      tequila: language === "he" ? "tequila" : "tequila",
+      absent: language === "he" ? "absent" : "absent",
+      ouzo: language === "he" ? "ouzo" : "ouzo",
+      likers: language === "he" ? "likers" : "likers",
+      two_component_mixture:
+        language === "he" ? "2 component mixture" : "2 component mixture",
+      dot4: language === "he" ? "DOT 4" : "DOT 4",
+      non_alcoholic_drinks:
+        language === "he" ? "משקאות קלים" : "non-alcoholic drinks",
+      desserts: language === "he" ? "קינוחים" : "desserts"
+    }),
+    [language]
   );
-  const happyHourBannerText =
-    normalizedHappyHourDiscountPercent > 0
-      ? `${baseHappyHourText} -${normalizedHappyHourDiscountPercent}%`
-      : baseHappyHourText;
-  const happyHourCategorySet = new Set<MenuCategory>(
-    (happyHourCategories ?? []).filter(
-      (category): category is MenuCategory => Boolean(category)
+  const hasTimedMenuWindows = useMemo(
+    () =>
+      promotions.some(
+        (promotion) =>
+          promotion.enabled &&
+          Boolean(promotion.startsFrom || promotion.until)
+      ) ||
+      businessLunches.some(
+        (businessLunch) =>
+          businessLunch.enabled &&
+          Boolean(businessLunch.startsFrom || businessLunch.until)
+      ),
+    [businessLunches, promotions]
+  );
+
+  function isScheduledWindowActive(
+    settings:
+      | Pick<PromotionSettings, "enabled" | "days" | "startsFrom" | "until">
+      | Pick<BusinessLunchSettings, "enabled" | "days" | "startsFrom" | "until">
+  ) {
+    if (!settings.enabled) {
+      return false;
+    }
+
+    const now = countdownNow;
+    const currentDay = new Date(now).getDay();
+
+    if (settings.days.length > 0 && !settings.days.includes(currentDay)) {
+      return false;
+    }
+
+    if (!settings.startsFrom || !settings.until) {
+      return true;
+    }
+
+    const startDate = new Date(settings.startsFrom);
+    const untilDate = new Date(settings.until);
+
+    if (
+      Number.isNaN(startDate.getTime()) ||
+      Number.isNaN(untilDate.getTime())
+    ) {
+      return false;
+    }
+
+    return now >= startDate.getTime() && now <= untilDate.getTime();
+  }
+
+  const activePromotions = useMemo(() => {
+    return promotions.filter(
+      (promotion) =>
+        promotion.discountPercent > 0 && isScheduledWindowActive(promotion)
+    );
+  }, [countdownNow, promotions]);
+  const activeBusinessLunches = useMemo(
+    () => businessLunches.filter((businessLunch) => isScheduledWindowActive(businessLunch)),
+    [businessLunches, countdownNow]
+  );
+  const visibleMenu = useMemo(() => {
+    const restrictedCategories = new Set<MenuCategory>(
+      businessLunches.flatMap((businessLunch) =>
+        businessLunch.enabled ? businessLunch.categories : []
+      )
+    );
+    const activeBusinessLunchCategories = new Set<MenuCategory>(
+      activeBusinessLunches.flatMap((businessLunch) => businessLunch.categories)
+    );
+
+    if (restrictedCategories.size === 0) {
+      return menu;
+    }
+
+    return menu.filter(
+      (item) =>
+        !restrictedCategories.has(item.category) ||
+        activeBusinessLunchCategories.has(item.category)
+    );
+  }, [activeBusinessLunches, businessLunches, menu]);
+
+  const effectiveSelectedFilter =
+    selectedMenuFilter &&
+    !visibleMenu.some((item) =>
+      selectedMenuFilter === "drinks"
+        ? drinkCategories.has(item.category)
+        : item.category === selectedMenuFilter
     )
+      ? null
+      : selectedMenuFilter;
+  const categoryDiscounts = useMemo(() => {
+    return activePromotions.reduce<Partial<Record<MenuCategory, number>>>(
+      (acc, promotion) => {
+        for (const category of promotion.categories) {
+          const currentDiscount = acc[category] ?? 0;
+
+          if (promotion.discountPercent > currentDiscount) {
+            acc[category] = promotion.discountPercent;
+          }
+        }
+
+        return acc;
+      },
+      {}
+    );
+  }, [activePromotions]);
+  const promotionBannerTexts = useMemo(
+    () =>
+      activePromotions.map((promotion) => {
+        const promoCategorySummary = promotion.categories
+          .map((category) => promoCategoryLabels[category] ?? category)
+          .join(", ");
+        const baseText = (promotion.text.trim() || text.happyHour).replace(
+          /\s*-\s*\d+%/gi,
+          ""
+        );
+
+        return [
+          `🎉 ${baseText}`,
+          promotion.discountPercent > 0 ? `-${promotion.discountPercent}%` : null,
+          promoCategorySummary
+            ? `${language === "he" ? "על" : "on"} ${promoCategorySummary}`
+            : null
+        ]
+          .filter(Boolean)
+          .join(" · ");
+      }),
+    [activePromotions, language, promoCategoryLabels, text.happyHour]
   );
-  const happyHourStartMs = happyHourStartsFrom
-    ? new Date(happyHourStartsFrom).getTime()
-    : NaN;
-  const happyHourUntilMs = happyHourUntil ? new Date(happyHourUntil).getTime() : NaN;
-  const isHappyHourActiveNow =
-    showHappyHour &&
-    normalizedHappyHourDiscountPercent > 0 &&
-    Number.isFinite(happyHourStartMs) &&
-    Number.isFinite(happyHourUntilMs) &&
-    Date.now() >= happyHourStartMs &&
-    Date.now() <= happyHourUntilMs;
+  const businessLunchBannerTexts = useMemo(
+    () =>
+      activeBusinessLunches.map((businessLunch) => {
+        const categorySummary = businessLunch.categories
+          .map((category) => promoCategoryLabels[category] ?? category)
+          .join(", ");
+        const baseText = businessLunch.text.trim() || text.businessLunchNow;
+
+        return categorySummary
+          ? `🍽 ${baseText} · ${language === "he" ? "על" : "on"} ${categorySummary}`
+          : `🍽 ${baseText}`;
+      }),
+    [activeBusinessLunches, language, promoCategoryLabels, text.businessLunchNow]
+  );
   const currentOrderDiscountAmount = Number(
     detailedItems
       .reduce((sum, { cartItem, menuItem }) => {
-        if (!isHappyHourActiveNow || !happyHourCategorySet.has(menuItem.category)) {
+        const categoryDiscount = categoryDiscounts[menuItem.category] ?? 0;
+
+        if (categoryDiscount <= 0) {
           return sum;
         }
 
         const unitPrice = cartItem.priceOverride ?? menuItem.price;
-        return (
-          sum +
-          unitPrice *
-            cartItem.quantity *
-            (normalizedHappyHourDiscountPercent / 100)
-        );
+        return sum + unitPrice * cartItem.quantity * (categoryDiscount / 100);
       }, 0)
       .toFixed(2)
   );
   const currentOrderTotalAfterDiscount = Number(
     Math.max(0, total - currentOrderDiscountAmount).toFixed(2)
+  );
+
+  const pendingOrderStorageKey = useMemo(
+    () => `pending-order:${restaurantSlug}:${tableToken}`,
+    [restaurantSlug, tableToken]
   );
 
   function getMenuItemDisplayName(
@@ -404,6 +556,29 @@ export function Cart({
     return `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`;
   }
 
+  function createOrderPayloadSignature(serveMode: ServeMode) {
+    const normalizedItems = [...items]
+      .map((item) => ({
+        menuItemId: item.menuItemId,
+        quantity: item.quantity,
+        note: item.note?.trim() ?? "",
+        volumeOptionId: item.volumeOptionId ?? "",
+        volumeLabel: item.volumeLabel ?? "",
+        priceOverride:
+          typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
+            ? item.priceOverride
+            : null
+      }))
+      .sort((left, right) =>
+        JSON.stringify(left).localeCompare(JSON.stringify(right))
+      );
+
+    return JSON.stringify({
+      serveMode,
+      items: normalizedItems
+    });
+  }
+
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
@@ -417,6 +592,14 @@ export function Cart({
       setLanguage(savedLanguage);
     }
   }, [restaurantSlug, tableToken]);
+
+  useEffect(() => {
+    const savedRequestId = window.localStorage.getItem(pendingOrderStorageKey);
+
+    if (savedRequestId) {
+      pendingOrderRequestIdRef.current = savedRequestId;
+    }
+  }, [pendingOrderStorageKey]);
 
   function setNextLanguage(nextLanguage: MenuLanguage) {
     setLanguage(nextLanguage);
@@ -540,18 +723,18 @@ export function Cart({
   }, [serviceRequestBlockedUntil]);
 
   useEffect(() => {
-    if (!hasKitchenOpenTimer) {
+    if (!hasKitchenOpenTimer && !hasBarOpenTimer && !hasTimedMenuWindows) {
       return;
     }
 
     const intervalId = window.setInterval(() => {
       setCountdownNow(Date.now());
-    }, 1000);
+    }, hasKitchenOpenTimer || hasBarOpenTimer ? 1000 : 60000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [hasKitchenOpenTimer]);
+  }, [hasBarOpenTimer, hasKitchenOpenTimer, hasTimedMenuWindows]);
 
   function animateOrderMovement(
     menuItemId: string,
@@ -673,6 +856,8 @@ export function Cart({
   }
 
   async function submitOrder(serveMode: ServeMode) {
+    const now = Date.now();
+
     if (areKitchenAndBarClosed) {
       setMessage(text.kitchenClosedAction);
       return;
@@ -690,7 +875,27 @@ export function Cart({
       return;
     }
 
+    const payloadSignature = createOrderPayloadSignature(serveMode);
+
+    if (
+      submitting ||
+      (lastSuccessfulOrderSignatureRef.current?.signature === payloadSignature &&
+        now - lastSuccessfulOrderSignatureRef.current.submittedAt <
+          ORDER_SUBMIT_THROTTLE_MS)
+    ) {
+      setDialogMessage(text.submitCooldown);
+      return;
+    }
+
+    const clientRequestId =
+      pendingOrderRequestIdRef.current ??
+      (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `req_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`);
+
     setSubmitting(true);
+    pendingOrderRequestIdRef.current = clientRequestId;
+    window.localStorage.setItem(pendingOrderStorageKey, clientRequestId);
     setMessage(null);
     setShowReviewDialog(false);
 
@@ -704,7 +909,8 @@ export function Cart({
           restaurantSlug,
           tableNumber,
           items,
-          serveMode
+          serveMode,
+          clientRequestId
         })
       });
 
@@ -714,6 +920,12 @@ export function Cart({
 
       const order = (await response.json()) as Order;
       setItems([]);
+      lastSuccessfulOrderSignatureRef.current = {
+        signature: payloadSignature,
+        submittedAt: Date.now()
+      };
+      pendingOrderRequestIdRef.current = null;
+      window.localStorage.removeItem(pendingOrderStorageKey);
       setSubmittedOrders((current) => {
         const existingIndex = current.findIndex((item) => item.id === order.id);
 
@@ -725,8 +937,12 @@ export function Cart({
       });
       setDialogMessage(text.orderSent);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : text.submitError;
       setMessage(
-        error instanceof Error ? error.message : text.submitError
+        errorMessage === text.submitError
+          ? text.submitRetrySafe
+          : errorMessage
       );
     } finally {
       setSubmitting(false);
@@ -1180,27 +1396,22 @@ export function Cart({
             {showKitchenLoadWarning ? (
               <p className="menu-kitchen-warning">{text.kitchenLoadWarning}</p>
             ) : null}
-            {showHappyHour ? (
-              <p className="menu-happy-hour">
-                {happyHourBannerText}
-                {happyHourStartsFrom
-                  ? ` ${text.happyHourStartsFrom} ${new Date(happyHourStartsFrom).toLocaleTimeString(
-                      "en-GB",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: false
-                      }
-                    )}`
-                  : ""}
-                {happyHourUntil
-                  ? ` ${text.happyHourUntil} ${new Date(happyHourUntil).toLocaleTimeString("en-GB", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: false
-                    })}`
-                  : ""}
-              </p>
+            {promotionBannerTexts.length || businessLunchBannerTexts.length ? (
+              <div className="menu-alert-banners">
+                {promotionBannerTexts.map((promotionText) => (
+                  <p key={promotionText} className="menu-alert-banner menu-happy-hour">
+                    {promotionText}
+                  </p>
+                ))}
+                {businessLunchBannerTexts.map((businessLunchText) => (
+                  <p
+                    key={businessLunchText}
+                    className="menu-alert-banner menu-happy-hour menu-business-lunch"
+                  >
+                    {businessLunchText}
+                  </p>
+                ))}
+              </div>
             ) : null}
           </div>
           {orderingEnabled ? (
@@ -1235,16 +1446,14 @@ export function Cart({
 
         <div className="content-grid">
           <MenuList
-            items={menu}
+            items={visibleMenu}
             language={language}
             quantities={quantities}
             orderingEnabled={orderingEnabled}
-            showHappyHour={showHappyHour}
-            happyHourCategories={happyHourCategories}
-            happyHourDiscountPercent={normalizedHappyHourDiscountPercent}
+            categoryDiscounts={categoryDiscounts}
             onAdd={addItem}
             onDecrease={decreaseItem}
-            selectedFilter={selectedMenuFilter}
+            selectedFilter={effectiveSelectedFilter}
           />
 
           {orderingEnabled ? (
@@ -1333,6 +1542,11 @@ export function Cart({
                   ? text.submitting
                   : text.submit}
             </button>
+            {submitting ? (
+              <p className="status-message status-message--loading">
+                {text.submitLoadingNote}
+              </p>
+            ) : null}
 
             {message ? <p className="status-message">{message}</p> : null}
 
@@ -1346,7 +1560,12 @@ export function Cart({
               >
                 <summary className="submitted-orders__summary">
                   <div className="submitted-orders__summary-copy">
-                    <h2>{text.currentOrders}</h2>
+                    <h2>
+                      <span>{text.currentOrders}</span>{" "}
+                      <span className="submitted-orders__summary-total">
+                        ({formatCurrency(submittedOrdersTotal)})
+                      </span>
+                    </h2>
                   </div>
                   <span
                     className="submitted-orders__chevron"
@@ -1368,10 +1587,6 @@ export function Cart({
                   </span>
                 </summary>
                 <div className="submitted-orders__content">
-                  <div className="submitted-orders-total">
-                    <span>{text.totalOrders}</span>
-                    <strong>{formatCurrency(submittedOrdersTotal)}</strong>
-                  </div>
                   {submittedOrders.map((order) => (
                     <article key={order.id} className="submitted-order-card">
                       <div className="order-card__header">

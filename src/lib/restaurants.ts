@@ -3,7 +3,7 @@ import { getMenuSettings } from "@/lib/menu-settings";
 import { MenuItem, Restaurant, TableSession } from "@/lib/types";
 import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
 
-const RESTAURANTS_CACHE_TTL_MS = 2_000;
+const RESTAURANTS_CACHE_TTL_MS = 60_000;
 
 type RestaurantsCacheEntry = {
   restaurants: Restaurant[];

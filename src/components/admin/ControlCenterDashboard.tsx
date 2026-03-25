@@ -36,6 +36,14 @@ const analyticsBlocks = [
   { icon: "🟡", title: "Daily status" }
 ] as const;
 
+const liveStatusDescriptions: Record<string, string> = {
+  Revenue: "Shift total",
+  "Avg Check": "Per order",
+  Orders: "Shift count",
+  "Active Orders": "Open now",
+  "Waiter Calls": "Calls this shift"
+};
+
 function buildSmoothLineChartPath(values: number[]) {
   if (!values.length) {
     return "";
@@ -119,9 +127,14 @@ function ControlCenterDashboardComponent({ insightStats, dashboardCharts }: Prop
                           : "control-center-analytics__stat"
                     }
                   >
-                    <span className="control-center-analytics__stat-label">
-                      {stat.label}
-                    </span>
+                    <div className="control-center-analytics__stat-copy">
+                      <span className="control-center-analytics__stat-label">
+                        {stat.label}
+                      </span>
+                      <span className="control-center-analytics__stat-description">
+                        {liveStatusDescriptions[stat.label] ?? ""}
+                      </span>
+                    </div>
                     <strong
                       className={
                         stat.label === "Revenue" || stat.label === "Orders"

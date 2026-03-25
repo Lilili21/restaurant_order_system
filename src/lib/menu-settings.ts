@@ -27,6 +27,27 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "desserts"
 ];
 
+export type PromotionSettings = {
+  id: string;
+  enabled: boolean;
+  text: string;
+  categories: MenuCategory[];
+  days: number[];
+  discountPercent: number;
+  startsFrom: string | null;
+  until: string | null;
+};
+
+export type BusinessLunchSettings = {
+  id: string;
+  enabled: boolean;
+  text: string;
+  categories: MenuCategory[];
+  days: number[];
+  startsFrom: string | null;
+  until: string | null;
+};
+
 export type MenuSettings = {
   workingHoursRules: Array<{
     id: string;
@@ -40,9 +61,12 @@ export type MenuSettings = {
   happyHourEnabled: boolean;
   happyHourText: string;
   happyHourCategories: MenuCategory[];
+  happyHourDays: number[];
   happyHourDiscountPercent: number;
   happyHourStartsFrom: string | null;
   happyHourUntil: string | null;
+  promotions: PromotionSettings[];
+  businessLunches: BusinessLunchSettings[];
   kitchenOpenEnabled: boolean;
   kitchenOpenUntil: string | null;
   barOpenEnabled: boolean;
@@ -54,7 +78,7 @@ export type MenuSettings = {
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
 const MENU_SETTINGS_KEY = "menu-settings";
-const MENU_SETTINGS_CACHE_TTL_MS = 2_000;
+const MENU_SETTINGS_CACHE_TTL_MS = 60_000;
 
 const DEFAULT_SETTINGS: MenuSettings = {
   workingHoursRules: [],
@@ -64,9 +88,12 @@ const DEFAULT_SETTINGS: MenuSettings = {
   happyHourEnabled: false,
   happyHourText: "",
   happyHourCategories: [],
+  happyHourDays: [],
   happyHourDiscountPercent: 0,
   happyHourStartsFrom: null,
   happyHourUntil: null,
+  promotions: [],
+  businessLunches: [],
   kitchenOpenEnabled: false,
   kitchenOpenUntil: null,
   barOpenEnabled: false,
@@ -195,6 +222,8 @@ function normalizeSettings(
     settings.happyHourUntil.trim()
       ? settings.happyHourUntil
       : null;
+  const happyHourText =
+    typeof settings?.happyHourText === "string" ? settings.happyHourText.trim() : "";
   const barOpenUntil =
     typeof settings?.barOpenUntil === "string" && settings.barOpenUntil.trim()
       ? settings.barOpenUntil
@@ -204,6 +233,17 @@ function normalizeSettings(
         MENU_CATEGORIES.includes(value as MenuCategory)
       )
     : [];
+  const happyHourDays = Array.isArray(settings?.happyHourDays)
+    ? [...new Set(
+        settings.happyHourDays.filter(
+          (day): day is number =>
+            typeof day === "number" &&
+            Number.isInteger(day) &&
+            day >= 0 &&
+            day <= 6
+        )
+      )].sort((left, right) => left - right)
+    : [];
   const happyHourDiscountPercentRaw =
     typeof settings?.happyHourDiscountPercent === "number"
       ? settings.happyHourDiscountPercent
@@ -211,19 +251,150 @@ function normalizeSettings(
   const happyHourDiscountPercent = Number.isFinite(happyHourDiscountPercentRaw)
     ? Math.min(100, Math.max(0, happyHourDiscountPercentRaw))
     : 0;
+  const normalizePromotion = (
+    promotion: Partial<PromotionSettings> | null | undefined,
+    index: number
+  ): PromotionSettings | null => {
+    if (!promotion || typeof promotion !== "object") {
+      return null;
+    }
+
+    const categories = Array.isArray(promotion.categories)
+      ? promotion.categories.filter((value): value is MenuCategory =>
+          MENU_CATEGORIES.includes(value as MenuCategory)
+        )
+      : [];
+    const days = Array.isArray(promotion.days)
+      ? [...new Set(
+          promotion.days.filter(
+            (day): day is number =>
+              typeof day === "number" &&
+              Number.isInteger(day) &&
+              day >= 0 &&
+              day <= 6
+          )
+        )].sort((left, right) => left - right)
+      : [];
+    const discountPercentRaw =
+      typeof promotion.discountPercent === "number"
+        ? promotion.discountPercent
+        : Number(promotion.discountPercent ?? 0);
+
+    return {
+      id:
+        typeof promotion.id === "string" && promotion.id.trim()
+          ? promotion.id.trim()
+          : `promo-${index + 1}`,
+      enabled: Boolean(promotion.enabled),
+      text:
+        typeof promotion.text === "string" ? promotion.text.trim() : "",
+      categories,
+      days,
+      discountPercent: Number.isFinite(discountPercentRaw)
+        ? Math.min(100, Math.max(0, discountPercentRaw))
+        : 0,
+      startsFrom: normalizeRuleTime(promotion.startsFrom),
+      until: normalizeRuleTime(promotion.until)
+    };
+  };
+  const normalizeBusinessLunch = (
+    businessLunch: Partial<BusinessLunchSettings> | null | undefined,
+    index: number
+  ): BusinessLunchSettings | null => {
+    if (!businessLunch || typeof businessLunch !== "object") {
+      return null;
+    }
+
+    const categories = Array.isArray(businessLunch.categories)
+      ? businessLunch.categories.filter((value): value is MenuCategory =>
+          MENU_CATEGORIES.includes(value as MenuCategory)
+        )
+      : [];
+    const days = Array.isArray(businessLunch.days)
+      ? [...new Set(
+          businessLunch.days.filter(
+            (day): day is number =>
+              typeof day === "number" &&
+              Number.isInteger(day) &&
+              day >= 0 &&
+              day <= 6
+          )
+        )].sort((left, right) => left - right)
+      : [];
+
+    return {
+      id:
+        typeof businessLunch.id === "string" && businessLunch.id.trim()
+          ? businessLunch.id.trim()
+          : `business-lunch-${index + 1}`,
+      enabled: Boolean(businessLunch.enabled),
+      text:
+        typeof businessLunch.text === "string" ? businessLunch.text.trim() : "",
+      categories,
+      days,
+      startsFrom: normalizeRuleTime(businessLunch.startsFrom),
+      until: normalizeRuleTime(businessLunch.until)
+    };
+  };
+  const explicitPromotions = Array.isArray(settings?.promotions)
+    ? settings.promotions
+        .map((promotion, index) => normalizePromotion(promotion, index))
+        .filter(Boolean) as PromotionSettings[]
+    : [];
+  const legacyPromotion =
+    happyHourText ||
+    happyHourCategories.length > 0 ||
+    happyHourDays.length > 0 ||
+    happyHourDiscountPercent > 0 ||
+    happyHourStartsFrom ||
+    happyHourUntil ||
+    settings?.happyHourEnabled
+      ? normalizePromotion(
+          {
+            id: "promo-1",
+            enabled: Boolean(settings?.happyHourEnabled),
+            text:
+              typeof settings?.happyHourText === "string"
+                ? settings.happyHourText
+                : "",
+            categories: happyHourCategories,
+            days: happyHourDays,
+            discountPercent: happyHourDiscountPercent,
+            startsFrom: happyHourStartsFrom,
+            until: happyHourUntil
+          },
+          0
+        )
+      : null;
+  const promotions =
+    explicitPromotions.length > 0
+      ? explicitPromotions
+      : legacyPromotion
+        ? [legacyPromotion]
+        : [];
+  const businessLunches = Array.isArray(settings?.businessLunches)
+    ? settings.businessLunches
+        .map((businessLunch, index) =>
+          normalizeBusinessLunch(businessLunch, index)
+        )
+        .filter(Boolean) as BusinessLunchSettings[]
+    : [];
+  const primaryPromotion = promotions[0] ?? null;
 
   return {
     workingHoursRules,
     kitchenLoadWarningEnabled: Boolean(settings?.kitchenLoadWarningEnabled),
     workingHoursFrom,
     workingHoursUntil,
-    happyHourEnabled: Boolean(settings?.happyHourEnabled),
-    happyHourText:
-      typeof settings?.happyHourText === "string" ? settings.happyHourText.trim() : "",
-    happyHourCategories,
-    happyHourDiscountPercent,
-    happyHourStartsFrom,
-    happyHourUntil,
+    happyHourEnabled: primaryPromotion?.enabled ?? false,
+    happyHourText: primaryPromotion?.text ?? "",
+    happyHourCategories: primaryPromotion?.categories ?? [],
+    happyHourDays: primaryPromotion?.days ?? [],
+    happyHourDiscountPercent: primaryPromotion?.discountPercent ?? 0,
+    happyHourStartsFrom: primaryPromotion?.startsFrom ?? null,
+    happyHourUntil: primaryPromotion?.until ?? null,
+    promotions,
+    businessLunches,
     kitchenOpenEnabled: Boolean(settings?.kitchenOpenEnabled),
     kitchenOpenUntil,
     barOpenEnabled: Boolean(settings?.barOpenEnabled),

@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation";
 
 import { Cart } from "@/components/menu/Cart";
-import { getAvailableMenuByRestaurant, getTableSession } from "@/lib/menu-store";
+import {
+  getAvailableMenuByRestaurant,
+  getTableSession,
+  preloadAvailableMenuByRestaurant,
+  preloadTableSession
+} from "@/lib/menu-store";
 import { getMenuSettings } from "@/lib/menu-settings";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
@@ -16,10 +21,16 @@ type MenuPageProps = {
 
 export default async function RestaurantMenuPage({ params }: MenuPageProps) {
   const { restaurantSlug, tableToken } = await params;
-  const menuSettings = await getMenuSettings();
+  const menuSettingsPromise = getMenuSettings();
 
   if (tableToken === "0") {
-    const restaurant = await getRestaurantBySlug(restaurantSlug);
+    preloadAvailableMenuByRestaurant(restaurantSlug);
+
+    const [menuSettings, restaurant, menu] = await Promise.all([
+      menuSettingsPromise,
+      getRestaurantBySlug(restaurantSlug),
+      getAvailableMenuByRestaurant(restaurantSlug)
+    ]);
 
     if (!restaurant) {
       notFound();
@@ -33,14 +44,10 @@ export default async function RestaurantMenuPage({ params }: MenuPageProps) {
           tableNumber={0}
           tableToken="0"
           orderingEnabled={false}
-          menu={await getAvailableMenuByRestaurant(restaurantSlug)}
+          menu={menu}
           showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
-          showHappyHour={menuSettings.happyHourEnabled}
-          happyHourText={menuSettings.happyHourText}
-          happyHourCategories={menuSettings.happyHourCategories}
-          happyHourDiscountPercent={menuSettings.happyHourDiscountPercent}
-          happyHourStartsFrom={menuSettings.happyHourStartsFrom}
-          happyHourUntil={menuSettings.happyHourUntil}
+          promotions={menuSettings.promotions}
+          businessLunches={menuSettings.businessLunches}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
           showBarOpen={menuSettings.barOpenEnabled}
@@ -51,7 +58,12 @@ export default async function RestaurantMenuPage({ params }: MenuPageProps) {
     );
   }
 
-  const session = await getTableSession(restaurantSlug, tableToken);
+  preloadTableSession(restaurantSlug, tableToken);
+
+  const [menuSettings, session] = await Promise.all([
+    menuSettingsPromise,
+    getTableSession(restaurantSlug, tableToken)
+  ]);
 
   if (!session) {
     notFound();
@@ -66,18 +78,14 @@ export default async function RestaurantMenuPage({ params }: MenuPageProps) {
         tableToken={session.table.accessToken}
         menu={session.menu}
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
-        showHappyHour={menuSettings.happyHourEnabled}
-          happyHourText={menuSettings.happyHourText}
-          happyHourCategories={menuSettings.happyHourCategories}
-          happyHourDiscountPercent={menuSettings.happyHourDiscountPercent}
-          happyHourStartsFrom={menuSettings.happyHourStartsFrom}
-          happyHourUntil={menuSettings.happyHourUntil}
-          showKitchenOpen={menuSettings.kitchenOpenEnabled}
-          kitchenOpenUntil={menuSettings.kitchenOpenUntil}
-          showBarOpen={menuSettings.barOpenEnabled}
-          barOpenUntil={menuSettings.barOpenUntil}
-          initialSubmittedOrders={[]}
-        />
+        promotions={menuSettings.promotions}
+        businessLunches={menuSettings.businessLunches}
+        showKitchenOpen={menuSettings.kitchenOpenEnabled}
+        kitchenOpenUntil={menuSettings.kitchenOpenUntil}
+        showBarOpen={menuSettings.barOpenEnabled}
+        barOpenUntil={menuSettings.barOpenUntil}
+        initialSubmittedOrders={[]}
+      />
       </main>
     );
 }

@@ -4,7 +4,11 @@ import { requireAdminAccess } from "@/lib/admin-auth";
 import { getMenuSettings, updateMenuSettings } from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import type { MenuCategory } from "@/lib/types";
-import type { MenuSettings } from "@/lib/menu-settings";
+import type {
+  BusinessLunchSettings,
+  MenuSettings,
+  PromotionSettings
+} from "@/lib/menu-settings";
 
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
@@ -40,9 +44,12 @@ export async function GET() {
     happyHourEnabled: settings.happyHourEnabled,
     happyHourText: settings.happyHourText,
     happyHourCategories: settings.happyHourCategories,
+    happyHourDays: settings.happyHourDays,
     happyHourDiscountPercent: settings.happyHourDiscountPercent,
     happyHourStartsFrom: settings.happyHourStartsFrom,
     happyHourUntil: settings.happyHourUntil,
+    promotions: settings.promotions,
+    businessLunches: settings.businessLunches,
     kitchenOpenEnabled: settings.kitchenOpenEnabled,
     kitchenOpenUntil: settings.kitchenOpenUntil,
     barOpenEnabled: settings.barOpenEnabled,
@@ -85,9 +92,29 @@ export async function PATCH(request: NextRequest) {
       happyHourEnabled?: boolean;
       happyHourText?: string;
       happyHourCategories?: MenuCategory[];
+      happyHourDays?: number[];
       happyHourDiscountPercent?: number;
       happyHourStartsFrom?: string | null;
       happyHourUntil?: string | null;
+      promotions?: Array<{
+        id?: string;
+        enabled?: boolean;
+        text?: string;
+        categories?: MenuCategory[];
+        days?: number[];
+        discountPercent?: number;
+        startsFrom?: string | null;
+        until?: string | null;
+      }>;
+      businessLunches?: Array<{
+        id?: string;
+        enabled?: boolean;
+        text?: string;
+        categories?: MenuCategory[];
+        days?: number[];
+        startsFrom?: string | null;
+        until?: string | null;
+      }>;
       kitchenOpenEnabled?: boolean;
       kitchenOpenUntil?: string | null;
       barOpenEnabled?: boolean;
@@ -100,6 +127,169 @@ export async function PATCH(request: NextRequest) {
       body.happyHourCategories.some((category) => !MENU_CATEGORIES.includes(category))
     ) {
       throw new Error("happyHourCategories contains invalid category");
+    }
+
+    if (
+      body.happyHourDays !== undefined &&
+      (!Array.isArray(body.happyHourDays) ||
+        body.happyHourDays.some(
+          (day) =>
+            typeof day !== "number" ||
+            !Number.isInteger(day) ||
+            day < 0 ||
+            day > 6
+        ))
+    ) {
+      throw new Error("happyHourDays must be integers from 0 to 6");
+    }
+
+    if (body.promotions !== undefined && !Array.isArray(body.promotions)) {
+      throw new Error("promotions is invalid");
+    }
+
+    if (Array.isArray(body.promotions)) {
+      if (body.promotions.length > 5) {
+        throw new Error("promotions cannot contain more than 5 items");
+      }
+
+      for (const promotion of body.promotions) {
+        if (!promotion || typeof promotion !== "object") {
+          throw new Error("promotions contains invalid item");
+        }
+
+        if (
+          promotion.categories !== undefined &&
+          (!Array.isArray(promotion.categories) ||
+            promotion.categories.some(
+              (category) => !MENU_CATEGORIES.includes(category)
+            ))
+        ) {
+          throw new Error("promotions contains invalid category");
+        }
+
+        if (
+          promotion.days !== undefined &&
+          (!Array.isArray(promotion.days) ||
+            promotion.days.some(
+              (day) =>
+                typeof day !== "number" ||
+                !Number.isInteger(day) ||
+                day < 0 ||
+                day > 6
+            ))
+        ) {
+          throw new Error("promotions days must be integers from 0 to 6");
+        }
+
+        if (
+          typeof promotion.discountPercent === "number" &&
+          (!Number.isFinite(promotion.discountPercent) ||
+            promotion.discountPercent < 0 ||
+            promotion.discountPercent > 100)
+        ) {
+          throw new Error("promotions discountPercent must be between 0 and 100");
+        }
+
+        if (
+          promotion.startsFrom !== undefined &&
+          promotion.startsFrom !== null &&
+          typeof promotion.startsFrom !== "string"
+        ) {
+          throw new Error("promotions startsFrom is invalid");
+        }
+
+        if (
+          promotion.until !== undefined &&
+          promotion.until !== null &&
+          typeof promotion.until !== "string"
+        ) {
+          throw new Error("promotions until is invalid");
+        }
+
+        if (typeof promotion.startsFrom === "string") {
+          const parsed = Date.parse(promotion.startsFrom);
+
+          if (!Number.isFinite(parsed)) {
+            throw new Error("promotions startsFrom is invalid");
+          }
+        }
+
+        if (typeof promotion.until === "string") {
+          const parsed = Date.parse(promotion.until);
+
+          if (!Number.isFinite(parsed)) {
+            throw new Error("promotions until is invalid");
+          }
+        }
+      }
+    }
+
+    if (body.businessLunches !== undefined && !Array.isArray(body.businessLunches)) {
+      throw new Error("businessLunches is invalid");
+    }
+
+    if (Array.isArray(body.businessLunches)) {
+      for (const businessLunch of body.businessLunches) {
+        if (!businessLunch || typeof businessLunch !== "object") {
+          throw new Error("businessLunches contains invalid item");
+        }
+
+        if (
+          businessLunch.categories !== undefined &&
+          (!Array.isArray(businessLunch.categories) ||
+            businessLunch.categories.some(
+              (category) => !MENU_CATEGORIES.includes(category)
+            ))
+        ) {
+          throw new Error("businessLunches contains invalid category");
+        }
+
+        if (
+          businessLunch.days !== undefined &&
+          (!Array.isArray(businessLunch.days) ||
+            businessLunch.days.some(
+              (day) =>
+                typeof day !== "number" ||
+                !Number.isInteger(day) ||
+                day < 0 ||
+                day > 6
+            ))
+        ) {
+          throw new Error("businessLunches days must be integers from 0 to 6");
+        }
+
+        if (
+          businessLunch.startsFrom !== undefined &&
+          businessLunch.startsFrom !== null &&
+          typeof businessLunch.startsFrom !== "string"
+        ) {
+          throw new Error("businessLunches startsFrom is invalid");
+        }
+
+        if (
+          businessLunch.until !== undefined &&
+          businessLunch.until !== null &&
+          typeof businessLunch.until !== "string"
+        ) {
+          throw new Error("businessLunches until is invalid");
+        }
+
+        if (typeof businessLunch.startsFrom === "string") {
+          const parsed = Date.parse(businessLunch.startsFrom);
+
+          if (!Number.isFinite(parsed)) {
+            throw new Error("businessLunches startsFrom is invalid");
+          }
+        }
+
+        if (typeof businessLunch.until === "string") {
+          const parsed = Date.parse(businessLunch.until);
+
+          if (!Number.isFinite(parsed)) {
+            throw new Error("businessLunches until is invalid");
+          }
+        }
+      }
     }
 
     if (
@@ -253,8 +443,72 @@ export async function PATCH(request: NextRequest) {
     if (Array.isArray(body.happyHourCategories)) {
       updates.happyHourCategories = body.happyHourCategories;
     }
+    if (Array.isArray(body.happyHourDays)) {
+      updates.happyHourDays = body.happyHourDays;
+    }
     if (typeof body.happyHourDiscountPercent === "number") {
       updates.happyHourDiscountPercent = body.happyHourDiscountPercent;
+    }
+
+    if (Array.isArray(body.promotions)) {
+      updates.promotions = body.promotions.map(
+        (promotion, index): PromotionSettings => ({
+          id:
+            typeof promotion.id === "string" && promotion.id.trim()
+              ? promotion.id.trim()
+              : `promo-${index + 1}`,
+          enabled: Boolean(promotion.enabled),
+          text:
+            typeof promotion.text === "string" ? promotion.text.trim() : "",
+          categories: Array.isArray(promotion.categories)
+            ? promotion.categories
+            : [],
+          days: Array.isArray(promotion.days) ? promotion.days : [],
+          discountPercent:
+            typeof promotion.discountPercent === "number"
+              ? promotion.discountPercent
+              : 0,
+          startsFrom:
+            typeof promotion.startsFrom === "string" &&
+            promotion.startsFrom.trim()
+              ? promotion.startsFrom.trim()
+              : null,
+          until:
+            typeof promotion.until === "string" && promotion.until.trim()
+              ? promotion.until.trim()
+              : null
+        })
+      );
+    }
+
+    if (Array.isArray(body.businessLunches)) {
+      updates.businessLunches = body.businessLunches.map(
+        (businessLunch, index): BusinessLunchSettings => ({
+          id:
+            typeof businessLunch.id === "string" && businessLunch.id.trim()
+              ? businessLunch.id.trim()
+              : `business-lunch-${index + 1}`,
+          enabled: Boolean(businessLunch.enabled),
+          text:
+            typeof businessLunch.text === "string"
+              ? businessLunch.text.trim()
+              : "",
+          categories: Array.isArray(businessLunch.categories)
+            ? businessLunch.categories
+            : [],
+          days: Array.isArray(businessLunch.days) ? businessLunch.days : [],
+          startsFrom:
+            typeof businessLunch.startsFrom === "string" &&
+            businessLunch.startsFrom.trim()
+              ? businessLunch.startsFrom.trim()
+              : null,
+          until:
+            typeof businessLunch.until === "string" &&
+            businessLunch.until.trim()
+              ? businessLunch.until.trim()
+              : null
+        })
+      );
     }
 
     if (

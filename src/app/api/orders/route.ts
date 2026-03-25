@@ -108,6 +108,13 @@ function validateCreateOrderPayload(body: unknown) {
       throw new Error("priceOverride is invalid");
     }
   }
+
+  if (
+    typeof body.clientRequestId === "string" &&
+    body.clientRequestId.length > 120
+  ) {
+    throw new Error("clientRequestId is too long");
+  }
 }
 
 export async function GET(request: NextRequest) {

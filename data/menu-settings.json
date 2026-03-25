@@ -1,7 +1,45 @@
 {
-  "workingHoursRules": [
+  "workingHoursRules": [],
+  "kitchenLoadWarningEnabled": true,
+  "workingHoursFrom": null,
+  "workingHoursUntil": null,
+  "happyHourEnabled": false,
+  "happyHourText": "dfg",
+  "happyHourCategories": [
+    "starters"
+  ],
+  "happyHourDays": [
+    0,
+    1
+  ],
+  "happyHourDiscountPercent": 100,
+  "happyHourStartsFrom": null,
+  "happyHourUntil": null,
+  "promotions": [
     {
-      "id": "hours-1774047095064-8yf4xp",
+      "id": "promo-1",
+      "enabled": false,
+      "text": "dfg",
+      "categories": [
+        "starters"
+      ],
+      "days": [
+        0,
+        1
+      ],
+      "discountPercent": 100,
+      "startsFrom": null,
+      "until": null
+    }
+  ],
+  "businessLunches": [
+    {
+      "id": "business-lunch-1774304312725-bv9m4b",
+      "enabled": false,
+      "text": "dfdsf",
+      "categories": [
+        "non_alcoholic_drinks"
+      ],
       "days": [
         0,
         1,
@@ -11,60 +49,23 @@
         5,
         6
       ],
-      "from": "14:00",
-      "until": "02:00"
+      "startsFrom": null,
+      "until": null
     }
   ],
-  "kitchenLoadWarningEnabled": false,
-  "workingHoursFrom": "14:00",
-  "workingHoursUntil": "02:00",
-  "happyHourEnabled": false,
-  "happyHourText": "Happy hour! 50% discount on all alcoholic drinks",
-  "happyHourCategories": [
-    "fluids",
-    "draft",
-    "bottled",
-    "fuel",
-    "whiskey",
-    "vodka",
-    "rum",
-    "cognac",
-    "gin",
-    "tequila",
-    "absent",
-    "ouzo",
-    "likers",
-    "two_component_mixture",
-    "dot4"
-  ],
-  "happyHourDiscountPercent": 50,
-  "happyHourStartsFrom": null,
-  "happyHourUntil": null,
   "kitchenOpenEnabled": false,
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,
   "barOpenUntil": null,
-  "tableCount": 13,
+  "tableCount": 8,
   "tableTokens": {
-    "1": "tbl_UxflwK16Xm3V",
-    "2": "tbl_rJ3w5MG_F-zH",
-    "3": "tbl_JXse_WbtctiY",
-    "4": "tbl_FNdWrgtlIiI4",
-    "5": "tbl_hTB-gBNEFjri",
-    "6": "tbl_o-MADyqXta3K",
-    "7": "tbl_AvR_Fs7x_KDn",
-    "8": "tbl_cY92t3dEqkVS",
-    "9": "tbl_frz7J1B5EvL1",
-    "10": "tbl_CpZEXGs2xlV4",
-    "11": "tbl_OSg-vWHFq4Rl",
-    "12": "tbl_bTHum7olray0",
-    "13": "tbl__Ah67BzE-3Mh",
-    "14": "tbl_NPzk1oaiOPce",
-    "15": "tbl_iJluCK26Nu68",
-    "16": "tbl_EBWmKBHpzvh0",
-    "17": "tbl__LwQgSg_d7lV",
-    "18": "tbl_bJeg6-j3cT9q",
-    "19": "tbl_y1wWnmBhZnFF",
-    "20": "tbl_oT-yFLbmUamP"
+    "1": "tbl_3oBYi40Rklr4",
+    "2": "tbl_jLSiG2j1rTS9",
+    "3": "tbl_BOhRfL4w4jrY",
+    "4": "tbl_boC1lAh1sg8R",
+    "5": "tbl_m81gRRBvtQCF",
+    "6": "tbl_J3fM7IgFjTZK",
+    "7": "tbl_EYawXN3mbzHc",
+    "8": "tbl_ZvDGky-BUDSm"
   }
 }

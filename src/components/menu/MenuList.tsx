@@ -8,9 +8,7 @@ type MenuListProps = {
   language: MenuLanguage;
   quantities: Record<string, number>;
   orderingEnabled?: boolean;
-  showHappyHour?: boolean;
-  happyHourCategories?: MenuCategory[];
-  happyHourDiscountPercent?: number;
+  categoryDiscounts?: Partial<Record<MenuCategory, number>>;
   onAdd: (
     menuItemId: string,
     sourceElement?: HTMLElement | null,
@@ -127,9 +125,7 @@ export function MenuList({
   language,
   quantities,
   orderingEnabled = true,
-  showHappyHour = false,
-  happyHourCategories = [],
-  happyHourDiscountPercent = 0,
+  categoryDiscounts = {},
   onAdd,
   onDecrease,
   selectedFilter
@@ -187,21 +183,15 @@ export function MenuList({
     }
   }, [selectedFilter]);
 
-  const normalizedDiscountPercent = Number.isFinite(happyHourDiscountPercent)
-    ? Math.max(0, happyHourDiscountPercent)
-    : 0;
-  const happyHourCategorySet = new Set<MenuCategory>(happyHourCategories);
   const formatCategoryLabel = (category: MenuCategory) =>
     categoryLabels[language][category] ?? category;
   const formatCategorySectionLabel = (category: MenuCategory) => {
     const baseLabel = categoryLabels[language][category] ?? category;
-    const showDiscountTag =
-      showHappyHour &&
-      normalizedDiscountPercent > 0 &&
-      happyHourCategorySet.has(category);
+    const categoryDiscount = categoryDiscounts[category] ?? 0;
+    const showDiscountTag = Number.isFinite(categoryDiscount) && categoryDiscount > 0;
 
     return showDiscountTag
-      ? `${baseLabel} -${normalizedDiscountPercent}%`
+      ? `${baseLabel} -${categoryDiscount}%`
       : baseLabel;
   };
 

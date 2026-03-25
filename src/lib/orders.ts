@@ -1,5 +1,5 @@
 import { initialOrders } from "@/lib/mock-data";
-import { getMenuSettings } from "@/lib/menu-settings";
+import { getMenuSettings, PromotionSettings } from "@/lib/menu-settings";
 import {
   CartItem,
   ClosedTableSummary,
@@ -63,6 +63,8 @@ const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
+const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
+const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
 
 type OrdersStateCacheEntry = {
   state: OrdersPersistence;
@@ -72,6 +74,32 @@ type OrdersStateCacheEntry = {
 declare global {
   // eslint-disable-next-line no-var
   var __ordersStateCache: OrdersStateCacheEntry | undefined;
+  // eslint-disable-next-line no-var
+  var __orderRequestCache:
+    | Map<
+        string,
+        {
+          orderId: string;
+          restaurantSlug: string;
+          tableNumber: number;
+          expiresAt: number;
+        }
+      >
+    | undefined;
+  // eslint-disable-next-line no-var
+  var __recentOrderPayloadCache:
+    | Map<
+        string,
+        {
+          orderId: string;
+          restaurantSlug: string;
+          tableNumber: number;
+          sessionId: number;
+          payloadSignature: string;
+          expiresAt: number;
+        }
+      >
+    | undefined;
 }
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
@@ -115,6 +143,151 @@ function setOrdersStateCache(state: OrdersPersistence) {
     state: cloneOrdersPersistence(state),
     expiresAt: Date.now() + ORDERS_STATE_CACHE_TTL_MS
   };
+}
+
+function getOrderRequestCache() {
+  globalThis.__orderRequestCache ??= new Map();
+  const now = Date.now();
+
+  for (const [key, entry] of globalThis.__orderRequestCache.entries()) {
+    if (entry.expiresAt <= now) {
+      globalThis.__orderRequestCache.delete(key);
+    }
+  }
+
+  return globalThis.__orderRequestCache;
+}
+
+function getRecentOrderPayloadCache() {
+  globalThis.__recentOrderPayloadCache ??= new Map();
+  const now = Date.now();
+
+  for (const [key, entry] of globalThis.__recentOrderPayloadCache.entries()) {
+    if (entry.expiresAt <= now) {
+      globalThis.__recentOrderPayloadCache.delete(key);
+    }
+  }
+
+  return globalThis.__recentOrderPayloadCache;
+}
+
+function findOrderByClientRequestId(
+  state: RuntimeState,
+  clientRequestId: string,
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  const cache = getOrderRequestCache();
+  const entry = cache.get(clientRequestId);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (
+    entry.restaurantSlug !== restaurantSlug ||
+    entry.tableNumber !== tableNumber
+  ) {
+    return null;
+  }
+
+  const order = state.ordersStore.find((item) => item.id === entry.orderId);
+
+  if (!order) {
+    cache.delete(clientRequestId);
+    return null;
+  }
+
+  return order;
+}
+
+function rememberClientRequestOrder(
+  clientRequestId: string,
+  order: Order,
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  getOrderRequestCache().set(clientRequestId, {
+    orderId: order.id,
+    restaurantSlug,
+    tableNumber,
+    expiresAt: Date.now() + ORDER_REQUEST_CACHE_TTL_MS
+  });
+}
+
+function createOrderPayloadSignature(
+  items: CartItem[],
+  serveMode?: ServeMode
+) {
+  const normalizedItems = items
+    .map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+      note: item.note?.trim() ?? "",
+      volumeOptionId: item.volumeOptionId ?? "",
+      volumeLabel: item.volumeLabel ?? "",
+      priceOverride:
+        typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
+          ? item.priceOverride
+          : null
+    }))
+    .sort((left, right) =>
+      JSON.stringify(left).localeCompare(JSON.stringify(right))
+    );
+
+  return JSON.stringify({
+    serveMode: serveMode ?? "all_at_once",
+    items: normalizedItems
+  });
+}
+
+function findRecentOrderByPayload(
+  state: RuntimeState,
+  restaurantSlug: string,
+  tableNumber: number,
+  sessionId: number,
+  payloadSignature: string
+) {
+  for (const entry of getRecentOrderPayloadCache().values()) {
+    if (
+      entry.restaurantSlug !== restaurantSlug ||
+      entry.tableNumber !== tableNumber ||
+      entry.sessionId !== sessionId ||
+      entry.payloadSignature !== payloadSignature
+    ) {
+      continue;
+    }
+
+    const order = state.ordersStore.find((item) => item.id === entry.orderId);
+
+    if (!order) {
+      continue;
+    }
+
+    return order;
+  }
+
+  return null;
+}
+
+function rememberRecentOrderPayload(
+  order: Order,
+  restaurantSlug: string,
+  tableNumber: number,
+  sessionId: number,
+  payloadSignature: string
+) {
+  const cache = getRecentOrderPayloadCache();
+  const cacheKey = `${restaurantSlug}:${tableNumber}:${sessionId}:${order.id}`;
+
+  cache.set(cacheKey, {
+    orderId: order.id,
+    restaurantSlug,
+    tableNumber,
+    sessionId,
+    payloadSignature,
+    expiresAt: Date.now() + ORDER_PAYLOAD_DEDUP_WINDOW_MS
+  });
 }
 
 function toOrdersMetaPersistence(
@@ -871,17 +1044,21 @@ function createOrderItem(
   };
 }
 
-function isHappyHourActiveNow(settings: Awaited<ReturnType<typeof getMenuSettings>>) {
-  if (!settings.happyHourEnabled) {
+function isPromotionActiveNow(promotion: PromotionSettings) {
+  if (!promotion.enabled || promotion.discountPercent <= 0) {
     return false;
   }
 
-  if (!settings.happyHourStartsFrom || !settings.happyHourUntil) {
+  if (promotion.days.length > 0 && !promotion.days.includes(new Date().getDay())) {
+    return false;
+  }
+
+  if (!promotion.startsFrom || !promotion.until) {
     return true;
   }
 
-  const startDate = new Date(settings.happyHourStartsFrom);
-  const untilDate = new Date(settings.happyHourUntil);
+  const startDate = new Date(promotion.startsFrom);
+  const untilDate = new Date(promotion.until);
 
   if (
     Number.isNaN(startDate.getTime()) ||
@@ -902,24 +1079,48 @@ function isHappyHourActiveNow(settings: Awaited<ReturnType<typeof getMenuSetting
   return nowMinutes >= startMinutes || nowMinutes <= untilMinutes;
 }
 
+function getPromotionDiscountForCategory(
+  category: MenuItem["category"],
+  settings: Awaited<ReturnType<typeof getMenuSettings>>
+) {
+  const activePromotions = settings.promotions.length
+    ? settings.promotions.filter(isPromotionActiveNow)
+    : settings.happyHourEnabled
+      ? [
+          {
+            id: "promo-legacy",
+            enabled: settings.happyHourEnabled,
+            text: settings.happyHourText,
+            categories: settings.happyHourCategories,
+            days: settings.happyHourDays,
+            discountPercent: settings.happyHourDiscountPercent,
+            startsFrom: settings.happyHourStartsFrom,
+            until: settings.happyHourUntil
+          }
+        ].filter(isPromotionActiveNow)
+      : [];
+
+  return activePromotions.reduce((maxDiscount, promotion) => {
+    if (!promotion.categories.includes(category)) {
+      return maxDiscount;
+    }
+
+    return Math.max(maxDiscount, promotion.discountPercent);
+  }, 0);
+}
+
 function applyHappyHourDiscount(
   price: number,
   category: MenuItem["category"],
   settings: Awaited<ReturnType<typeof getMenuSettings>>
 ) {
-  if (!isHappyHourActiveNow(settings)) {
+  const discountPercent = getPromotionDiscountForCategory(category, settings);
+
+  if (discountPercent <= 0) {
     return price;
   }
 
-  if (!settings.happyHourCategories.includes(category)) {
-    return price;
-  }
-
-  if (settings.happyHourDiscountPercent <= 0) {
-    return price;
-  }
-
-  const discountMultiplier = 1 - settings.happyHourDiscountPercent / 100;
+  const discountMultiplier = 1 - discountPercent / 100;
   return Number(Math.max(0, price * discountMultiplier).toFixed(2));
 }
 
@@ -997,6 +1198,20 @@ export async function getOrders(restaurantSlug?: string) {
       }
 
       return order.status !== "served" && order.status !== "cancelled";
+    })
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export async function getAllStoredOrders(restaurantSlug?: string) {
+  const { ordersStore } = await readRuntimeStateAsync();
+
+  return ordersStore
+    .filter((order) => {
+      if (restaurantSlug && order.restaurantSlug !== restaurantSlug) {
+        return false;
+      }
+
+      return true;
     })
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
@@ -1180,6 +1395,7 @@ export async function createOrder(input: {
   tableNumber: number;
   items: CartItem[];
   serveMode?: ServeMode;
+  clientRequestId?: string;
 }) {
   const state = await readRuntimeStateAsync();
   const restaurant = await getRestaurantBySlug(input.restaurantSlug);
@@ -1196,9 +1412,29 @@ export async function createOrder(input: {
     throw new Error("Table not found");
   }
 
+  if (input.clientRequestId) {
+    const repeatedOrder = findOrderByClientRequestId(
+      state,
+      input.clientRequestId,
+      input.restaurantSlug,
+      input.tableNumber
+    );
+
+    if (repeatedOrder) {
+      return normalizeOrderState(repeatedOrder);
+    }
+  }
+
   if (!input.items.length) {
     throw new Error("Order must contain at least one item");
   }
+
+  const { sessionId } = ensureCurrentSessionId(
+    state,
+    input.restaurantSlug,
+    input.tableNumber
+  );
+  const payloadSignature = createOrderPayloadSignature(input.items, input.serveMode);
 
   const menuLookup = await getMenuLookupForRestaurant(input.restaurantSlug);
   const menuSettings = await getMenuSettings();
@@ -1215,11 +1451,28 @@ export async function createOrder(input: {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  const { sessionId } = ensureCurrentSessionId(
+
+  const repeatedPayloadOrder = findRecentOrderByPayload(
     state,
     input.restaurantSlug,
-    input.tableNumber
+    input.tableNumber,
+    sessionId,
+    payloadSignature
   );
+
+  if (repeatedPayloadOrder) {
+    if (input.clientRequestId) {
+      rememberClientRequestOrder(
+        input.clientRequestId,
+        repeatedPayloadOrder,
+        input.restaurantSlug,
+        input.tableNumber
+      );
+    }
+
+    return normalizeOrderState(repeatedPayloadOrder);
+  }
+
   const existingNewOrder = state.ordersStore.find(
     (order) =>
       order.restaurantSlug === restaurant.slug &&
@@ -1235,6 +1488,23 @@ export async function createOrder(input: {
 
     if (input.serveMode) {
       mergedOrder.serveMode = input.serveMode;
+    }
+
+    rememberRecentOrderPayload(
+      mergedOrder,
+      input.restaurantSlug,
+      input.tableNumber,
+      sessionId,
+      payloadSignature
+    );
+
+    if (input.clientRequestId) {
+      rememberClientRequestOrder(
+        input.clientRequestId,
+        mergedOrder,
+        input.restaurantSlug,
+        input.tableNumber
+      );
     }
 
     await persistStateAsync(state);
@@ -1256,6 +1526,24 @@ export async function createOrder(input: {
   };
 
   state.ordersStore.unshift(order);
+
+  rememberRecentOrderPayload(
+    order,
+    input.restaurantSlug,
+    input.tableNumber,
+    sessionId,
+    payloadSignature
+  );
+
+  if (input.clientRequestId) {
+    rememberClientRequestOrder(
+      input.clientRequestId,
+      order,
+      input.restaurantSlug,
+      input.tableNumber
+    );
+  }
+
   await persistStateAsync(state);
 
   return order;

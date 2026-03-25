@@ -9,7 +9,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
 const MENU_STORE_KEY = "menu-store";
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
-const MENU_STORE_CACHE_TTL_MS = 2_000;
+const MENU_STORE_CACHE_TTL_MS = 60_000;
 const ALLOWED_BADGES: MenuBadge[] = [
   "chef_special",
   "most_popular",
@@ -27,9 +27,27 @@ type MenuStoreCacheEntry = {
   expiresAt: number;
 };
 
+type AvailableMenuCacheEntry = {
+  items: MenuItem[];
+  expiresAt: number;
+};
+
+type TableSessionCacheEntry = {
+  session: TableSession | null;
+  expiresAt: number;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var __menuStoreCache: MenuStoreCacheEntry | undefined;
+  // eslint-disable-next-line no-var
+  var __availableMenuCache:
+    | Map<string, AvailableMenuCacheEntry>
+    | undefined;
+  // eslint-disable-next-line no-var
+  var __tableSessionCache:
+    | Map<string, TableSessionCacheEntry>
+    | undefined;
 }
 
 function cloneMenuItems(items: MenuItem[]): MenuItem[] {
@@ -50,6 +68,70 @@ function setMenuStoreCache(items: MenuItem[]) {
   globalThis.__menuStoreCache = {
     items: cloneMenuItems(items),
     expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+  };
+}
+
+function getAvailableMenuCache() {
+  globalThis.__availableMenuCache ??= new Map();
+  const now = Date.now();
+
+  for (const [key, entry] of globalThis.__availableMenuCache.entries()) {
+    if (entry.expiresAt <= now) {
+      globalThis.__availableMenuCache.delete(key);
+    }
+  }
+
+  return globalThis.__availableMenuCache;
+}
+
+function getTableSessionCache() {
+  globalThis.__tableSessionCache ??= new Map();
+  const now = Date.now();
+
+  for (const [key, entry] of globalThis.__tableSessionCache.entries()) {
+    if (entry.expiresAt <= now) {
+      globalThis.__tableSessionCache.delete(key);
+    }
+  }
+
+  return globalThis.__tableSessionCache;
+}
+
+function clearDerivedMenuCaches(restaurantSlug?: string) {
+  const availableMenuCache = getAvailableMenuCache();
+  const tableSessionCache = getTableSessionCache();
+
+  if (!restaurantSlug) {
+    availableMenuCache.clear();
+    tableSessionCache.clear();
+    return;
+  }
+
+  availableMenuCache.delete(restaurantSlug);
+
+  for (const key of tableSessionCache.keys()) {
+    if (key.startsWith(`${restaurantSlug}:`)) {
+      tableSessionCache.delete(key);
+    }
+  }
+}
+
+function cloneTableSession(session: TableSession | null): TableSession | null {
+  if (!session) {
+    return null;
+  }
+
+  return {
+    restaurant: {
+      ...session.restaurant,
+      tables: session.restaurant.tables.map((table) => ({ ...table }))
+    },
+    table: { ...session.table },
+    menu: cloneMenuItems(session.menu),
+    submittedOrders: session.submittedOrders?.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({ ...item }))
+    }))
   };
 }
 
@@ -191,6 +273,7 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
   if (!supabase) {
     persistMenuItemsWith(items);
     setMenuStoreCache(items);
+    clearDerivedMenuCaches();
     return;
   }
 
@@ -208,6 +291,7 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
   }
 
   setMenuStoreCache(items);
+  clearDerivedMenuCaches();
 }
 
 if (!existsSync(MENU_STORE_PATH)) {
@@ -221,7 +305,24 @@ export async function getAllMenuItems(restaurantSlug?: string) {
 }
 
 export async function getAvailableMenuByRestaurant(restaurantSlug: string) {
-  return (await getAllMenuItems(restaurantSlug)).filter((item) => item.available);
+  const cache = getAvailableMenuCache();
+  const cached = cache.get(restaurantSlug);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneMenuItems(cached.items);
+  }
+
+  const items = (await getAllMenuItems(restaurantSlug)).filter((item) => item.available);
+  cache.set(restaurantSlug, {
+    items: cloneMenuItems(items),
+    expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+  });
+
+  return cloneMenuItems(items);
+}
+
+export function preloadAvailableMenuByRestaurant(restaurantSlug: string) {
+  void getAvailableMenuByRestaurant(restaurantSlug);
 }
 
 export async function getMenuItemById(menuItemId: string) {
@@ -383,7 +484,17 @@ export async function getTableSession(
   restaurantSlug: string,
   tableRef: number | string
 ): Promise<TableSession | null> {
-  const restaurant = await getRestaurantBySlug(restaurantSlug);
+  const cacheKey = `${restaurantSlug}:${String(tableRef)}`;
+  const cached = getTableSessionCache().get(cacheKey);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneTableSession(cached.session);
+  }
+
+  const [restaurant, menu] = await Promise.all([
+    getRestaurantBySlug(restaurantSlug),
+    getAvailableMenuByRestaurant(restaurantSlug)
+  ]);
 
   if (!restaurant) {
     return null;
@@ -399,9 +510,23 @@ export async function getTableSession(
     return null;
   }
 
-  return {
+  const session = {
     restaurant,
     table,
-    menu: await getAvailableMenuByRestaurant(restaurantSlug)
+    menu
   };
+
+  getTableSessionCache().set(cacheKey, {
+    session: cloneTableSession(session),
+    expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+  });
+
+  return session;
+}
+
+export function preloadTableSession(
+  restaurantSlug: string,
+  tableRef: number | string
+) {
+  void getTableSession(restaurantSlug, tableRef);
 }

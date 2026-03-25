@@ -1,6 +1,19 @@
 {
   "orders": [
     {
+      "id": "bill_1774470231514",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "kind": "bill_request",
+      "status": "new",
+      "createdAt": "2026-03-25T20:23:51.514Z",
+      "updatedAt": "2026-03-25T20:23:51.514Z",
+      "items": [],
+      "total": 0
+    },
+    {
       "id": "call_1774118587189",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -17,12 +30,12 @@
       "id": "ord_1774118511623",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
-      "tableNumber": 1,
-      "sessionId": 7,
-      "status": "new",
+      "tableNumber": 7,
+      "sessionId": 1,
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T18:41:51.623Z",
-      "updatedAt": "2026-03-21T18:41:51.623Z",
+      "updatedAt": "2026-03-25T20:24:32.244Z",
       "items": [
         {
           "id": "item_1774118511622_4spy2h",
@@ -32,8 +45,8 @@
           "volumeOptionId": "volume_0_empty_50",
           "volumeLabel": "",
           "price": 50,
-          "quantity": 1,
-          "served": false
+          "quantity": 2,
+          "served": true
         },
         {
           "id": "item_1774118511623_xu970f",
@@ -44,10 +57,37 @@
           "volumeLabel": "",
           "price": 20,
           "quantity": 1,
-          "served": false
+          "served": true
+        },
+        {
+          "id": "item_1774470272244_74so63",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774470272244_xd5jiy",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774470272244_adnopc",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 2,
+          "served": true
         }
       ],
-      "total": 70
+      "total": 359
     },
     {
       "id": "call_1774106116317",
@@ -68,7 +108,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 7,
       "sessionId": 1,
-      "status": "new",
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T14:02:46.987Z",
       "updatedAt": "2026-03-21T14:02:46.987Z",
@@ -80,7 +120,7 @@
           "name": "Tabbouleh salad",
           "price": 29,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 29
@@ -298,8 +338,8 @@
       "id": "ord_dash_20260321_2335",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
-      "tableNumber": 1,
-      "sessionId": 7,
+      "tableNumber": 7,
+      "sessionId": 1,
       "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T23:35:00.000Z",
@@ -359,9 +399,9 @@
       "id": "ord_dash_active_20260321_1210",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
-      "tableNumber": 1,
-      "sessionId": 7,
-      "status": "preparing",
+      "tableNumber": 7,
+      "sessionId": 1,
+      "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T12:10:00.000Z",
       "updatedAt": "2026-03-21T18:41:22.753Z",
@@ -373,7 +413,7 @@
           "name": "Salmon fillet",
           "price": 78,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1774118482753_oehb2c",
@@ -384,7 +424,7 @@
           "volumeLabel": "",
           "price": 50,
           "quantity": 1,
-          "served": false
+          "served": true
         },
         {
           "id": "item_1774118482753_6k00vo",
@@ -395,7 +435,7 @@
           "volumeLabel": "",
           "price": 20,
           "quantity": 1,
-          "served": false
+          "served": true
         }
       ],
       "total": 148
@@ -404,8 +444,8 @@
       "id": "ord_1774079537668",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
-      "tableNumber": 1,
-      "sessionId": 7,
+      "tableNumber": 7,
+      "sessionId": 1,
       "status": "served",
       "serveMode": "as_ready",
       "createdAt": "2026-03-21T07:52:17.668Z",
@@ -3504,7 +3544,7 @@
     ],
     [
       "olive-bistro:7",
-      1
+      3
     ],
     [
       "olive-bistro:8",
@@ -3560,6 +3600,242 @@
     ]
   ],
   "closedTableSummaries": [
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "closedAt": "2026-03-25T20:26:53.489Z",
+      "total": 0,
+      "orderCount": 0,
+      "orderIds": [],
+      "orders": []
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 1,
+      "closedAt": "2026-03-25T20:26:53.186Z",
+      "total": 736,
+      "orderCount": 7,
+      "orderIds": [
+        "ord_1774118511623",
+        "ord_1774101766987",
+        "ord_dash_20260321_2335",
+        "ord_dash_active_20260321_1210",
+        "ord_1774079537668",
+        "bill_1773740240220",
+        "call_1773740091907"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774118511623",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T18:41:51.623Z",
+          "updatedAt": "2026-03-25T20:24:32.244Z",
+          "items": [
+            {
+              "id": "item_1774118511622_4spy2h",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 2,
+              "served": true
+            },
+            {
+              "id": "item_1774118511623_xu970f",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "pina colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_74so63",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_xd5jiy",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_adnopc",
+              "menuItemId": "m4",
+              "category": "mains",
+              "name": "Salmon fillet",
+              "price": 78,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 359
+        },
+        {
+          "id": "ord_1774101766987",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T14:02:46.987Z",
+          "updatedAt": "2026-03-21T14:02:46.987Z",
+          "items": [
+            {
+              "id": "item_1774101766987_h76rbz",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        },
+        {
+          "id": "ord_dash_20260321_2335",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T23:35:00.000Z",
+          "updatedAt": "2026-03-21T23:40:00.000Z",
+          "items": [
+            {
+              "id": "item_dash_20260321_2335_1",
+              "menuItemId": "m_1773255842139",
+              "category": "starters",
+              "name": "Omelette 5",
+              "price": 100,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 100
+        },
+        {
+          "id": "ord_dash_active_20260321_1210",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T12:10:00.000Z",
+          "updatedAt": "2026-03-21T18:41:22.753Z",
+          "items": [
+            {
+              "id": "item_dash_active_20260321_1210_1",
+              "menuItemId": "m4",
+              "category": "mains",
+              "name": "Salmon fillet",
+              "price": 78,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774118482753_oehb2c",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774118482753_6k00vo",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "pina colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 148
+        },
+        {
+          "id": "ord_1774079537668",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T07:52:17.668Z",
+          "updatedAt": "2026-03-21T07:52:17.668Z",
+          "items": [
+            {
+              "id": "item_1774079537668_c051k1",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 100
+        },
+        {
+          "id": "bill_1773740240220",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "kind": "bill_request",
+          "status": "served",
+          "createdAt": "2026-03-17T09:37:20.220Z",
+          "updatedAt": "2026-03-17T09:37:20.220Z",
+          "items": [],
+          "total": 0
+        },
+        {
+          "id": "call_1773740091907",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "kind": "waiter_call",
+          "status": "served",
+          "createdAt": "2026-03-17T09:34:51.907Z",
+          "updatedAt": "2026-03-17T09:34:51.907Z",
+          "items": [],
+          "total": 0
+        }
+      ]
+    },
     {
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

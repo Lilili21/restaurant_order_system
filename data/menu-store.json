@@ -97,8 +97,8 @@
     "descriptionEn": "Fluffy omelette.",
     "showImage": true,
     "badges": [
-      "chef_special",
-      "vegan"
+      "vegan",
+      "most_popular"
     ],
     "volumeOptions": []
   },
@@ -117,8 +117,8 @@
     "descriptionEn": "Classic hummus, olive oil and warm pita.",
     "showImage": true,
     "badges": [
-      "most_popular",
-      "spicy"
+      "spicy",
+      "chef_special"
     ],
     "volumeOptions": []
   },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
 import { getMenuSettings } from "@/lib/menu-settings";
-import { getClosedTableSummaries, getOrders, getTableOverviews } from "@/lib/orders";
+import { getAllStoredOrders, getTableOverviews } from "@/lib/orders";
 import { MenuCategory, Order } from "@/lib/types";
 
 const DRINK_CATEGORIES = new Set<MenuCategory>([
@@ -293,10 +293,9 @@ export async function GET(request: NextRequest) {
     settings.workingHoursRules,
     settings.workingHoursFrom
   );
-  const [activeOrders, tables, closedSessions] = await Promise.all([
-    getOrders(restaurantSlug ?? undefined),
-    getTableOverviews(restaurantSlug ?? undefined),
-    getClosedTableSummaries(restaurantSlug ?? undefined)
+  const [allOrders, tables] = await Promise.all([
+    getAllStoredOrders(restaurantSlug ?? undefined),
+    getTableOverviews(restaurantSlug ?? undefined)
   ]);
 
   const currentShiftWindow = getWindowBounds(
@@ -305,36 +304,8 @@ export async function GET(request: NextRequest) {
     settings.workingHoursUntil
   );
 
-  const currentClosedOrders = closedSessions
-    .filter((session) => {
-      if (!currentShiftStartTs) {
-        return false;
-      }
-
-      const closedAtTs = new Date(session.closedAt).getTime();
-      return (
-        Number.isFinite(closedAtTs) &&
-        closedAtTs >= currentShiftStartTs &&
-        closedAtTs <= Date.now()
-      );
-    })
-    .flatMap((session) => session.orders ?? [])
-    .filter(
-      (order) =>
-        order.kind !== "waiter_call" &&
-        order.kind !== "bill_request" &&
-        order.status !== "cancelled"
-    );
-  const currentSessionVisibleOrders = tables
-    .flatMap((table) => table.orders ?? [])
-    .filter(
-      (order) =>
-        order.kind !== "waiter_call" &&
-        order.kind !== "bill_request" &&
-        order.status !== "cancelled"
-    );
-  const currentShiftLiveOrders = currentShiftStartTs
-    ? activeOrders.filter((order) => {
+  const shiftOrdersToNow = currentShiftStartTs
+    ? allOrders.filter((order) => {
         if (
           order.kind === "waiter_call" ||
           order.kind === "bill_request" ||
@@ -347,34 +318,37 @@ export async function GET(request: NextRequest) {
         return createdAt >= currentShiftStartTs && createdAt <= Date.now();
       })
     : [];
-  const analyticsOrders = [...currentShiftLiveOrders, ...currentClosedOrders];
-  const currentShiftTrackedOrders = [...currentShiftLiveOrders, ...currentClosedOrders];
-  const uniqueCurrentShiftTrackedOrders = [
-    ...new Map(currentShiftTrackedOrders.map((order) => [order.id, order])).values()
+  const currentSessionVisibleOrders = tables
+    .flatMap((table) => table.orders ?? [])
+    .filter(
+      (order) =>
+        order.kind !== "waiter_call" &&
+        order.kind !== "bill_request" &&
+        order.status !== "cancelled"
+    );
+  const analyticsOrders = shiftOrdersToNow;
+  const currentShiftTrackedOrders = [
+    ...new Map(shiftOrdersToNow.map((order) => [order.id, order])).values()
   ];
-  const revenueTrackedOrders = [
-    ...new Map(
-      [...currentSessionVisibleOrders, ...currentClosedOrders].map((order) => [
-        order.id,
-        order
-      ])
-    ).values()
-  ];
-  const currentShiftRevenue = revenueTrackedOrders.reduce(
+  const currentShiftRevenue = currentShiftTrackedOrders.reduce(
     (sum, order) => sum + order.total,
     0
   );
   const currentShiftAvgCheck =
-    uniqueCurrentShiftTrackedOrders.length > 0
-      ? currentShiftRevenue / uniqueCurrentShiftTrackedOrders.length
+    currentShiftTrackedOrders.length > 0
+      ? currentShiftRevenue / currentShiftTrackedOrders.length
       : 0;
-  const liveOrders = activeOrders.filter(
-    (order) =>
-      order.kind !== "waiter_call" &&
-      order.kind !== "bill_request" &&
-      order.status !== "served" &&
-      order.status !== "cancelled"
-  );
+  const liveOrdersCount = currentSessionVisibleOrders.length;
+  const waiterCallsCount = currentShiftStartTs
+    ? allOrders.filter((order) => {
+        if (order.kind !== "waiter_call") {
+          return false;
+        }
+
+        const createdAt = new Date(order.createdAt).getTime();
+        return createdAt >= currentShiftStartTs && createdAt <= Date.now();
+      }).length
+    : 0;
 
   const recentDishItems = currentShiftWindow
     ? getRecentDishItems(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
@@ -385,14 +359,14 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     insights: {
-      revenue: revenueTrackedOrders.length
+      revenue: currentShiftTrackedOrders.length
         ? Number(currentShiftRevenue.toFixed(2))
         : "—",
-      avgCheck: uniqueCurrentShiftTrackedOrders.length
+      avgCheck: currentShiftTrackedOrders.length
         ? Number(currentShiftAvgCheck.toFixed(2))
         : "—",
-      orders: uniqueCurrentShiftTrackedOrders.length || "—",
-      activeOrders: liveOrders.length || "—",
+      orders: currentShiftTrackedOrders.length || "—",
+      activeOrders: liveOrdersCount || "—",
       topDish: currentShiftWindow
         ? getUniqueDishNames(recentDishItems, "desc")
         : "—",
@@ -402,8 +376,7 @@ export async function GET(request: NextRequest) {
       peakHour: currentShiftWindow
         ? getPeakHourLabel(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
         : "—",
-      waiterCalls:
-        activeOrders.filter((order) => order.kind === "waiter_call").length || "—"
+      waiterCalls: waiterCallsCount || "—"
     },
     charts: {
       labels: hourlySeries.labels,

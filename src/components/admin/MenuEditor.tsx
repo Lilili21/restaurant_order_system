@@ -9,12 +9,20 @@ import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
 import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
 import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
+import type {
+  BusinessLunchSettings,
+  PromotionSettings
+} from "@/lib/menu-settings";
 import {
   MenuBadge,
   MenuCategory,
   MenuItem,
   MenuVolumeOption
 } from "@/lib/types";
+import type {
+  EditableBusinessLunch,
+  EditablePromotion
+} from "@/components/admin/MenuPromotionTypes";
 
 const categoryLabels: Record<MenuCategory, string> = {
   starters: "🥗 Starters",
@@ -121,6 +129,122 @@ type NewMenuItemDraft = {
   available: boolean;
   saving: boolean;
 };
+
+function formatTimeInputValue(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  });
+}
+
+function createEditablePromotion(): EditablePromotion {
+  return {
+    id: `promo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    enabled: true,
+    text: "",
+    categories: [],
+    days: [],
+    discountPercent: "0",
+    startsFrom: "",
+    until: ""
+  };
+}
+
+function createEditableBusinessLunch(): EditableBusinessLunch {
+  return {
+    id: `business-lunch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    enabled: true,
+    text: "",
+    categories: [],
+    days: [],
+    startsFrom: "",
+    until: ""
+  };
+}
+
+function getBusinessLunchValidationMessage(
+  businessLunch: EditableBusinessLunch
+) {
+  if (!businessLunch.startsFrom || !businessLunch.until) {
+    return "Select business lunch start and end time first.";
+  }
+
+  if (!businessLunch.categories.length) {
+    return "Select at least one category for business lunch.";
+  }
+
+  if (!businessLunch.days.length) {
+    return "Select at least one day for business lunch.";
+  }
+
+  return null;
+}
+
+function getPromotionValidationMessage(promotion: EditablePromotion) {
+  const parsedDiscountPercent = Number(
+    Number.parseFloat(promotion.discountPercent || "0").toFixed(2)
+  );
+
+  if (
+    !Number.isFinite(parsedDiscountPercent) ||
+    parsedDiscountPercent < 0 ||
+    parsedDiscountPercent > 100
+  ) {
+    return "Discount must be between 0 and 100.";
+  }
+
+  if (!promotion.startsFrom || !promotion.until) {
+    return "Select promo start and end time first.";
+  }
+
+  if (!promotion.categories.length) {
+    return "Select at least one category for the promo.";
+  }
+
+  if (!promotion.days.length) {
+    return "Select at least one day for the promo.";
+  }
+
+  return null;
+}
+
+function toEditablePromotion(promotion: PromotionSettings): EditablePromotion {
+  return {
+    id: promotion.id,
+    enabled: promotion.enabled,
+    text: promotion.text,
+    categories: promotion.categories,
+    days: promotion.days,
+    discountPercent: String(promotion.discountPercent),
+    startsFrom: formatTimeInputValue(promotion.startsFrom),
+    until: formatTimeInputValue(promotion.until)
+  };
+}
+
+function toEditableBusinessLunch(
+  businessLunch: BusinessLunchSettings
+): EditableBusinessLunch {
+  return {
+    id: businessLunch.id,
+    enabled: businessLunch.enabled,
+    text: businessLunch.text,
+    categories: businessLunch.categories,
+    days: businessLunch.days,
+    startsFrom: formatTimeInputValue(businessLunch.startsFrom),
+    until: formatTimeInputValue(businessLunch.until)
+  };
+}
 
 function toEditableItem(item: MenuItem): EditableMenuItem {
   return {
@@ -313,13 +437,14 @@ export function MenuEditor() {
   const [message, setMessage] = useState<string | null>(null);
   const [kitchenLoadWarningEnabled, setKitchenLoadWarningEnabled] = useState(false);
   const [kitchenLoadWarningSaving, setKitchenLoadWarningSaving] = useState(false);
-  const [happyHourEnabled, setHappyHourEnabled] = useState(false);
-  const [happyHourText, setHappyHourText] = useState("");
-  const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>([]);
-  const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState("0");
-  const [happyHourStartsFrom, setHappyHourStartsFrom] = useState("");
-  const [happyHourUntil, setHappyHourUntil] = useState("");
-  const [happyHourSaving, setHappyHourSaving] = useState(false);
+  const [businessLunches, setBusinessLunches] = useState<EditableBusinessLunch[]>([]);
+  const [businessLunchSaving, setBusinessLunchSaving] = useState(false);
+  const [businessLunchModalOpen, setBusinessLunchModalOpen] = useState(false);
+  const [businessLunchDraft, setBusinessLunchDraft] =
+    useState<EditableBusinessLunch | null>(null);
+  const [businessLunchMessage, setBusinessLunchMessage] = useState<string | null>(null);
+  const [promotions, setPromotions] = useState<EditablePromotion[]>([]);
+  const [promotionSaving, setPromotionSaving] = useState(false);
   const [kitchenOpenEnabled, setKitchenOpenEnabled] = useState(false);
   const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
@@ -353,13 +478,10 @@ export function MenuEditor() {
   const [settingsButtonsOpen, setSettingsButtonsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [happyHourModalOpen, setHappyHourModalOpen] = useState(false);
-  const [happyHourDraftText, setHappyHourDraftText] = useState("");
-  const [happyHourDraftCategories, setHappyHourDraftCategories] = useState<
-    MenuCategory[]
-  >([]);
-  const [happyHourDraftDiscountPercent, setHappyHourDraftDiscountPercent] =
-    useState("0");
+  const [promotionModalOpen, setPromotionModalOpen] = useState(false);
+  const [promotionDraft, setPromotionDraft] =
+    useState<EditablePromotion | null>(null);
+  const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
   const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
     {}
   );
@@ -433,9 +555,12 @@ export function MenuEditor() {
       if (!cancelled && settingsResponse.ok) {
         const settings = (await settingsResponse.json()) as {
           kitchenLoadWarningEnabled?: boolean;
+          promotions?: PromotionSettings[];
+          businessLunches?: BusinessLunchSettings[];
           happyHourEnabled?: boolean;
           happyHourText?: string;
           happyHourCategories?: MenuCategory[];
+          happyHourDays?: number[];
           happyHourDiscountPercent?: number;
           happyHourStartsFrom?: string | null;
           happyHourUntil?: string | null;
@@ -446,38 +571,49 @@ export function MenuEditor() {
         };
 
         setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
-        setHappyHourEnabled(Boolean(settings.happyHourEnabled));
-        const nextHappyHourText =
-          typeof settings.happyHourText === "string" ? settings.happyHourText : "";
-        setHappyHourText(nextHappyHourText);
-        setHappyHourCategories(
-          Array.isArray(settings.happyHourCategories)
-            ? settings.happyHourCategories
-            : []
-        );
-        setHappyHourDiscountPercent(
-          typeof settings.happyHourDiscountPercent === "number"
-            ? String(settings.happyHourDiscountPercent)
-            : "0"
-        );
-        setHappyHourStartsFrom(
-          settings.happyHourStartsFrom
-            ? new Date(settings.happyHourStartsFrom).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false
-              })
-            : ""
-        );
-        setHappyHourUntil(
-          settings.happyHourUntil
-            ? new Date(settings.happyHourUntil).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false
-              })
-            : ""
-        );
+        const nextPromotions =
+          Array.isArray(settings.promotions) && settings.promotions.length > 0
+            ? settings.promotions.map(toEditablePromotion)
+            : settings.happyHourEnabled ||
+                (typeof settings.happyHourText === "string" &&
+                  settings.happyHourText.trim()) ||
+                (Array.isArray(settings.happyHourCategories) &&
+                  settings.happyHourCategories.length > 0) ||
+                (Array.isArray(settings.happyHourDays) &&
+                  settings.happyHourDays.length > 0) ||
+                typeof settings.happyHourDiscountPercent === "number"
+              ? [
+                  {
+                    id: "promo-1",
+                    enabled: Boolean(settings.happyHourEnabled),
+                    text:
+                      typeof settings.happyHourText === "string"
+                        ? settings.happyHourText
+                        : "",
+                    categories: Array.isArray(settings.happyHourCategories)
+                      ? settings.happyHourCategories
+                      : [],
+                    days: Array.isArray(settings.happyHourDays)
+                      ? settings.happyHourDays
+                      : [],
+                    discountPercent:
+                      typeof settings.happyHourDiscountPercent === "number"
+                        ? String(settings.happyHourDiscountPercent)
+                        : "0",
+                    startsFrom: formatTimeInputValue(settings.happyHourStartsFrom),
+                    until: formatTimeInputValue(settings.happyHourUntil)
+                  }
+                ]
+              : [];
+        const nextBusinessLunches =
+          Array.isArray(settings.businessLunches) &&
+          settings.businessLunches.length > 0
+            ? settings.businessLunches.map(toEditableBusinessLunch)
+            : [];
+        setBusinessLunches(nextBusinessLunches);
+        setBusinessLunchMessage(null);
+        setPromotions(nextPromotions);
+        setPromotionMessage(null);
         setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
         setKitchenOpenUntil(
           settings.kitchenOpenUntil
@@ -769,81 +905,64 @@ export function MenuEditor() {
     setKitchenLoadWarningSaving(false);
   }
 
-  async function saveHappyHourSettings(
-    nextEnabled: boolean,
-    nextText: string,
-    nextCategories: MenuCategory[],
-    nextDiscountPercent: string,
-    nextStartTime: string,
-    nextUntilTime: string
-  ) {
-    const previousEnabled = happyHourEnabled;
-    const previousText = happyHourText;
-    const previousCategories = happyHourCategories;
-    const previousDiscountPercent = happyHourDiscountPercent;
-    const previousStartTime = happyHourStartsFrom;
-    const previousUntilTime = happyHourUntil;
-    const normalizedText = nextText.trim();
-    const normalizedDiscountPercent = Number(
-      Number.parseFloat(nextDiscountPercent || "0").toFixed(2)
-    );
-    const normalizedStartTime = nextStartTime.trim();
-    const normalizedUntilTime = nextUntilTime.trim();
-    let startIsoValue: string | null = null;
-    let untilIsoValue: string | null = null;
+  function toPromotionIsoTimeValue(value: string) {
+    const normalizedValue = value.trim();
 
-    if (
-      !Number.isFinite(normalizedDiscountPercent) ||
-      normalizedDiscountPercent < 0 ||
-      normalizedDiscountPercent > 100
-    ) {
-      setMessage("Discount must be between 0 and 100.");
-      return;
+    if (!normalizedValue) {
+      return null;
     }
 
-    if (nextEnabled) {
-      if (!normalizedStartTime || !normalizedUntilTime) {
-        setMessage("Select Happy hour start and end time first.");
-        return;
-      }
-      if (!nextCategories.length) {
-        setMessage("Select at least one category for Happy hour.");
-        return;
+    const [hours, minutes] = normalizedValue.split(":").map(Number);
+
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+      return null;
+    }
+
+    const target = new Date();
+    target.setHours(hours, minutes, 0, 0);
+    return target.toISOString();
+  }
+
+  async function saveBusinessLunches(nextBusinessLunches: EditableBusinessLunch[]) {
+    const previousBusinessLunches = businessLunches;
+    const normalizedBusinessLunches = nextBusinessLunches.map(
+      (businessLunch, index) => ({
+        ...businessLunch,
+        id: businessLunch.id || `business-lunch-${index + 1}`,
+        text: businessLunch.text.trim(),
+        categories: [...businessLunch.categories],
+        days: [...new Set(businessLunch.days)].sort(
+          (left, right) => left - right
+        ),
+        startsFrom: businessLunch.startsFrom.trim(),
+        until: businessLunch.until.trim()
+      })
+    );
+
+    for (const businessLunch of normalizedBusinessLunches) {
+      if (!businessLunch.enabled) {
+        continue;
       }
 
-      const [startHours, startMinutes] = normalizedStartTime
-        .split(":")
-        .map(Number);
-      const [untilHours, untilMinutes] = normalizedUntilTime
-        .split(":")
-        .map(Number);
+      const validationMessage = getBusinessLunchValidationMessage(businessLunch);
+
+      if (validationMessage) {
+        setBusinessLunchMessage(validationMessage);
+        return false;
+      }
 
       if (
-        !Number.isFinite(startHours) ||
-        !Number.isFinite(startMinutes) ||
-        !Number.isFinite(untilHours) ||
-        !Number.isFinite(untilMinutes)
+        !toPromotionIsoTimeValue(businessLunch.startsFrom) ||
+        !toPromotionIsoTimeValue(businessLunch.until)
       ) {
-        setMessage("Invalid Happy hour time.");
-        return;
+        setBusinessLunchMessage("Invalid business lunch time.");
+        return false;
       }
-
-      const startTarget = new Date();
-      startTarget.setHours(startHours, startMinutes, 0, 0);
-      startIsoValue = startTarget.toISOString();
-
-      const untilTarget = new Date();
-      untilTarget.setHours(untilHours, untilMinutes, 0, 0);
-      untilIsoValue = untilTarget.toISOString();
     }
 
-    setHappyHourEnabled(nextEnabled);
-    setHappyHourText(normalizedText);
-    setHappyHourCategories(nextCategories);
-    setHappyHourDiscountPercent(String(normalizedDiscountPercent));
-    setHappyHourStartsFrom(normalizedStartTime);
-    setHappyHourUntil(normalizedUntilTime);
-    setHappyHourSaving(true);
+    setBusinessLunchMessage(null);
+    setBusinessLunches(normalizedBusinessLunches);
+    setBusinessLunchSaving(true);
 
     const response = await fetch("/api/menu-settings", {
       method: "PATCH",
@@ -853,58 +972,374 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
-        happyHourEnabled: nextEnabled,
-        happyHourText: normalizedText,
-        happyHourCategories: nextCategories,
-        happyHourDiscountPercent: normalizedDiscountPercent,
-        happyHourStartsFrom: nextEnabled ? startIsoValue : null,
-        happyHourUntil: nextEnabled ? untilIsoValue : null
+        businessLunches: normalizedBusinessLunches.map((businessLunch) => ({
+          id: businessLunch.id,
+          enabled: businessLunch.enabled,
+          text: businessLunch.text,
+          categories: businessLunch.categories,
+          days: businessLunch.days,
+          startsFrom: businessLunch.enabled
+            ? toPromotionIsoTimeValue(businessLunch.startsFrom)
+            : null,
+          until: businessLunch.enabled
+            ? toPromotionIsoTimeValue(businessLunch.until)
+            : null
+        }))
       })
     });
 
     if (!response.ok) {
-      setHappyHourEnabled(previousEnabled);
-      setHappyHourText(previousText);
-      setHappyHourCategories(previousCategories);
-      setHappyHourDiscountPercent(previousDiscountPercent);
-      setHappyHourStartsFrom(previousStartTime);
-      setHappyHourUntil(previousUntilTime);
-      setMessage("Failed to update Happy hour.");
-      setHappyHourSaving(false);
-      return;
+      setBusinessLunches(previousBusinessLunches);
+      setBusinessLunchMessage("Failed to update business lunch.");
+      setBusinessLunchSaving(false);
+      return false;
     }
-    setHappyHourSaving(false);
+
+    setBusinessLunchSaving(false);
+    setBusinessLunchMessage(null);
+    return true;
   }
 
-  const openHappyHourModal = useCallback(function openHappyHourModal() {
-    setHappyHourDraftText(happyHourText);
-    setHappyHourDraftCategories(happyHourCategories);
-    setHappyHourDraftDiscountPercent(happyHourDiscountPercent || "0");
-    setHappyHourModalOpen(true);
-  }, [happyHourCategories, happyHourDiscountPercent, happyHourText]);
+  async function savePromotions(nextPromotions: EditablePromotion[]) {
+    const previousPromotions = promotions;
+    if (nextPromotions.length > 5) {
+      setPromotionMessage("You can add up to 5 promos.");
+      return false;
+    }
 
-  const toggleHappyHourDraftCategory = useCallback(
-    function toggleHappyHourDraftCategory(category: MenuCategory) {
-    setHappyHourDraftCategories((current) =>
-      current.includes(category)
-        ? current.filter((value) => value !== category)
-        : [...current, category]
-    );
+    const normalizedPromotions = nextPromotions.map((promotion, index) => ({
+      ...promotion,
+      id: promotion.id || `promo-${index + 1}`,
+      text: promotion.text.trim(),
+      categories: [...promotion.categories],
+      days: [...new Set(promotion.days)].sort((left, right) => left - right),
+      discountPercent: String(
+        Number(Number.parseFloat(promotion.discountPercent || "0").toFixed(2))
+      ),
+      startsFrom: promotion.startsFrom.trim(),
+      until: promotion.until.trim()
+    }));
+
+    for (const promotion of normalizedPromotions) {
+      if (!promotion.enabled) {
+        continue;
+      }
+
+      const validationMessage = getPromotionValidationMessage(promotion);
+
+      if (validationMessage) {
+        setPromotionMessage(validationMessage);
+        return false;
+      }
+
+      if (!toPromotionIsoTimeValue(promotion.startsFrom) || !toPromotionIsoTimeValue(promotion.until)) {
+        setPromotionMessage("Invalid promo time.");
+        return false;
+      }
+    }
+
+    setPromotionMessage(null);
+    setPromotions(normalizedPromotions);
+    setPromotionSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        promotions: normalizedPromotions.map((promotion) => ({
+          id: promotion.id,
+          enabled: promotion.enabled,
+          text: promotion.text,
+          categories: promotion.categories,
+          days: promotion.days,
+          discountPercent: Number(
+            Number.parseFloat(promotion.discountPercent || "0").toFixed(2)
+          ),
+          startsFrom: promotion.enabled
+            ? toPromotionIsoTimeValue(promotion.startsFrom)
+            : null,
+          until: promotion.enabled ? toPromotionIsoTimeValue(promotion.until) : null
+        }))
+      })
+    });
+
+    if (!response.ok) {
+      setPromotions(previousPromotions);
+      setPromotionMessage("Failed to update promo.");
+      setPromotionSaving(false);
+      return false;
+    }
+
+    setPromotionSaving(false);
+    setPromotionMessage(null);
+    return true;
+  }
+
+  const openNewBusinessLunchModal = useCallback(
+    function openNewBusinessLunchModal() {
+      setBusinessLunchMessage(null);
+      setBusinessLunchDraft(createEditableBusinessLunch());
+      setBusinessLunchModalOpen(true);
     },
     []
   );
 
-  async function saveHappyHourModal() {
-    await saveHappyHourSettings(
-      happyHourEnabled,
-      happyHourDraftText,
-      happyHourDraftCategories,
-      happyHourDraftDiscountPercent,
-      happyHourStartsFrom,
-      happyHourUntil
+  const openEditBusinessLunchModal = useCallback(
+    function openEditBusinessLunchModal(businessLunchId: string) {
+      const businessLunch = businessLunches.find(
+        (current) => current.id === businessLunchId
+      );
+
+      if (!businessLunch) {
+        return;
+      }
+
+      setBusinessLunchMessage(null);
+      setBusinessLunchDraft({ ...businessLunch });
+      setBusinessLunchModalOpen(true);
+    },
+    [businessLunches]
+  );
+
+  const updateBusinessLunchDraft = useCallback(function updateBusinessLunchDraft(
+    field: keyof EditableBusinessLunch,
+    value: string | boolean | MenuCategory[] | number[]
+  ) {
+    setBusinessLunchMessage(null);
+    setBusinessLunchDraft((current) =>
+      current ? { ...current, [field]: value } : current
+    );
+  }, []);
+
+  const toggleBusinessLunchDraftCategory = useCallback(
+    function toggleBusinessLunchDraftCategory(category: MenuCategory) {
+      setBusinessLunchMessage(null);
+      setBusinessLunchDraft((current) =>
+        current
+          ? {
+              ...current,
+              categories: current.categories.includes(category)
+                ? current.categories.filter((value) => value !== category)
+                : [...current.categories, category]
+            }
+          : current
+      );
+    },
+    []
+  );
+
+  const toggleBusinessLunchDraftDay = useCallback(function toggleBusinessLunchDraftDay(day: number) {
+    setBusinessLunchMessage(null);
+    setBusinessLunchDraft((current) =>
+      current
+        ? {
+            ...current,
+            days: current.days.includes(day)
+              ? current.days.filter((value) => value !== day)
+              : [...current.days, day].sort((left, right) => left - right)
+          }
+        : current
+    );
+  }, []);
+
+  async function saveBusinessLunchModal() {
+    if (!businessLunchDraft) {
+      return;
+    }
+
+    const nextBusinessLunches = businessLunches.some(
+      (businessLunch) => businessLunch.id === businessLunchDraft.id
+    )
+      ? businessLunches.map((businessLunch) =>
+          businessLunch.id === businessLunchDraft.id
+            ? businessLunchDraft
+            : businessLunch
+        )
+      : [...businessLunches, businessLunchDraft];
+
+    const saved = await saveBusinessLunches(nextBusinessLunches);
+
+    if (saved) {
+      setBusinessLunchModalOpen(false);
+      setBusinessLunchDraft(null);
+    }
+  }
+
+  async function toggleBusinessLunchEnabled(
+    businessLunchId: string,
+    enabled: boolean
+  ) {
+    const currentBusinessLunch = businessLunches.find(
+      (businessLunch) => businessLunch.id === businessLunchId
     );
 
-    setHappyHourModalOpen(false);
+    if (!currentBusinessLunch) {
+      return;
+    }
+
+    if (enabled) {
+      const validationMessage = getBusinessLunchValidationMessage(
+        currentBusinessLunch
+      );
+
+      if (validationMessage) {
+        setBusinessLunchMessage(validationMessage);
+        setBusinessLunchDraft({ ...currentBusinessLunch });
+        setBusinessLunchModalOpen(true);
+        return;
+      }
+    }
+
+    await saveBusinessLunches(
+      businessLunches.map((businessLunch) =>
+        businessLunch.id === businessLunchId
+          ? { ...businessLunch, enabled }
+          : businessLunch
+      )
+    );
+  }
+
+  async function deleteBusinessLunch(businessLunchId: string) {
+    const saved = await saveBusinessLunches(
+      businessLunches.filter(
+        (businessLunch) => businessLunch.id !== businessLunchId
+      )
+    );
+
+    if (saved && businessLunchDraft?.id === businessLunchId) {
+      setBusinessLunchDraft(null);
+      setBusinessLunchModalOpen(false);
+    }
+  }
+
+  const openNewPromotionModal = useCallback(function openNewPromotionModal() {
+    if (promotions.length >= 5) {
+      setPromotionMessage("You can add up to 5 promos.");
+      return;
+    }
+
+    setPromotionMessage(null);
+    setPromotionDraft(createEditablePromotion());
+    setPromotionModalOpen(true);
+  }, [promotions]);
+
+  const openEditPromotionModal = useCallback(
+    function openEditPromotionModal(promotionId: string) {
+      const promotion = promotions.find((current) => current.id === promotionId);
+
+      if (!promotion) {
+        return;
+      }
+
+      setPromotionMessage(null);
+      setPromotionDraft({ ...promotion });
+      setPromotionModalOpen(true);
+    },
+    [promotions]
+  );
+
+  const updatePromotionDraft = useCallback(function updatePromotionDraft(
+    field: keyof EditablePromotion,
+    value: string | boolean | MenuCategory[] | number[]
+  ) {
+    setPromotionMessage(null);
+    setPromotionDraft((current) =>
+      current ? { ...current, [field]: value } : current
+    );
+  }, []);
+
+  const togglePromotionDraftCategory = useCallback(
+    function togglePromotionDraftCategory(category: MenuCategory) {
+      setPromotionMessage(null);
+      setPromotionDraft((current) =>
+        current
+          ? {
+              ...current,
+              categories: current.categories.includes(category)
+                ? current.categories.filter((value) => value !== category)
+                : [...current.categories, category]
+            }
+          : current
+      );
+    },
+    []
+  );
+
+  const togglePromotionDraftDay = useCallback(function togglePromotionDraftDay(day: number) {
+    setPromotionMessage(null);
+    setPromotionDraft((current) =>
+      current
+        ? {
+            ...current,
+            days: current.days.includes(day)
+              ? current.days.filter((value) => value !== day)
+              : [...current.days, day].sort((left, right) => left - right)
+          }
+        : current
+    );
+  }, []);
+
+  async function savePromotionModal() {
+    if (!promotionDraft) {
+      return;
+    }
+
+    const nextPromotions = promotions.some(
+      (promotion) => promotion.id === promotionDraft.id
+    )
+      ? promotions.map((promotion) =>
+          promotion.id === promotionDraft.id ? promotionDraft : promotion
+        )
+      : [...promotions, promotionDraft];
+
+    const saved = await savePromotions(nextPromotions);
+
+    if (saved) {
+      setPromotionModalOpen(false);
+      setPromotionDraft(null);
+    }
+  }
+
+  async function togglePromotionEnabled(promotionId: string, enabled: boolean) {
+    const currentPromotion = promotions.find(
+      (promotion) => promotion.id === promotionId
+    );
+
+    if (!currentPromotion) {
+      return;
+    }
+
+    if (enabled) {
+      const validationMessage = getPromotionValidationMessage(currentPromotion);
+
+      if (validationMessage) {
+        setPromotionMessage(validationMessage);
+        setPromotionDraft({ ...currentPromotion });
+        setPromotionModalOpen(true);
+        return;
+      }
+    }
+
+    await savePromotions(
+      promotions.map((promotion) =>
+        promotion.id === promotionId ? { ...promotion, enabled } : promotion
+      )
+    );
+  }
+
+  async function deletePromotion(promotionId: string) {
+    const saved = await savePromotions(
+      promotions.filter((promotion) => promotion.id !== promotionId)
+    );
+
+    if (saved && promotionDraft?.id === promotionId) {
+      setPromotionDraft(null);
+      setPromotionModalOpen(false);
+    }
   }
 
   async function saveKitchenOpenSettings(
@@ -1549,18 +1984,34 @@ export function MenuEditor() {
         kitchenLoadWarningEnabled={kitchenLoadWarningEnabled}
         kitchenLoadWarningSaving={kitchenLoadWarningSaving}
         toggleKitchenLoadWarning={toggleKitchenLoadWarning}
-        happyHourEnabled={happyHourEnabled}
-        happyHourSaving={happyHourSaving}
-        happyHourModalOpen={happyHourModalOpen}
-        happyHourText={happyHourText}
-        happyHourCategories={happyHourCategories}
-        happyHourDiscountPercent={happyHourDiscountPercent}
-        happyHourStartsFrom={happyHourStartsFrom}
-        happyHourUntil={happyHourUntil}
-        openHappyHourModal={openHappyHourModal}
-        saveHappyHourSettings={saveHappyHourSettings}
-        setHappyHourStartsFrom={setHappyHourStartsFrom}
-        setHappyHourUntil={setHappyHourUntil}
+        businessLunches={businessLunches}
+        businessLunchSaving={businessLunchSaving}
+        businessLunchModalOpen={businessLunchModalOpen}
+        businessLunchDraft={businessLunchDraft}
+        businessLunchMessage={businessLunchMessage}
+        openNewBusinessLunchModal={openNewBusinessLunchModal}
+        openEditBusinessLunchModal={openEditBusinessLunchModal}
+        updateBusinessLunchDraft={updateBusinessLunchDraft}
+        toggleBusinessLunchDraftCategory={toggleBusinessLunchDraftCategory}
+        toggleBusinessLunchDraftDay={toggleBusinessLunchDraftDay}
+        setBusinessLunchModalOpen={setBusinessLunchModalOpen}
+        saveBusinessLunchModal={saveBusinessLunchModal}
+        toggleBusinessLunchEnabled={toggleBusinessLunchEnabled}
+        deleteBusinessLunch={deleteBusinessLunch}
+        promotions={promotions}
+        promotionSaving={promotionSaving}
+        promotionModalOpen={promotionModalOpen}
+        promotionDraft={promotionDraft}
+        promotionMessage={promotionMessage}
+        openNewPromotionModal={openNewPromotionModal}
+        openEditPromotionModal={openEditPromotionModal}
+        updatePromotionDraft={updatePromotionDraft}
+        togglePromotionDraftCategory={togglePromotionDraftCategory}
+        togglePromotionDraftDay={togglePromotionDraftDay}
+        setPromotionModalOpen={setPromotionModalOpen}
+        savePromotionModal={savePromotionModal}
+        togglePromotionEnabled={togglePromotionEnabled}
+        deletePromotion={deletePromotion}
         kitchenOpenEnabled={kitchenOpenEnabled}
         kitchenOpenSaving={kitchenOpenSaving}
         kitchenOpenUntil={kitchenOpenUntil}
@@ -1571,14 +2022,6 @@ export function MenuEditor() {
         barOpenUntil={barOpenUntil}
         saveBarOpenSettings={saveBarOpenSettings}
         setBarOpenUntil={setBarOpenUntil}
-        happyHourDraftText={happyHourDraftText}
-        setHappyHourDraftText={setHappyHourDraftText}
-        happyHourDraftDiscountPercent={happyHourDraftDiscountPercent}
-        setHappyHourDraftDiscountPercent={setHappyHourDraftDiscountPercent}
-        happyHourDraftCategories={happyHourDraftCategories}
-        toggleHappyHourDraftCategory={toggleHappyHourDraftCategory}
-        setHappyHourModalOpen={setHappyHourModalOpen}
-        saveHappyHourModal={saveHappyHourModal}
         dishCategories={dishCategories}
         allDrinkCategories={allDrinkCategories}
         categoryLabels={categoryLabels}
