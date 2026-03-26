@@ -281,7 +281,6 @@ export function Cart({
   const [serviceRequestBlockedUntil, setServiceRequestBlockedUntil] = useState(0);
   const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
   const [countdownNow, setCountdownNow] = useState(Date.now());
-  const [orderJumpExpanded, setOrderJumpExpanded] = useState(true);
   const [isOrderPanelVisible, setIsOrderPanelVisible] = useState(false);
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -1114,16 +1113,11 @@ export function Cart({
   }
 
   function scrollToOrder() {
-    const target = document.getElementById("new-order-panel");
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    orderPanelRef.current?.scrollIntoView({ behavior: "auto", block: "start" });
   }
 
   function handleOrderJump() {
-    if (orderJumpExpanded) {
-      scrollToOrder();
-    }
-
-    setOrderJumpExpanded((current) => !current);
+    scrollToOrder();
   }
 
   function getUpsellPromptType() {
@@ -1335,7 +1329,6 @@ export function Cart({
           className={
             [
               "order-jump-button",
-              orderJumpExpanded ? "order-jump-button--expanded" : "",
               language === "he" ? "order-jump-button--rtl" : ""
             ]
               .filter(Boolean)
@@ -1351,9 +1344,7 @@ export function Cart({
               {pendingOrderItemsCount}
             </span>
           ) : null}
-          {orderJumpExpanded ? (
-            <span className="order-jump-button__label">{text.jumpToOrder}</span>
-          ) : null}
+          <span className="order-jump-button__label">{text.jumpToOrder}</span>
         </button>
       ) : null}
       {flyingOrderItems.map((item) => {

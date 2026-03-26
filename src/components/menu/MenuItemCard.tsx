@@ -1,4 +1,4 @@
-import { MouseEvent, useState } from "react";
+import { MouseEvent } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
@@ -54,9 +54,6 @@ export function MenuItemCard({
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
-  const [expandedImageBadge, setExpandedImageBadge] = useState<MenuBadge | null>(
-    null
-  );
   const addLabel = language === "he" ? "הוסף" : "Add";
   const name =
     language === "he"
@@ -104,10 +101,6 @@ export function MenuItemCard({
     return badgeMeta[badge].label[language];
   }
 
-  function handleImageBadgeClick(badge: MenuBadge) {
-    setExpandedImageBadge((current) => (current === badge ? null : badge));
-  }
-
   return (
     <article className="menu-card">
       {hasImage ? (
@@ -115,28 +108,19 @@ export function MenuItemCard({
           {imageBadges.length ? (
             <div className="menu-card__image-badges" aria-label="Dish highlights">
               {imageBadges.map((badge) => (
-                <button
+                <span
                   key={badge}
-                  type="button"
-                  className={`menu-card__image-badge ${
-                    expandedImageBadge === badge
-                      ? "menu-card__image-badge--expanded"
-                      : ""
-                  }`}
+                  className="menu-card__image-badge menu-card__image-badge--expanded"
                   aria-label={getBadgeLabel(badge)}
                   title={getBadgeLabel(badge)}
-                  aria-expanded={expandedImageBadge === badge}
-                  onClick={() => handleImageBadgeClick(badge)}
                 >
                   <span className="menu-card__image-badge-icon" aria-hidden="true">
                     {badgeMeta[badge].icon}
                   </span>
-                  {expandedImageBadge === badge ? (
-                    <span className="menu-card__image-badge-label">
-                      {getBadgeLabel(badge)}
-                    </span>
-                  ) : null}
-                </button>
+                  <span className="menu-card__image-badge-label">
+                    {getBadgeLabel(badge)}
+                  </span>
+                </span>
               ))}
             </div>
           ) : null}
