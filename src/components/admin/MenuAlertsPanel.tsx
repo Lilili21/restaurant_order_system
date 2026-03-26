@@ -39,6 +39,17 @@ function formatPromotionCategorySummary(
 
 type Props = {
   notificationsOpen: boolean;
+  recommendationsOpen: boolean;
+  recommendations: Array<{
+    id: string;
+    title: string;
+    summary: string;
+    action: string;
+    focusItems: string[];
+    focusItemIds: string[];
+    quickActionLabel: string;
+  }>;
+  onRunRecommendation: (recommendationId: string) => void;
   kitchenLoadWarningEnabled: boolean;
   kitchenLoadWarningSaving: boolean;
   toggleKitchenLoadWarning: (enabled: boolean) => Promise<void>;
@@ -96,6 +107,9 @@ type Props = {
 
 function MenuAlertsPanelComponent({
   notificationsOpen,
+  recommendationsOpen,
+  recommendations,
+  onRunRecommendation,
   kitchenLoadWarningEnabled,
   kitchenLoadWarningSaving,
   toggleKitchenLoadWarning,
@@ -457,6 +471,57 @@ function MenuAlertsPanelComponent({
                 ✓
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {recommendationsOpen ? (
+        <div className="menu-notice-control">
+          <div className="menu-notice-control__promo-list">
+            {recommendations.map((recommendation) => (
+              <div
+                key={recommendation.id}
+                className="menu-notice-control__promo-row recommendation-row"
+              >
+                <div className="recommendation-row__main">
+                  <div>
+                    <p className="menu-notice-control__promo-title">
+                      {recommendation.title}
+                    </p>
+                    <p className="menu-notice-control__summary">
+                      {recommendation.summary}
+                    </p>
+                  </div>
+                  <p className="menu-notice-control__promo-message">Suggested action</p>
+                  <p className="menu-notice-control__summary">
+                    {recommendation.action}
+                  </p>
+                </div>
+                <div className="recommendation-row__side">
+                  <p className="menu-notice-control__promo-message">Focus items</p>
+                  {recommendation.focusItems.length ? (
+                    <div className="orders-filter__chips recommendation-row__chips">
+                      {recommendation.focusItems.map((item) => (
+                        <span key={item} className="orders-filter__chip">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="menu-notice-control__summary">
+                      Applies at menu level.
+                    </p>
+                  )}
+                  <button
+                    className="admin-menu-bubble recommendation-row__action"
+                    type="button"
+                    onClick={() => onRunRecommendation(recommendation.id)}
+                  >
+                    {recommendation.quickActionLabel}
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}

@@ -11,7 +11,7 @@
     "descriptionEn": "rum wrum wrum wrum",
     "price": 50,
     "image": "/images/default-menu-item.svg",
-    "showImage": false,
+    "showImage": true,
     "available": true,
     "badges": [
       "new"
@@ -36,7 +36,7 @@
     "descriptionEn": "",
     "price": 20,
     "image": "/images/default-menu-item.svg",
-    "showImage": false,
+    "showImage": true,
     "available": true,
     "badges": [],
     "volumeOptions": [
@@ -135,7 +135,7 @@
     "nameEn": "Tabbouleh salad",
     "descriptionHe": "בורגול, הרבה ירק, לימון, עגבניות ונענע.",
     "descriptionEn": "Bulgur, lots of greens, lemon, tomatoes and mint.",
-    "showImage": false,
+    "showImage": true,
     "badges": [
       "new",
       "gluten_free"
@@ -218,7 +218,9 @@
     "descriptionHe": "קינוח חם עם גבינה, פיסטוקים וסירופ.",
     "descriptionEn": "Warm dessert with cheese, pistachios and syrup.",
     "showImage": true,
-    "badges": [],
+    "badges": [
+      "gluten_free"
+    ],
     "volumeOptions": []
   }
 ]

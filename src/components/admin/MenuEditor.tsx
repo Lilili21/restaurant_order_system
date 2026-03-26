@@ -101,6 +101,18 @@ type DashboardCharts = {
   revenueTrend: number[];
 };
 
+type RecommendationItem = {
+  id: string;
+  title: string;
+  summary: string;
+  action: string;
+  focusItems: string[];
+  focusItemIds: string[];
+  quickActionLabel: string;
+  targetKind: "dishes" | "drinks" | null;
+  targetCategories?: MenuCategory[];
+};
+
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
   draftNameEn: string;
@@ -333,6 +345,17 @@ function parseVolumeRows(value: string) {
     });
 }
 
+function getEditorItemDisplayName(item: EditableMenuItem) {
+  return (
+    item.draftNameEn?.trim() ||
+    item.draftNameHe?.trim() ||
+    item.nameEn?.trim() ||
+    item.nameHe?.trim() ||
+    item.name?.trim() ||
+    "Untitled item"
+  );
+}
+
 function stringifyVolumeRows(rows: Array<{ label: string; price: string }>) {
   return rows
     .filter((row) => row.label.trim() || row.price.trim())
@@ -469,7 +492,9 @@ export function MenuEditor() {
   });
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
+  const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [recommendationsOpen, setRecommendationsOpen] = useState(false);
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
@@ -514,6 +539,428 @@ export function MenuEditor() {
     [pathSegments]
   );
   const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
+  const recommendations = useMemo<RecommendationItem[]>(() => {
+    const normalizeAdviceName = (value: string) =>
+      value
+        .toLocaleLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/[^\p{L}\p{N}\s]/gu, "")
+        .trim();
+    const availableItems = items.filter((item) => item.available);
+    const unavailableDishes = items
+      .filter(
+        (item) =>
+          !item.available && !drinkCategories.includes(item.draftCategory)
+      )
+      .slice(0, 3);
+    const unavailableDrinks = items
+      .filter(
+        (item) =>
+          !item.available && drinkCategories.includes(item.draftCategory)
+      )
+      .slice(0, 3);
+    const availableDishes = availableItems.filter(
+      (item) => !drinkCategories.includes(item.draftCategory)
+    );
+    const availableDrinks = availableItems.filter((item) =>
+      drinkCategories.includes(item.draftCategory)
+    );
+    const dishesWithoutDescription = availableDishes
+      .filter(
+        (item) =>
+          !item.draftDescriptionHe.trim() && !item.draftDescriptionEn.trim()
+      )
+      .slice(0, 3);
+    const drinksWithoutDescription = availableDrinks
+      .filter(
+        (item) =>
+          !item.draftDescriptionHe.trim() && !item.draftDescriptionEn.trim()
+      )
+      .slice(0, 3);
+    const availableDesserts = availableItems.filter(
+      (item) => item.draftCategory === "desserts"
+    );
+    const itemsWithoutImage = availableItems.filter(
+      (item) => !item.draftImage.trim() || !item.draftShowImage
+    );
+    const imageDishes = itemsWithoutImage
+      .filter((item) => !drinkCategories.includes(item.draftCategory))
+      .slice(0, 3);
+    const imageDrinks = itemsWithoutImage
+      .filter((item) => drinkCategories.includes(item.draftCategory))
+      .slice(0, 3);
+    const itemsWithoutBadges = availableItems.filter(
+      (item) => (item.draftBadges ?? []).length === 0
+    );
+    const badgeDishes = itemsWithoutBadges
+      .filter((item) => !drinkCategories.includes(item.draftCategory))
+      .slice(0, 3);
+    const badgeDrinks = itemsWithoutBadges
+      .filter((item) => drinkCategories.includes(item.draftCategory))
+      .slice(0, 3);
+    const hiddenImageDishes = availableDishes
+      .filter((item) => item.draftImage.trim() && !item.draftShowImage)
+      .slice(0, 3);
+    const hiddenImageDrinks = availableDrinks
+      .filter((item) => item.draftImage.trim() && !item.draftShowImage)
+      .slice(0, 3);
+    const drinksWithoutVolumeOptions = availableDrinks
+      .filter((item) => !item.draftVolumeOptionsText.trim())
+      .slice(0, 3);
+    const drinksWithoutHighlight = availableDrinks
+      .filter(
+        (item) =>
+          !(item.draftBadges ?? []).includes("most_popular") &&
+          !(item.draftBadges ?? []).includes("new")
+      )
+      .slice(0, 3);
+    const topDishNames = insightStats.topDish
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const topDishesMissingBadge = availableDishes
+      .filter((item) => {
+        const normalizedName = normalizeAdviceName(getEditorItemDisplayName(item));
+        return (
+          topDishNames.some(
+            (topDishName) => normalizeAdviceName(topDishName) === normalizedName
+          ) && !(item.draftBadges ?? []).includes("most_popular")
+        );
+      })
+      .slice(0, 3);
+    const startersAvailable = availableDishes.some(
+      (item) => item.draftCategory === "starters"
+    );
+    const mainsAvailable = availableDishes.some(
+      (item) => item.draftCategory === "mains"
+    );
+    const hasEnabledBusinessLunch = businessLunches.some(
+      (businessLunch) => businessLunch.enabled
+    );
+    const hasActivePromo = promotions.some((promotion) => promotion.enabled);
+    const peakHourAvailable =
+      insightStats.peakHour !== "—" && insightStats.peakHour.trim().length > 0;
+    const nextRecommendations: RecommendationItem[] = [];
+
+    if (insightStats.lowDish !== "—") {
+      nextRecommendations.push({
+        id: "slow-movers",
+        title: "Lift slow movers",
+        summary: `Low-performing dishes right now: ${insightStats.lowDish}. They likely need stronger placement or a clearer reason to choose them.`,
+        action:
+          "Add a promo, improve the image, or place one of these items near the top of its category before slower hours.",
+        focusItems: insightStats.lowDish.split(",").map((item) => item.trim()).filter(Boolean),
+        focusItemIds: [],
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (imageDishes.length > 0) {
+      nextRecommendations.push({
+        id: "images-dishes",
+        title: "Add images to improve dish conversion",
+        summary:
+          "Some live dishes still have no visible image. Those usually underperform on the customer menu compared with photo-backed cards.",
+        action:
+          "Upload photos for these dishes first, especially if they are high-margin or often ordered together with drinks.",
+        focusItems: imageDishes.map(getEditorItemDisplayName),
+        focusItemIds: imageDishes.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (imageDrinks.length > 0) {
+      nextRecommendations.push({
+        id: "images-drinks",
+        title: "Add images to improve drink conversion",
+        summary:
+          "Some live drinks still have no visible image. Those usually underperform on the customer menu compared with photo-backed cards.",
+        action:
+          "Upload photos for these drinks first, especially the ones used in upsell or recommendation flows.",
+        focusItems: imageDrinks.map(getEditorItemDisplayName),
+        focusItemIds: imageDrinks.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (hiddenImageDishes.length > 0) {
+      nextRecommendations.push({
+        id: "show-images-dishes",
+        title: "Turn dish photos back on",
+        summary:
+          "Some dishes already have uploaded images, but image display is switched off. That removes visual proof without any extra benefit.",
+        action:
+          "Re-enable photos for the strongest dish cards first so guests can scan the menu faster.",
+        focusItems: hiddenImageDishes.map(getEditorItemDisplayName),
+        focusItemIds: hiddenImageDishes.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (hiddenImageDrinks.length > 0) {
+      nextRecommendations.push({
+        id: "show-images-drinks",
+        title: "Turn drink photos back on",
+        summary:
+          "Some drinks already have uploaded images, but image display is switched off. That weakens visual upsell on the customer menu.",
+        action:
+          "Re-enable photos for signature drinks and cocktails first so they stand out in the drinks flow.",
+        focusItems: hiddenImageDrinks.map(getEditorItemDisplayName),
+        focusItemIds: hiddenImageDrinks.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (badgeDishes.length > 0) {
+      nextRecommendations.push({
+        id: "badges-dishes",
+        title: "Use dish badges more deliberately",
+        summary:
+          "Several live dishes are missing badges like Most popular, New, Vegan, or Spicy, so they lose quick visual context in the menu.",
+        action:
+          "Tag the strongest candidates with one clear badge each. Start with items that are easier to sell through social proof or dietary filters.",
+        focusItems: badgeDishes.map(getEditorItemDisplayName),
+        focusItemIds: badgeDishes.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (badgeDrinks.length > 0) {
+      nextRecommendations.push({
+        id: "badges-drinks",
+        title: "Use drink badges more deliberately",
+        summary:
+          "Several live drinks are missing badges like Most popular or New, so they lose quick visual context in the menu.",
+        action:
+          "Badge the drinks you want to push most, especially cocktails, signature serves, and items with strong margins.",
+        focusItems: badgeDrinks.map(getEditorItemDisplayName),
+        focusItemIds: badgeDrinks.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (drinksWithoutVolumeOptions.length > 0) {
+      nextRecommendations.push({
+        id: "drink-volume-options",
+        title: "Add drink size or pour options",
+        summary:
+          "Some live drinks have no volume options yet. That makes the bar menu feel flatter and leaves upsell room on the table.",
+        action:
+          "Add at least one labeled pour or serving option first for the strongest drinks you want to push.",
+        focusItems: drinksWithoutVolumeOptions.map(getEditorItemDisplayName),
+        focusItemIds: drinksWithoutVolumeOptions.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (dishesWithoutDescription.length > 0) {
+      nextRecommendations.push({
+        id: "descriptions-dishes",
+        title: "Add short dish descriptions",
+        summary:
+          "Some live dishes still have no description at all. Even one short line helps guests decide faster and reduces hesitation.",
+        action:
+          "Start with a one-sentence benefit for each dish: key ingredient, texture, or serving style.",
+        focusItems: dishesWithoutDescription.map(getEditorItemDisplayName),
+        focusItemIds: dishesWithoutDescription.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (drinksWithoutDescription.length > 0) {
+      nextRecommendations.push({
+        id: "descriptions-drinks",
+        title: "Add short drink descriptions",
+        summary:
+          "Some live drinks still have no description at all. A quick note on taste or mix can make the bar menu feel much clearer.",
+        action:
+          "Add a short cue for each drink, for example spirit base, sweetness, or freshness.",
+        focusItems: drinksWithoutDescription.map(getEditorItemDisplayName),
+        focusItemIds: drinksWithoutDescription.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (availableDishes.length > 0 && availableDrinks.length > 0 && drinksWithoutHighlight.length > 0) {
+      nextRecommendations.push({
+        id: "drink-attach",
+        title: "Increase drink attach rate",
+        summary:
+          "You have a healthy food menu and live drinks, but some drink items are not highlighted at all. That makes beverage upsell harder at checkout.",
+        action:
+          "Mark 2-3 drinks as Most popular or New, then surface them whenever a guest has dishes in the cart but no drinks yet.",
+        focusItems: drinksWithoutHighlight.map(getEditorItemDisplayName),
+        focusItemIds: drinksWithoutHighlight.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (topDishesMissingBadge.length > 0) {
+      nextRecommendations.push({
+        id: "bestseller-badges",
+        title: "Mark best sellers as Most popular",
+        summary:
+          "Some items already performing as top dishes are not labeled as Most popular yet, so you are missing easy social proof.",
+        action:
+          "Add the Most popular badge to these winners first so guests spot them immediately.",
+        focusItems: topDishesMissingBadge.map(getEditorItemDisplayName),
+        focusItemIds: topDishesMissingBadge.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (availableDesserts.length <= 1) {
+      nextRecommendations.push({
+        id: "desserts",
+        title: "Strengthen dessert upsell",
+        summary:
+          "Dessert coverage is thin right now, which makes the last-step upsell weaker than it could be.",
+        action:
+          "Add one more easy dessert or promote the current dessert earlier in the flow, especially after mains are added.",
+        focusItems: availableDesserts.map(getEditorItemDisplayName),
+        focusItemIds: availableDesserts.map((item) => item.id),
+        quickActionLabel: "Open desserts",
+        targetKind: "dishes",
+        targetCategories: ["desserts"]
+      });
+    }
+
+    if (
+      startersAvailable &&
+      mainsAvailable &&
+      !hasEnabledBusinessLunch
+    ) {
+      nextRecommendations.push({
+        id: "business-lunch",
+        title: "Create a business lunch set",
+        summary:
+          "You already have the core categories for a lunch offer, but there is no enabled business lunch right now.",
+        action:
+          "Bundle one starter and one main into a weekday lunch offer to create a faster decision path during daytime traffic.",
+        focusItems: [],
+        focusItemIds: [],
+        quickActionLabel: "Create lunch",
+        targetKind: null
+      });
+    }
+
+    if (!startersAvailable || !mainsAvailable) {
+      const missingCategories = [
+        !startersAvailable ? "starters" : null,
+        !mainsAvailable ? "mains" : null
+      ].filter(Boolean) as MenuCategory[];
+      const missingCategoryLabels = missingCategories.map(
+        (category) => categoryLabels[category]
+      );
+
+      nextRecommendations.push({
+        id: "dish-coverage",
+        title: "Balance dish category coverage",
+        summary: `Some core dish categories are empty right now: ${missingCategoryLabels.join(", ")}.`,
+        action:
+          "Add at least one strong option in each core category so the customer menu feels complete and easier to browse.",
+        focusItems: [],
+        focusItemIds: [],
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes",
+        targetCategories: missingCategories
+      });
+    }
+
+    if (unavailableDishes.length > 0) {
+      nextRecommendations.push({
+        id: "unavailable-dishes",
+        title: "Review unavailable dishes",
+        summary:
+          "Some dish cards are currently unavailable. If that stays for long, guests will see a thinner menu than intended.",
+        action:
+          "Bring back the strongest dishes when possible, or replace them so the core food offer stays complete.",
+        focusItems: unavailableDishes.map(getEditorItemDisplayName),
+        focusItemIds: unavailableDishes.map((item) => item.id),
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (unavailableDrinks.length > 0) {
+      nextRecommendations.push({
+        id: "unavailable-drinks",
+        title: "Review unavailable drinks",
+        summary:
+          "Some drink cards are currently unavailable. That can weaken drink attach rate and make the bar section feel patchy.",
+        action:
+          "Restore the most requested drinks first, or swap them for available alternatives with similar role in the menu.",
+        focusItems: unavailableDrinks.map(getEditorItemDisplayName),
+        focusItemIds: unavailableDrinks.map((item) => item.id),
+        quickActionLabel: "Open drinks",
+        targetKind: "drinks"
+      });
+    }
+
+    if (!hasActivePromo && peakHourAvailable) {
+      nextRecommendations.push({
+        id: "timed-promo",
+        title: "Schedule a timed recommendation window",
+        summary: `Peak traffic is around ${insightStats.peakHour}, but there is no enabled promo or recommendation window helping guests choose faster.`,
+        action:
+          "Create a lightweight timed recommendation set for 30-60 minutes before peak hour: one drink, one main, one dessert.",
+        focusItems: [],
+        focusItemIds: [],
+        quickActionLabel: "Create promo",
+        targetKind: null
+      });
+    }
+
+    if (insightStats.topDish !== "—") {
+      nextRecommendations.push({
+        id: "social-proof",
+        title: "Turn best sellers into anchors",
+        summary: `Top dishes right now: ${insightStats.topDish}. These items should anchor categories and pull attention to nearby upsells.`,
+        action:
+          "Keep them near the top, give them strong photos and badges, and pair each with one drink or dessert recommendation.",
+        focusItems: insightStats.topDish.split(",").map((item) => item.trim()).filter(Boolean),
+        focusItemIds: [],
+        quickActionLabel: "Open dishes",
+        targetKind: "dishes"
+      });
+    }
+
+    if (!nextRecommendations.length) {
+      nextRecommendations.push({
+        id: "baseline",
+        title: "Build a simple recommendation engine first",
+        summary:
+          "You already have enough data to start without machine learning: menu metadata, badges, categories, availability, and shift analytics.",
+        action:
+          "Begin with three rules: recommend drinks if the cart has dishes only, recommend dessert before checkout, and prioritize available high-margin items during quiet hours.",
+        focusItems: [],
+        focusItemIds: [],
+        quickActionLabel: "Open menu",
+        targetKind: null
+      });
+    }
+
+    return nextRecommendations.slice(0, 10);
+  }, [
+    businessLunches,
+    insightStats.lowDish,
+    insightStats.peakHour,
+    insightStats.topDish,
+    items,
+    promotions
+  ]);
 
   useEffect(() => {
     if (!isAuthorized || !secondaryCredentials) {
@@ -1671,13 +2118,30 @@ export function MenuEditor() {
           (selectedKind === "drinks"
             ? drinkCategories.includes(item.category)
             : !drinkCategories.includes(item.category)) &&
+          (!recommendationFocusItemIds ||
+            recommendationFocusItemIds.includes(item.id)) &&
           (selectedCategories.length === 0 ||
             selectedCategories.includes(item.category))
       ),
-    [items, selectedCategories, selectedKind]
+    [items, recommendationFocusItemIds, selectedCategories, selectedKind]
   );
 
+  useEffect(() => {
+    if (!recommendationFocusItemIds?.length) {
+      return;
+    }
+
+    const hasAnyFocusedItem = items.some((item) =>
+      recommendationFocusItemIds.includes(item.id)
+    );
+
+    if (!hasAnyFocusedItem) {
+      setRecommendationFocusItemIds(null);
+    }
+  }, [items, recommendationFocusItemIds]);
+
   const toggleCategory = useCallback(function toggleCategory(category: MenuCategory) {
+    setRecommendationFocusItemIds(null);
     setSelectedCategories((current) =>
       current.includes(category)
         ? current.filter((value) => value !== category)
@@ -1738,6 +2202,8 @@ export function MenuEditor() {
     setPreviewOpen(false);
     setMenuOpen(false);
     setNotificationsOpen(false);
+    setRecommendationsOpen(false);
+    setRecommendationFocusItemIds(null);
   }, []);
 
   const toggleMenuBlock = useCallback(function toggleMenuBlock() {
@@ -1748,10 +2214,12 @@ export function MenuEditor() {
         setPreviewOpen(false);
         setMenuOpen(false);
         setNotificationsOpen(false);
+        setRecommendationsOpen(false);
       } else {
         setDashboardOpen(false);
         setSettingsButtonsOpen(false);
         setNotificationsOpen(false);
+        setRecommendationsOpen(false);
         setPreviewOpen(true);
         setMenuOpen(false);
       }
@@ -1766,12 +2234,14 @@ export function MenuEditor() {
 
       if (!nextOpen) {
         setNotificationsOpen(false);
+        setRecommendationsOpen(false);
       } else {
         setDashboardOpen(false);
         setMenuButtonsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
         setNotificationsOpen(true);
+        setRecommendationsOpen(false);
       }
 
       return nextOpen;
@@ -1788,6 +2258,7 @@ export function MenuEditor() {
         setPreviewOpen(false);
         setMenuOpen(false);
         setNotificationsOpen(false);
+        setRecommendationsOpen(false);
       }
 
       return nextOpen;
@@ -1795,6 +2266,7 @@ export function MenuEditor() {
   }, []);
 
   const selectDishes = useCallback(() => {
+    setRecommendationFocusItemIds(null);
     setSelectedKind("dishes");
     setSelectedCategories([]);
     setNewItem((current) => ({
@@ -1810,6 +2282,7 @@ export function MenuEditor() {
   }, []);
 
   const selectDrinks = useCallback(() => {
+    setRecommendationFocusItemIds(null);
     setSelectedKind("drinks");
     setSelectedCategories([]);
     setNewItem((current) => ({
@@ -1829,6 +2302,24 @@ export function MenuEditor() {
 
       if (nextOpen) {
         setMenuOpen(false);
+        setRecommendationsOpen(false);
+        setRecommendationFocusItemIds(null);
+      }
+
+      return nextOpen;
+    });
+  }, []);
+
+  const toggleRecommendations = useCallback(() => {
+    setRecommendationsOpen((current) => {
+      const nextOpen = !current;
+
+      if (nextOpen) {
+        setNotificationsOpen(false);
+        setPreviewOpen(false);
+        setMenuOpen(false);
+      } else {
+        setRecommendationFocusItemIds(null);
       }
 
       return nextOpen;
@@ -1841,6 +2332,8 @@ export function MenuEditor() {
 
       if (nextOpen) {
         setPreviewOpen(false);
+        setRecommendationsOpen(false);
+        setRecommendationFocusItemIds(null);
       }
 
       return nextOpen;
@@ -1848,7 +2341,10 @@ export function MenuEditor() {
   }, []);
 
   const toggleNotifications = useCallback(
-    () => setNotificationsOpen((current) => !current),
+    () => {
+      setRecommendationFocusItemIds(null);
+      setNotificationsOpen((current) => !current);
+    },
     []
   );
 
@@ -1857,7 +2353,57 @@ export function MenuEditor() {
     []
   );
 
-  const clearSelectedCategories = useCallback(() => setSelectedCategories([]), []);
+  const clearSelectedCategories = useCallback(() => {
+    setRecommendationFocusItemIds(null);
+    setSelectedCategories([]);
+  }, []);
+
+  const runRecommendationAction = useCallback(
+    (recommendationId: string) => {
+      const recommendation = recommendations.find((item) => item.id === recommendationId);
+
+      if (!recommendation) {
+        return;
+      }
+
+      setDashboardOpen(false);
+      setSettingsButtonsOpen(false);
+      setMenuButtonsOpen(true);
+      setPreviewOpen(false);
+      setMenuOpen(true);
+      setNotificationsOpen(false);
+      setRecommendationsOpen(false);
+
+      if (recommendationId === "timed-promo") {
+        setMenuButtonsOpen(false);
+        setSettingsButtonsOpen(true);
+        setMenuOpen(false);
+        setRecommendationFocusItemIds(null);
+        openNewPromotionModal();
+        return;
+      }
+
+      if (recommendationId === "business-lunch") {
+        setMenuButtonsOpen(false);
+        setSettingsButtonsOpen(true);
+        setMenuOpen(false);
+        setRecommendationFocusItemIds(null);
+        openNewBusinessLunchModal();
+        return;
+      }
+
+      if (recommendation.targetKind) {
+        setSelectedKind(recommendation.targetKind);
+      }
+
+      setSelectedCategories(recommendation.targetCategories ?? []);
+
+      setRecommendationFocusItemIds(
+        recommendation.focusItemIds.length ? recommendation.focusItemIds : null
+      );
+    },
+    [openNewBusinessLunchModal, openNewPromotionModal, recommendations]
+  );
 
   const toggleNewDescription = useCallback(
     () => setNewDescriptionExpanded((current) => !current),
@@ -1967,6 +2513,8 @@ export function MenuEditor() {
         restaurantSlug={restaurantSlug}
         notificationsOpen={notificationsOpen}
         onToggleNotifications={toggleNotifications}
+        recommendationsOpen={recommendationsOpen}
+        onToggleRecommendations={toggleRecommendations}
         selectedKind={selectedKind}
         onSelectDishes={selectDishes}
         onSelectDrinks={selectDrinks}
@@ -1981,6 +2529,9 @@ export function MenuEditor() {
       {previewOpen ? <MenuPreviewPanel src={menuPreviewHref} /> : null}
       <MenuAlertsPanel
         notificationsOpen={notificationsOpen}
+        recommendationsOpen={recommendationsOpen}
+        recommendations={recommendations}
+        onRunRecommendation={runRecommendationAction}
         kitchenLoadWarningEnabled={kitchenLoadWarningEnabled}
         kitchenLoadWarningSaving={kitchenLoadWarningSaving}
         toggleKitchenLoadWarning={toggleKitchenLoadWarning}

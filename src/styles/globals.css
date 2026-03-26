@@ -2330,6 +2330,41 @@ textarea.modal-input {
   justify-self: start;
 }
 
+.recommendation-row {
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.72fr);
+  align-items: start;
+}
+
+.recommendation-row__main {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.recommendation-row__side {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.recommendation-row__chips {
+  gap: 10px;
+}
+
+.recommendation-row__chips .orders-filter__chip {
+  min-height: 42px;
+  padding: 0 16px;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 220px;
+  font-size: 0.96rem;
+  line-height: 1.1;
+}
+
+.recommendation-row__action {
+  justify-self: start;
+}
+
 .menu-notice-control__summary {
   flex: 0 1 auto;
   margin: 0;
@@ -2440,6 +2475,10 @@ textarea.modal-input {
   .menu-notice-control__promo-row {
     grid-template-columns: 1fr;
     align-items: start;
+  }
+
+  .recommendation-row {
+    grid-template-columns: 1fr;
   }
 
   .menu-notice-control--inline .menu-settings-panel__field--compact {

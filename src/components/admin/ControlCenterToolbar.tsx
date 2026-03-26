@@ -27,6 +27,8 @@ type Props = {
   restaurantSlug: string;
   notificationsOpen: boolean;
   onToggleNotifications: () => void;
+  recommendationsOpen: boolean;
+  onToggleRecommendations: () => void;
   selectedKind: "dishes" | "drinks";
   onSelectDishes: () => void;
   onSelectDrinks: () => void;
@@ -49,6 +51,8 @@ function ControlCenterToolbarComponent({
   restaurantSlug,
   notificationsOpen,
   onToggleNotifications,
+  recommendationsOpen,
+  onToggleRecommendations,
   selectedKind,
   onSelectDishes,
   onSelectDrinks
@@ -100,6 +104,17 @@ function ControlCenterToolbarComponent({
       </div>
       {menuButtonsOpen ? (
         <div className="menu-editor__toolbar-row">
+          <button
+            className={
+              recommendationsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={onToggleRecommendations}
+          >
+            Advices
+          </button>
           <button
             className={
               previewOpen
