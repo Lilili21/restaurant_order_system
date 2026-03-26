@@ -1,8 +1,21 @@
 {
-  "workingHoursRules": [],
+  "workingHoursRules": [
+    {
+      "id": "hours-1774523215656-io8aue",
+      "days": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "from": "10:00",
+      "until": "02:00"
+    }
+  ],
   "kitchenLoadWarningEnabled": false,
-  "workingHoursFrom": null,
-  "workingHoursUntil": null,
+  "workingHoursFrom": "10:00",
+  "workingHoursUntil": "02:00",
   "happyHourEnabled": false,
   "happyHourText": "dfg",
   "happyHourCategories": [
@@ -53,8 +66,8 @@
       "until": null
     }
   ],
-  "kitchenOpenEnabled": true,
-  "kitchenOpenUntil": "2026-03-25T22:50:00.000Z",
+  "kitchenOpenEnabled": false,
+  "kitchenOpenUntil": null,
   "barOpenEnabled": false,
   "barOpenUntil": null,
   "tableCount": 8,

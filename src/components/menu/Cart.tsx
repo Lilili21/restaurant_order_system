@@ -96,7 +96,8 @@ const uiText = {
     table: "שולחן",
     tableOrderingHint: "📍 אתם מזמינים משולחן מספר",
     callWaiter: "קרא למלצר",
-    requestBill: "בקש חשבון",
+    requestBill: "הביאו חשבון",
+    serviceHelp: "עזרה / שאלה",
     welcomeTitle: "ברוכים הבאים",
     welcomeText: "בחרו מנות מהתפריט ושלחו את ההזמנה ישירות מהשולחן שלכם.",
     welcomeOk: "אישור",
@@ -117,8 +118,8 @@ const uiText = {
     serveModeText: "בחרו את אופן ההגשה המתאים לכם.",
     serveAll: "להגיש הכול יחד",
     serveAsReady: "להגיש לפי המוכן",
-    newOrder: "הזמנה חדשה",
-    emptyCart: "הסל עדיין ריק. הוסיפו מנות מהתפריט.",
+    newOrder: "ההזמנה שלי",
+    emptyCart: "ההזמנה שלכם עדיין ריקה. הוסיפו משהו טעים מהתפריט.",
     total: "סה\"כ",
     happyHourDiscount: "הנחת Happy hour",
     submit: "שלח הזמנה",
@@ -157,7 +158,7 @@ const uiText = {
     waiterError: "לא ניתן היה לקרוא למלצר",
     billError: "לא ניתן היה לבקש חשבון",
     close: "סגור חלון",
-    jumpToOrder: "Orders",
+    jumpToOrder: "ההזמנה שלי",
     quickInfo: [
       "📍 סניפים נוספים",
       "⭐ השאירו ביקורת",
@@ -169,7 +170,8 @@ const uiText = {
     table: "Table",
     tableOrderingHint: "📍 You are ordering from table",
     callWaiter: "Call waiter",
-    requestBill: "Request bill",
+    requestBill: "Bring bill",
+    serviceHelp: "Help / question",
     welcomeTitle: "Welcome",
     welcomeText:
       "Choose your dishes and send the order straight to the kitchen from your table.",
@@ -190,8 +192,8 @@ const uiText = {
     serveModeText: "Choose the serving option that works best for you.",
     serveAll: "Serve everything together",
     serveAsReady: "Serve as ready",
-    newOrder: "New order",
-    emptyCart: "It is empty for now. Add dishes from the menu.",
+    newOrder: "My order",
+    emptyCart: "Your order is empty. Add something tasty from the menu.",
     total: "Total",
     happyHourDiscount: "Happy hour discount",
     submit: "Place order",
@@ -201,7 +203,7 @@ const uiText = {
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
     billRequested: "A waiter will bring your bill shortly.\nThank you for dining with us!",
-    waiterServiceNote: "A waiter will be with you shortly.",
+    waiterServiceNote: "Waiter is on the way.",
     waiterAlreadyCalled: "A waiter will be at your table shortly.",
     kitchenOpen: "Kitchen closed in",
     kitchenClosed: "Kitchen closed",
@@ -230,7 +232,7 @@ const uiText = {
     waiterError: "Failed to call the waiter",
     billError: "Failed to request the bill",
     close: "Close dialog",
-    jumpToOrder: "Orders",
+    jumpToOrder: "My order",
     quickInfo: [
       "📍 Other locations",
       "⭐ Leave a review",
@@ -277,10 +279,13 @@ export function Cart({
   );
   const [hasActiveServiceRequest, setHasActiveServiceRequest] = useState(false);
   const [serviceRequestBlockedUntil, setServiceRequestBlockedUntil] = useState(0);
+  const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
   const [countdownNow, setCountdownNow] = useState(Date.now());
-  const [orderJumpExpanded, setOrderJumpExpanded] = useState(false);
+  const [orderJumpExpanded, setOrderJumpExpanded] = useState(true);
+  const [isOrderPanelVisible, setIsOrderPanelVisible] = useState(false);
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
+  const orderPanelRef = useRef<HTMLElement | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
   const lastSuccessfulOrderSignatureRef = useRef<{
@@ -302,6 +307,10 @@ export function Cart({
       sum +
       (item.cartItem.priceOverride ?? item.menuItem.price) *
         item.cartItem.quantity,
+    0
+  );
+  const pendingOrderItemsCount = items.reduce(
+    (sum, item) => sum + item.quantity,
     0
   );
   const hasDessertInOrder = detailedItems.some(
@@ -348,6 +357,13 @@ export function Cart({
   const isKitchenClosed = showKitchenClosedBanner;
   const isBarClosed = showBarClosedBanner;
   const areKitchenAndBarClosed = isKitchenClosed && isBarClosed;
+  const submitDisabled =
+    detailedItems.length === 0 ||
+    submitting ||
+    areKitchenAndBarClosed ||
+    (isKitchenClosed && hasDishesInOrder) ||
+    (isBarClosed && hasDrinksInOrder);
+  const shouldAnimateSubmitButton = detailedItems.length > 0 && !submitDisabled;
   const promoCategoryLabels = useMemo<Record<MenuCategory, string>>(
     () => ({
       starters: language === "he" ? "מנות פתיחה" : "starters",
@@ -606,6 +622,29 @@ export function Cart({
     }
   }, [pendingOrderStorageKey]);
 
+  useEffect(() => {
+    const panelElement = orderPanelRef.current;
+
+    if (!panelElement) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsOrderPanelVisible(entry.isIntersecting);
+      },
+      {
+        threshold: 0.2
+      }
+    );
+
+    observer.observe(panelElement);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [orderingEnabled]);
+
   function setNextLanguage(nextLanguage: MenuLanguage) {
     setLanguage(nextLanguage);
     window.localStorage.setItem(
@@ -614,6 +653,12 @@ export function Cart({
     );
     setShowWelcomeDialog(true);
   }
+
+  useEffect(() => {
+    if (serviceRequestDisabled) {
+      setServiceMenuOpen(false);
+    }
+  }, [serviceRequestDisabled]);
 
   useEffect(() => {
     if (!orderingEnabled) {
@@ -1074,13 +1119,11 @@ export function Cart({
   }
 
   function handleOrderJump() {
-    if (!orderJumpExpanded) {
-      setOrderJumpExpanded(true);
-      return;
+    if (orderJumpExpanded) {
+      scrollToOrder();
     }
 
-    scrollToOrder();
-    setOrderJumpExpanded(false);
+    setOrderJumpExpanded((current) => !current);
   }
 
   function getUpsellPromptType() {
@@ -1286,7 +1329,7 @@ export function Cart({
         </div>
       ) : null}
 
-      {orderingEnabled ? (
+      {orderingEnabled && !isOrderPanelVisible ? (
         <button
           ref={orderJumpButtonRef}
           className={
@@ -1303,6 +1346,11 @@ export function Cart({
           onClick={handleOrderJump}
         >
           <span aria-hidden="true">🍽</span>
+          {pendingOrderItemsCount > 0 ? (
+            <span className="order-jump-button__count">
+              {pendingOrderItemsCount}
+            </span>
+          ) : null}
           {orderJumpExpanded ? (
             <span className="order-jump-button__label">{text.jumpToOrder}</span>
           ) : null}
@@ -1431,19 +1479,39 @@ export function Cart({
                 <button
                   className="button-danger button-danger--call"
                   type="button"
-                  onClick={callWaiter}
+                  onClick={() => setServiceMenuOpen((current) => !current)}
                   disabled={serviceRequestDisabled}
+                  aria-expanded={serviceMenuOpen}
+                  aria-controls="service-action-menu"
                 >
                   {text.callWaiter}
                 </button>
-                <button
-                  className="button-neutral button-neutral--bill"
-                  type="button"
-                  onClick={requestBill}
-                  disabled={serviceRequestDisabled}
-                >
-                  {text.requestBill}
-                </button>
+                {serviceMenuOpen ? (
+                  <div id="service-action-menu" className="service-action-menu">
+                    <button
+                      className="button-neutral button-neutral--bill"
+                      type="button"
+                      onClick={() => {
+                        setServiceMenuOpen(false);
+                        void requestBill();
+                      }}
+                      disabled={serviceRequestDisabled}
+                    >
+                      {text.requestBill}
+                    </button>
+                    <button
+                      className="button-neutral button-neutral--bill"
+                      type="button"
+                      onClick={() => {
+                        setServiceMenuOpen(false);
+                        void callWaiter();
+                      }}
+                      disabled={serviceRequestDisabled}
+                    >
+                      {text.serviceHelp}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -1455,6 +1523,8 @@ export function Cart({
             language={language}
             quantities={quantities}
             orderingEnabled={orderingEnabled}
+            dishesClosed={showKitchenClosedBanner}
+            drinksClosed={showBarClosedBanner}
             categoryDiscounts={categoryDiscounts}
             onAdd={addItem}
             onDecrease={decreaseItem}
@@ -1462,13 +1532,22 @@ export function Cart({
           />
 
           {orderingEnabled ? (
-          <aside id="new-order-panel" className="cart-panel">
+          <aside
+            id="new-order-panel"
+            ref={orderPanelRef}
+            className="cart-panel cart-panel--new-order"
+          >
             <div className="section-header">
               <h2>{text.newOrder}</h2>
             </div>
 
             {!detailedItems.length ? (
-              <p className="muted">{text.emptyCart}</p>
+              <div className="cart-empty-state" role="status" aria-live="polite">
+                <span className="cart-empty-state__icon" aria-hidden="true">
+                  🍽
+                </span>
+                <p className="cart-empty-state__text">{text.emptyCart}</p>
+              </div>
             ) : (
               <div className="cart-list">
                 {detailedItems.map(({ cartItem, menuItem }) => (
@@ -1527,15 +1606,14 @@ export function Cart({
             ) : null}
 
             <button
-              className="cart-submit"
+              className={
+                shouldAnimateSubmitButton
+                  ? "cart-submit cart-submit--animated"
+                  : "cart-submit"
+              }
               type="button"
               onClick={openServeModeDialog}
-              disabled={
-                submitting ||
-                areKitchenAndBarClosed ||
-                (isKitchenClosed && hasDishesInOrder) ||
-                (isBarClosed && hasDrinksInOrder)
-              }
+              disabled={submitDisabled}
             >
               {areKitchenAndBarClosed
                 ? text.kitchenClosedAction

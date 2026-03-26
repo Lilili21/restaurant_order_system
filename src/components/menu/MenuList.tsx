@@ -8,6 +8,8 @@ type MenuListProps = {
   language: MenuLanguage;
   quantities: Record<string, number>;
   orderingEnabled?: boolean;
+  dishesClosed?: boolean;
+  drinksClosed?: boolean;
   categoryDiscounts?: Partial<Record<MenuCategory, number>>;
   onAdd: (
     menuItemId: string,
@@ -23,6 +25,7 @@ type MenuListProps = {
 };
 
 export type MenuFilter = MenuCategory | "dishes" | "drinks";
+type MenuFilterGroup = "dishes" | "drinks" | null;
 
 const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
   he: {
@@ -125,6 +128,8 @@ export function MenuList({
   language,
   quantities,
   orderingEnabled = true,
+  dishesClosed = false,
+  drinksClosed = false,
   categoryDiscounts = {},
   onAdd,
   onDecrease,
@@ -132,6 +137,11 @@ export function MenuList({
 }: MenuListProps) {
   const [selectedCategory, setSelectedCategory] = useState<MenuFilter>(
     selectedFilter ?? "dishes"
+  );
+  const [openGroup, setOpenGroup] = useState<MenuFilterGroup>(
+    selectedFilter === "drinks" || drinkCategories.has(selectedFilter as MenuCategory)
+      ? "drinks"
+      : "dishes"
   );
   const getQuantityKey = (menuItemId: string, volumeOptionId?: string) =>
     `${menuItemId}:${volumeOptionId ?? "base"}`;
@@ -180,8 +190,23 @@ export function MenuList({
   useEffect(() => {
     if (selectedFilter) {
       setSelectedCategory(selectedFilter);
+      setOpenGroup(
+        selectedFilter === "drinks" || drinkCategories.has(selectedFilter as MenuCategory)
+          ? "drinks"
+          : "dishes"
+      );
     }
   }, [selectedFilter]);
+
+  function handleGroupSelect(group: Exclude<MenuFilterGroup, null>) {
+    setOpenGroup((current) => (current === group ? null : group));
+    setSelectedCategory(group);
+  }
+
+  function handleCategorySelect(category: MenuCategory) {
+    setSelectedCategory(category);
+    setOpenGroup(drinkCategories.has(category) ? "drinks" : "dishes");
+  }
 
   const formatCategoryLabel = (category: MenuCategory) =>
     categoryLabels[language][category] ?? category;
@@ -198,47 +223,50 @@ export function MenuList({
   return (
     <div className="menu-sections">
       <div className="orders-filter menu-filter">
-        <div className="orders-filter__chips">
+        <div className="orders-filter__chips orders-filter__chips--groups">
           <button
             type="button"
             className={
-              selectedCategory === "dishes"
-                ? "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-dishes orders-filter__chip--active"
-                : "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-dishes"
+              [
+                "orders-filter__chip",
+                "orders-filter__chip--group",
+                "orders-filter__chip--group-dishes",
+                selectedCategory === "dishes" ? "orders-filter__chip--active" : "",
+                dishesClosed ? "orders-filter__chip--group-closed" : ""
+              ]
+                .filter(Boolean)
+                .join(" ")
             }
-            onClick={() => setSelectedCategory("dishes")}
+            onClick={() => handleGroupSelect("dishes")}
           >
             {categoryLabels[language].dishes}
           </button>
-          {visibleDishCategories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={
-                selectedCategory === category
-                  ? "orders-filter__chip orders-filter__chip--active"
-                  : "orders-filter__chip"
-              }
-              onClick={() => setSelectedCategory(category)}
-            >
-              {formatCategoryLabel(category)}
-            </button>
-          ))}
-        </div>
-        {visibleDrinkCategories.length ? (
-          <div className="orders-filter__chips">
+          {visibleDrinkCategories.length ? (
             <button
               type="button"
               className={
-                selectedCategory === "drinks"
-                  ? "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-drinks orders-filter__chip--active"
-                  : "orders-filter__chip orders-filter__chip--group orders-filter__chip--group-drinks"
+                [
+                  "orders-filter__chip",
+                  "orders-filter__chip--group",
+                  "orders-filter__chip--group-drinks",
+                  selectedCategory === "drinks" ? "orders-filter__chip--active" : "",
+                  drinksClosed ? "orders-filter__chip--group-closed" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")
               }
-              onClick={() => setSelectedCategory("drinks")}
+              onClick={() => handleGroupSelect("drinks")}
             >
               {categoryLabels[language].drinks_group}
             </button>
-            {visibleDrinkCategories.map((category) => (
+          ) : null}
+        </div>
+        {openGroup ? (
+          <div className="orders-filter__chips orders-filter__chips--nested">
+            {(openGroup === "drinks"
+              ? visibleDrinkCategories
+              : visibleDishCategories
+            ).map((category) => (
               <button
                 key={category}
                 type="button"
@@ -247,7 +275,7 @@ export function MenuList({
                     ? "orders-filter__chip orders-filter__chip--active"
                     : "orders-filter__chip"
                 }
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => handleCategorySelect(category)}
               >
                 {formatCategoryLabel(category)}
               </button>
