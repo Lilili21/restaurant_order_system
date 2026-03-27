@@ -1664,13 +1664,16 @@ export function MenuEditor() {
     nextRecommendationRules: EditableRecommendationRule[]
   ) {
     const previousRecommendationRules = recommendationRules;
-    const normalizedRecommendationRules = nextRecommendationRules
-      .map((recommendation, index) => ({
+    const normalizedRecommendationRules: EditableRecommendationRule[] =
+      nextRecommendationRules
+      .map((recommendation, index): EditableRecommendationRule => ({
         ...recommendation,
         id: recommendation.id || `recommendation-${index + 1}`,
         triggerItemId: recommendation.triggerItemId.trim(),
         suggestedItemId: recommendation.suggestedItemId.trim(),
-        suggestedCategory: recommendation.suggestedCategory || ""
+        suggestedCategory: recommendation.suggestedCategory
+          ? recommendation.suggestedCategory
+          : ""
       }))
       .filter(
         (recommendation) =>
