@@ -1910,20 +1910,55 @@ export function MenuEditor() {
         | "enabled",
       value: string | boolean
     ) {
-      const nextRecommendationRules = recommendationRules.map((recommendation) =>
-        recommendation.id === ruleId
-          ? field === "suggestedType"
-            ? {
-                ...recommendation,
-                suggestedType: value === "category" ? "category" : "item",
-                suggestedItemId:
-                  value === "category" ? "" : recommendation.suggestedItemId,
-                suggestedCategory:
-                  value === "category" ? recommendation.suggestedCategory : ""
-              }
-            : { ...recommendation, [field]: value }
-          : recommendation
-      );
+      const nextRecommendationRules: EditableRecommendationRule[] =
+        recommendationRules.map((recommendation): EditableRecommendationRule => {
+          if (recommendation.id !== ruleId) {
+            return recommendation;
+          }
+
+          if (field === "suggestedType") {
+            const nextSuggestedType = value === "category" ? "category" : "item";
+
+            return {
+              ...recommendation,
+              suggestedType: nextSuggestedType,
+              suggestedItemId:
+                nextSuggestedType === "category"
+                  ? ""
+                  : recommendation.suggestedItemId,
+              suggestedCategory:
+                nextSuggestedType === "category"
+                  ? recommendation.suggestedCategory
+                  : ""
+            };
+          }
+
+          if (field === "triggerItemId") {
+            return {
+              ...recommendation,
+              triggerItemId: String(value)
+            };
+          }
+
+          if (field === "suggestedItemId") {
+            return {
+              ...recommendation,
+              suggestedItemId: String(value)
+            };
+          }
+
+          if (field === "suggestedCategory") {
+            return {
+              ...recommendation,
+              suggestedCategory: String(value) as EditableRecommendationRule["suggestedCategory"]
+            };
+          }
+
+          return {
+            ...recommendation,
+            enabled: Boolean(value)
+          };
+        });
 
       void saveRecommendationRules(nextRecommendationRules);
     },
