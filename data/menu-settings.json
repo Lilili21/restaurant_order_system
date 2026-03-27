@@ -66,6 +66,32 @@
       "until": null
     }
   ],
+  "recommendations": [
+    {
+      "id": "recommendation-1774550119276-6a9o7f",
+      "enabled": true,
+      "triggerItemId": "m_1773862719283",
+      "suggestedType": "item",
+      "suggestedItemId": "m_1773757074844",
+      "suggestedCategory": null
+    },
+    {
+      "id": "recommendation-1774550140425-06a5kr",
+      "enabled": true,
+      "triggerItemId": "m_1773255842139",
+      "suggestedType": "category",
+      "suggestedItemId": "",
+      "suggestedCategory": "non_alcoholic_drinks"
+    },
+    {
+      "id": "recommendation-1774558726054-mu5wtj",
+      "enabled": true,
+      "triggerItemId": "m_1773862719283",
+      "suggestedType": "item",
+      "suggestedItemId": "m3",
+      "suggestedCategory": null
+    }
+  ],
   "kitchenOpenEnabled": false,
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,

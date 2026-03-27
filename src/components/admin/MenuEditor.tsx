@@ -11,7 +11,8 @@ import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
 import type {
   BusinessLunchSettings,
-  PromotionSettings
+  PromotionSettings,
+  RecommendationRuleSettings
 } from "@/lib/menu-settings";
 import {
   MenuBadge,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/types";
 import type {
   EditableBusinessLunch,
+  EditableRecommendationRule,
   EditablePromotion
 } from "@/components/admin/MenuPromotionTypes";
 
@@ -84,6 +86,7 @@ const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
   (category) => category !== "drinks" && !drinkCategories.includes(category)
 );
 const allDrinkCategories = [...drinkCategories];
+const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 type InsightStats = {
   revenue: string;
   avgCheck: string;
@@ -111,6 +114,14 @@ type RecommendationItem = {
   quickActionLabel: string;
   targetKind: "dishes" | "drinks" | null;
   targetCategories?: MenuCategory[];
+};
+
+type RecommendationSmartSuggestion = {
+  id: string;
+  label: string;
+  suggestedType: "item" | "category";
+  suggestedItemId: string;
+  suggestedCategory: MenuCategory | "";
 };
 
 type EditableMenuItem = MenuItem & {
@@ -185,6 +196,17 @@ function createEditableBusinessLunch(): EditableBusinessLunch {
   };
 }
 
+function createEditableRecommendationRule(): EditableRecommendationRule {
+  return {
+    id: `recommendation-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    enabled: true,
+    triggerItemId: "",
+    suggestedType: "item",
+    suggestedItemId: "",
+    suggestedCategory: ""
+  };
+}
+
 function getBusinessLunchValidationMessage(
   businessLunch: EditableBusinessLunch
 ) {
@@ -255,6 +277,19 @@ function toEditableBusinessLunch(
     days: businessLunch.days,
     startsFrom: formatTimeInputValue(businessLunch.startsFrom),
     until: formatTimeInputValue(businessLunch.until)
+  };
+}
+
+function toEditableRecommendationRule(
+  recommendation: RecommendationRuleSettings
+): EditableRecommendationRule {
+  return {
+    id: recommendation.id,
+    enabled: recommendation.enabled,
+    triggerItemId: recommendation.triggerItemId,
+    suggestedType: recommendation.suggestedType,
+    suggestedItemId: recommendation.suggestedItemId,
+    suggestedCategory: recommendation.suggestedCategory ?? ""
   };
 }
 
@@ -468,6 +503,13 @@ export function MenuEditor() {
   const [businessLunchMessage, setBusinessLunchMessage] = useState<string | null>(null);
   const [promotions, setPromotions] = useState<EditablePromotion[]>([]);
   const [promotionSaving, setPromotionSaving] = useState(false);
+  const [recommendationRules, setRecommendationRules] = useState<
+    EditableRecommendationRule[]
+  >([]);
+  const [recommendationRulesSaving, setRecommendationRulesSaving] = useState(false);
+  const [recommendationRulesMessage, setRecommendationRulesMessage] = useState<string | null>(
+    null
+  );
   const [kitchenOpenEnabled, setKitchenOpenEnabled] = useState(false);
   const [kitchenOpenUntil, setKitchenOpenUntil] = useState("");
   const [kitchenOpenSaving, setKitchenOpenSaving] = useState(false);
@@ -495,6 +537,7 @@ export function MenuEditor() {
   const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [recommendationsOpen, setRecommendationsOpen] = useState(false);
+  const [settingsRecommendationsOpen, setSettingsRecommendationsOpen] = useState(false);
   const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
@@ -539,6 +582,89 @@ export function MenuEditor() {
     [pathSegments]
   );
   const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
+  const recommendationItemOptions = useMemo(
+    () =>
+      items.map((item) => ({
+        id: item.id,
+        label: getEditorItemDisplayName(item)
+      })),
+    [items]
+  );
+  const recommendationSmartSuggestions = useMemo<
+    Record<string, RecommendationSmartSuggestion[]>
+  >(() => {
+    const availableItems = items.filter((item) => item.available);
+    const pickBestItemForCategory = (category: MenuCategory) =>
+      availableItems
+        .filter((item) => item.draftCategory === category)
+        .sort((left, right) => {
+          const leftScore =
+            Number(left.draftBadges.includes("most_popular")) * 4 +
+            Number(left.draftBadges.includes("new")) * 2 +
+            Number(Boolean(left.draftImage && left.draftShowImage));
+          const rightScore =
+            Number(right.draftBadges.includes("most_popular")) * 4 +
+            Number(right.draftBadges.includes("new")) * 2 +
+            Number(Boolean(right.draftImage && right.draftShowImage));
+
+          return rightScore - leftScore;
+        })[0] ?? null;
+
+    return Object.fromEntries(
+      recommendationRules.map((rule) => {
+        const triggerItem = items.find((item) => item.id === rule.triggerItemId);
+        const triggerIsDrink = triggerItem
+          ? drinkCategories.includes(triggerItem.draftCategory)
+          : false;
+        const candidateCategories = triggerItem
+          ? triggerItem.draftCategory === "desserts"
+            ? (["non_alcoholic_drinks", "drinks"] as MenuCategory[])
+            : triggerIsDrink
+              ? (["starters", "mains", "desserts"] as MenuCategory[])
+              : (["desserts", "non_alcoholic_drinks", "drinks"] as MenuCategory[])
+          : (["desserts", "non_alcoholic_drinks", "starters", "mains"] as MenuCategory[]);
+
+        const nextSuggestions: RecommendationSmartSuggestion[] = [];
+
+        for (const category of candidateCategories) {
+          const hasCategoryItems = availableItems.some(
+            (item) => item.draftCategory === category
+          );
+
+          if (!hasCategoryItems) {
+            continue;
+          }
+
+          nextSuggestions.push({
+            id: `${rule.id}-category-${category}`,
+            label: `Suggest ${categoryLabels[category]}`,
+            suggestedType: "category",
+            suggestedItemId: "",
+            suggestedCategory: category
+          });
+
+          const bestItem = pickBestItemForCategory(category);
+
+          if (bestItem) {
+            nextSuggestions.push({
+              id: `${rule.id}-item-${bestItem.id}`,
+              label: `Suggest ${getEditorItemDisplayName(bestItem)}`,
+              suggestedType: "item",
+              suggestedItemId: bestItem.id,
+              suggestedCategory: ""
+            });
+          }
+        }
+
+        const dedupedSuggestions = nextSuggestions.filter(
+          (suggestion, index, current) =>
+            current.findIndex((item) => item.label === suggestion.label) === index
+        );
+
+        return [rule.id, dedupedSuggestions.slice(0, 6)];
+      })
+    );
+  }, [items, recommendationRules]);
   const recommendations = useMemo<RecommendationItem[]>(() => {
     const normalizeAdviceName = (value: string) =>
       value
@@ -1004,6 +1130,7 @@ export function MenuEditor() {
           kitchenLoadWarningEnabled?: boolean;
           promotions?: PromotionSettings[];
           businessLunches?: BusinessLunchSettings[];
+          recommendations?: RecommendationRuleSettings[];
           happyHourEnabled?: boolean;
           happyHourText?: string;
           happyHourCategories?: MenuCategory[];
@@ -1057,10 +1184,17 @@ export function MenuEditor() {
           settings.businessLunches.length > 0
             ? settings.businessLunches.map(toEditableBusinessLunch)
             : [];
+        const nextRecommendationRules =
+          Array.isArray(settings.recommendations) &&
+          settings.recommendations.length > 0
+            ? settings.recommendations.map(toEditableRecommendationRule)
+            : [];
         setBusinessLunches(nextBusinessLunches);
         setBusinessLunchMessage(null);
         setPromotions(nextPromotions);
         setPromotionMessage(null);
+        setRecommendationRules(nextRecommendationRules);
+        setRecommendationRulesMessage(null);
         setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
         setKitchenOpenUntil(
           settings.kitchenOpenUntil
@@ -1526,6 +1660,94 @@ export function MenuEditor() {
     return true;
   }
 
+  async function saveRecommendationRules(
+    nextRecommendationRules: EditableRecommendationRule[]
+  ) {
+    const previousRecommendationRules = recommendationRules;
+    const normalizedRecommendationRules = nextRecommendationRules
+      .map((recommendation, index) => ({
+        ...recommendation,
+        id: recommendation.id || `recommendation-${index + 1}`,
+        triggerItemId: recommendation.triggerItemId.trim(),
+        suggestedItemId: recommendation.suggestedItemId.trim(),
+        suggestedCategory: recommendation.suggestedCategory || ""
+      }))
+      .filter(
+        (recommendation) =>
+          recommendation.triggerItemId &&
+          (
+            recommendation.suggestedType === "category"
+              ? Boolean(recommendation.suggestedCategory)
+              : Boolean(recommendation.suggestedItemId)
+          ) &&
+          !(
+            recommendation.suggestedType === "item" &&
+            recommendation.triggerItemId === recommendation.suggestedItemId
+          )
+      );
+
+    const recommendationCountsByTrigger = normalizedRecommendationRules.reduce<
+      Record<string, number>
+    >((acc, recommendation) => {
+      acc[recommendation.triggerItemId] =
+        (acc[recommendation.triggerItemId] ?? 0) + 1;
+      return acc;
+    }, {});
+    const overLimitTriggerItemId = Object.entries(recommendationCountsByTrigger).find(
+      ([, count]) => count > MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM
+    )?.[0];
+
+    if (overLimitTriggerItemId) {
+      const triggerItem = items.find((item) => item.id === overLimitTriggerItemId);
+      setRecommendationRulesMessage(
+        triggerItem
+          ? `You can keep up to 3 recommendations for ${getEditorItemDisplayName(triggerItem)}.`
+          : "You can keep up to 3 recommendations per dish."
+      );
+      return false;
+    }
+
+    setRecommendationRulesMessage(null);
+    setRecommendationRules(normalizedRecommendationRules);
+    setRecommendationRulesSaving(true);
+
+    const response = await fetch("/api/menu-settings", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        recommendations: normalizedRecommendationRules.map((recommendation) => ({
+          id: recommendation.id,
+          enabled: recommendation.enabled,
+          triggerItemId: recommendation.triggerItemId,
+          suggestedType: recommendation.suggestedType,
+          suggestedItemId:
+            recommendation.suggestedType === "item"
+              ? recommendation.suggestedItemId
+              : "",
+          suggestedCategory:
+            recommendation.suggestedType === "category"
+              ? recommendation.suggestedCategory
+              : null
+        }))
+      })
+    });
+
+    if (!response.ok) {
+      setRecommendationRules(previousRecommendationRules);
+      setRecommendationRulesMessage("Failed to update recommendations.");
+      setRecommendationRulesSaving(false);
+      return false;
+    }
+
+    setRecommendationRulesSaving(false);
+    setRecommendationRulesMessage(null);
+    return true;
+  }
+
   const openNewBusinessLunchModal = useCallback(
     function openNewBusinessLunchModal() {
       setBusinessLunchMessage(null);
@@ -1673,6 +1895,89 @@ export function MenuEditor() {
     setPromotionDraft(createEditablePromotion());
     setPromotionModalOpen(true);
   }, [promotions]);
+
+  const updateRecommendationRule = useCallback(
+    function updateRecommendationRule(
+      ruleId: string,
+      field:
+        | "triggerItemId"
+        | "suggestedType"
+        | "suggestedItemId"
+        | "suggestedCategory"
+        | "enabled",
+      value: string | boolean
+    ) {
+      const nextRecommendationRules = recommendationRules.map((recommendation) =>
+        recommendation.id === ruleId
+          ? field === "suggestedType"
+            ? {
+                ...recommendation,
+                suggestedType: value === "category" ? "category" : "item",
+                suggestedItemId:
+                  value === "category" ? "" : recommendation.suggestedItemId,
+                suggestedCategory:
+                  value === "category" ? recommendation.suggestedCategory : ""
+              }
+            : { ...recommendation, [field]: value }
+          : recommendation
+      );
+
+      void saveRecommendationRules(nextRecommendationRules);
+    },
+    [recommendationRules]
+  );
+
+  const addRecommendationRule = useCallback(function addRecommendationRule() {
+    if (items.length < 2) {
+      setRecommendationRulesMessage("Add at least two menu items first.");
+      return;
+    }
+
+    void saveRecommendationRules([
+      ...recommendationRules,
+      {
+        ...createEditableRecommendationRule(),
+        triggerItemId: items[0]?.id ?? "",
+        suggestedType: "item",
+        suggestedItemId: items[1]?.id ?? items[0]?.id ?? "",
+        suggestedCategory: ""
+      }
+    ]);
+  }, [items, recommendationRules]);
+
+  const deleteRecommendationRule = useCallback(
+    function deleteRecommendationRule(ruleId: string) {
+      void saveRecommendationRules(
+        recommendationRules.filter((recommendation) => recommendation.id !== ruleId)
+      );
+    },
+    [recommendationRules]
+  );
+
+  const applyRecommendationSmartSuggestion = useCallback(
+    function applyRecommendationSmartSuggestion(
+      ruleId: string,
+      suggestion: RecommendationSmartSuggestion
+    ) {
+      const nextRecommendationRules = recommendationRules.map((recommendation) =>
+        recommendation.id === ruleId
+          ? {
+              ...recommendation,
+              suggestedType: suggestion.suggestedType,
+              suggestedItemId: suggestion.suggestedType === "item"
+                ? suggestion.suggestedItemId
+                : "",
+              suggestedCategory: suggestion.suggestedType === "category"
+                ? suggestion.suggestedCategory
+                : ""
+            }
+          : recommendation
+      );
+
+      void saveRecommendationRules(nextRecommendationRules);
+    },
+    [recommendationRules]
+  );
 
   const openEditPromotionModal = useCallback(
     function openEditPromotionModal(promotionId: string) {
@@ -2203,6 +2508,7 @@ export function MenuEditor() {
     setMenuOpen(false);
     setNotificationsOpen(false);
     setRecommendationsOpen(false);
+    setSettingsRecommendationsOpen(false);
     setRecommendationFocusItemIds(null);
   }, []);
 
@@ -2215,11 +2521,13 @@ export function MenuEditor() {
         setMenuOpen(false);
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
       } else {
         setDashboardOpen(false);
         setSettingsButtonsOpen(false);
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
         setPreviewOpen(true);
         setMenuOpen(false);
       }
@@ -2235,6 +2543,7 @@ export function MenuEditor() {
       if (!nextOpen) {
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
       } else {
         setDashboardOpen(false);
         setMenuButtonsOpen(false);
@@ -2242,6 +2551,7 @@ export function MenuEditor() {
         setMenuOpen(false);
         setNotificationsOpen(true);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
       }
 
       return nextOpen;
@@ -2259,6 +2569,7 @@ export function MenuEditor() {
         setMenuOpen(false);
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
       }
 
       return nextOpen;
@@ -2303,6 +2614,7 @@ export function MenuEditor() {
       if (nextOpen) {
         setMenuOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
         setRecommendationFocusItemIds(null);
       }
 
@@ -2318,6 +2630,7 @@ export function MenuEditor() {
         setNotificationsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
+        setSettingsRecommendationsOpen(false);
       } else {
         setRecommendationFocusItemIds(null);
       }
@@ -2333,6 +2646,7 @@ export function MenuEditor() {
       if (nextOpen) {
         setPreviewOpen(false);
         setRecommendationsOpen(false);
+        setSettingsRecommendationsOpen(false);
         setRecommendationFocusItemIds(null);
       }
 
@@ -2343,10 +2657,17 @@ export function MenuEditor() {
   const toggleNotifications = useCallback(
     () => {
       setRecommendationFocusItemIds(null);
+      setSettingsRecommendationsOpen(false);
       setNotificationsOpen((current) => !current);
     },
     []
   );
+
+  const toggleSettingsRecommendations = useCallback(() => {
+    setRecommendationFocusItemIds(null);
+    setNotificationsOpen(false);
+    setSettingsRecommendationsOpen((current) => !current);
+  }, []);
 
   const toggleCreateForm = useCallback(
     () => setShowCreateForm((current) => !current),
@@ -2373,6 +2694,7 @@ export function MenuEditor() {
       setMenuOpen(true);
       setNotificationsOpen(false);
       setRecommendationsOpen(false);
+      setSettingsRecommendationsOpen(false);
 
       if (recommendationId === "timed-promo") {
         setMenuButtonsOpen(false);
@@ -2515,6 +2837,8 @@ export function MenuEditor() {
         onToggleNotifications={toggleNotifications}
         recommendationsOpen={recommendationsOpen}
         onToggleRecommendations={toggleRecommendations}
+        settingsRecommendationsOpen={settingsRecommendationsOpen}
+        onToggleSettingsRecommendations={toggleSettingsRecommendations}
         selectedKind={selectedKind}
         onSelectDishes={selectDishes}
         onSelectDrinks={selectDrinks}
@@ -2530,6 +2854,7 @@ export function MenuEditor() {
       <MenuAlertsPanel
         notificationsOpen={notificationsOpen}
         recommendationsOpen={recommendationsOpen}
+        settingsRecommendationsOpen={settingsRecommendationsOpen}
         recommendations={recommendations}
         onRunRecommendation={runRecommendationAction}
         kitchenLoadWarningEnabled={kitchenLoadWarningEnabled}
@@ -2554,6 +2879,15 @@ export function MenuEditor() {
         promotionModalOpen={promotionModalOpen}
         promotionDraft={promotionDraft}
         promotionMessage={promotionMessage}
+        recommendationRules={recommendationRules}
+        recommendationRulesSaving={recommendationRulesSaving}
+        recommendationRulesMessage={recommendationRulesMessage}
+        recommendationItemOptions={recommendationItemOptions}
+        recommendationSmartSuggestions={recommendationSmartSuggestions}
+        updateRecommendationRule={updateRecommendationRule}
+        addRecommendationRule={addRecommendationRule}
+        deleteRecommendationRule={deleteRecommendationRule}
+        applyRecommendationSmartSuggestion={applyRecommendationSmartSuggestion}
         openNewPromotionModal={openNewPromotionModal}
         openEditPromotionModal={openEditPromotionModal}
         updatePromotionDraft={updatePromotionDraft}

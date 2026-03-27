@@ -48,6 +48,15 @@ export type BusinessLunchSettings = {
   until: string | null;
 };
 
+export type RecommendationRuleSettings = {
+  id: string;
+  enabled: boolean;
+  triggerItemId: string;
+  suggestedType: "item" | "category";
+  suggestedItemId: string;
+  suggestedCategory: MenuCategory | null;
+};
+
 export type MenuSettings = {
   workingHoursRules: Array<{
     id: string;
@@ -67,6 +76,7 @@ export type MenuSettings = {
   happyHourUntil: string | null;
   promotions: PromotionSettings[];
   businessLunches: BusinessLunchSettings[];
+  recommendations: RecommendationRuleSettings[];
   kitchenOpenEnabled: boolean;
   kitchenOpenUntil: string | null;
   barOpenEnabled: boolean;
@@ -94,6 +104,7 @@ const DEFAULT_SETTINGS: MenuSettings = {
   happyHourUntil: null,
   promotions: [],
   businessLunches: [],
+  recommendations: [],
   kitchenOpenEnabled: false,
   kitchenOpenUntil: null,
   barOpenEnabled: false,
@@ -379,6 +390,51 @@ function normalizeSettings(
         )
         .filter(Boolean) as BusinessLunchSettings[]
     : [];
+  const recommendations = Array.isArray(settings?.recommendations)
+    ? settings.recommendations
+        .map((recommendation, index) => {
+          if (!recommendation || typeof recommendation !== "object") {
+            return null;
+          }
+
+          const triggerItemId =
+            typeof recommendation.triggerItemId === "string"
+              ? recommendation.triggerItemId.trim()
+              : "";
+          const suggestedItemId =
+            typeof recommendation.suggestedItemId === "string"
+              ? recommendation.suggestedItemId.trim()
+              : "";
+          const suggestedType =
+            recommendation.suggestedType === "category" ? "category" : "item";
+          const suggestedCategory =
+            typeof recommendation.suggestedCategory === "string" &&
+            MENU_CATEGORIES.includes(recommendation.suggestedCategory as MenuCategory)
+              ? (recommendation.suggestedCategory as MenuCategory)
+              : null;
+
+          if (
+            !triggerItemId ||
+            (suggestedType === "item" && !suggestedItemId) ||
+            (suggestedType === "category" && !suggestedCategory)
+          ) {
+            return null;
+          }
+
+          return {
+            id:
+              typeof recommendation.id === "string" && recommendation.id.trim()
+                ? recommendation.id.trim()
+                : `recommendation-${index + 1}`,
+            enabled: Boolean(recommendation.enabled),
+            triggerItemId,
+            suggestedType,
+            suggestedItemId: suggestedType === "item" ? suggestedItemId : "",
+            suggestedCategory: suggestedType === "category" ? suggestedCategory : null
+          };
+        })
+        .filter(Boolean) as RecommendationRuleSettings[]
+    : [];
   const primaryPromotion = promotions[0] ?? null;
 
   return {
@@ -395,6 +451,7 @@ function normalizeSettings(
     happyHourUntil: primaryPromotion?.until ?? null,
     promotions,
     businessLunches,
+    recommendations,
     kitchenOpenEnabled: Boolean(settings?.kitchenOpenEnabled),
     kitchenOpenUntil,
     barOpenEnabled: Boolean(settings?.barOpenEnabled),

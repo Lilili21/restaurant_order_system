@@ -7,7 +7,8 @@ import type { MenuFilter } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
 import type {
   BusinessLunchSettings,
-  PromotionSettings
+  PromotionSettings,
+  RecommendationRuleSettings
 } from "@/lib/menu-settings";
 import {
   CartItem,
@@ -28,6 +29,7 @@ type CartProps = {
   showKitchenLoadWarning: boolean;
   promotions?: PromotionSettings[];
   businessLunches?: BusinessLunchSettings[];
+  recommendations?: RecommendationRuleSettings[];
   showKitchenOpen: boolean;
   kitchenOpenUntil: string | null;
   showBarOpen: boolean;
@@ -89,6 +91,7 @@ const drinkCategories = new Set<MenuCategory>([
 
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 const ORDER_SUBMIT_THROTTLE_MS = 3 * 1000;
+const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 
 const uiText = {
   he: {
@@ -120,6 +123,11 @@ const uiText = {
     serveAsReady: "להגיש לפי המוכן",
     newOrder: "ההזמנה שלי",
     emptyCart: "ההזמנה שלכם עדיין ריקה. הוסיפו משהו טעים מהתפריט.",
+    recommendationTitle: "אולי תוסיפו גם",
+    recommendationPrefix: "בחרתם",
+    recommendationJoiner: ". תוסיפו גם",
+    recommendationAdd: "הוספה",
+    recommendationView: "צפו",
     total: "סה\"כ",
     happyHourDiscount: "הנחת Happy hour",
     submit: "שלח הזמנה",
@@ -194,6 +202,11 @@ const uiText = {
     serveAsReady: "Serve as ready",
     newOrder: "My order",
     emptyCart: "Your order is empty. Add something tasty from the menu.",
+    recommendationTitle: "You may also like",
+    recommendationPrefix: "You chose",
+    recommendationJoiner: ". Add",
+    recommendationAdd: "Add",
+    recommendationView: "View",
     total: "Total",
     happyHourDiscount: "Happy hour discount",
     submit: "Place order",
@@ -251,6 +264,7 @@ export function Cart({
   showKitchenLoadWarning,
   promotions = [],
   businessLunches = [],
+  recommendations = [],
   showKitchenOpen,
   kitchenOpenUntil,
   showBarOpen,
@@ -575,6 +589,183 @@ export function Cart({
   function getCartItemKey(cartItem: CartItem) {
     return `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`;
   }
+
+  function getMenuCategoryDisplayName(category: MenuCategory) {
+    return promoCategoryLabels[category] ?? category;
+  }
+
+  const activeCartRecommendations = useMemo(() => {
+    const currentOrderItemIds = new Set(detailedItems.map(({ menuItem }) => menuItem.id));
+    const uniqueTriggerItemIdsInOrder = [
+      ...new Set(detailedItems.map(({ menuItem }) => menuItem.id))
+    ];
+    const nextRecommendations: Array<
+      | {
+          kind: "item";
+          triggerItem: MenuItem;
+          suggestedItem: MenuItem;
+        }
+      | {
+          kind: "category";
+          triggerItem: MenuItem;
+          suggestedCategory: MenuCategory;
+        }
+    > = [];
+    const seenSuggestions = new Set<string>();
+    const hasEligibleRecommendationForTriggerItem = (triggerItemId: string) =>
+      recommendations.some((recommendation) => {
+        if (!recommendation.enabled || recommendation.triggerItemId !== triggerItemId) {
+          return false;
+        }
+
+        if (
+          recommendation.suggestedType === "item" &&
+          currentOrderItemIds.has(recommendation.suggestedItemId)
+        ) {
+          return false;
+        }
+
+        if (recommendation.suggestedType === "category") {
+          const suggestedCategory = recommendation.suggestedCategory;
+
+          if (
+            !suggestedCategory ||
+            detailedItems.some(({ menuItem }) => menuItem.category === suggestedCategory) ||
+            !visibleMenu.some((item) => item.category === suggestedCategory) ||
+            (isKitchenClosed && !drinkCategories.has(suggestedCategory)) ||
+            (isBarClosed && drinkCategories.has(suggestedCategory))
+          ) {
+            return false;
+          }
+
+          return true;
+        }
+
+        const suggestedItem = menu.find((item) => item.id === recommendation.suggestedItemId);
+
+        if (!suggestedItem || !suggestedItem.available) {
+          return false;
+        }
+
+        if (
+          (isKitchenClosed && !drinkCategories.has(suggestedItem.category)) ||
+          (isBarClosed && drinkCategories.has(suggestedItem.category))
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+    const activeTriggerItemId =
+      uniqueTriggerItemIdsInOrder.find((itemId) =>
+        hasEligibleRecommendationForTriggerItem(itemId)
+      ) ?? null;
+
+    if (!activeTriggerItemId) {
+      return nextRecommendations;
+    }
+
+    for (const recommendation of recommendations) {
+      if (
+        !recommendation.enabled ||
+        recommendation.triggerItemId !== activeTriggerItemId
+      ) {
+        continue;
+      }
+
+      if (
+        !currentOrderItemIds.has(recommendation.triggerItemId) ||
+        (
+          recommendation.suggestedType === "item" &&
+          currentOrderItemIds.has(recommendation.suggestedItemId)
+        )
+      ) {
+        continue;
+      }
+
+      const triggerItem = menu.find((item) => item.id === recommendation.triggerItemId);
+      const suggestedItem =
+        recommendation.suggestedType === "item"
+          ? menu.find((item) => item.id === recommendation.suggestedItemId)
+          : null;
+
+      if (!triggerItem) {
+        continue;
+      }
+
+      if (recommendation.suggestedType === "category") {
+        const suggestedCategory = recommendation.suggestedCategory;
+
+        if (!suggestedCategory) {
+          continue;
+        }
+
+        if (
+          currentOrderItemIds.size > 0 &&
+          detailedItems.some(({ menuItem }) => menuItem.category === suggestedCategory)
+        ) {
+          continue;
+        }
+
+        if (
+          !visibleMenu.some((item) => item.category === suggestedCategory) ||
+          (isKitchenClosed && !drinkCategories.has(suggestedCategory)) ||
+          (isBarClosed && drinkCategories.has(suggestedCategory))
+        ) {
+          continue;
+        }
+
+        const suggestionKey = `category:${suggestedCategory}`;
+
+        if (seenSuggestions.has(suggestionKey)) {
+          continue;
+        }
+
+        seenSuggestions.add(suggestionKey);
+        nextRecommendations.push({
+          kind: "category" as const,
+          triggerItem,
+          suggestedCategory
+        });
+
+        if (nextRecommendations.length >= MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM) {
+          break;
+        }
+
+        continue;
+      }
+
+      if (!suggestedItem || !suggestedItem.available) {
+        continue;
+      }
+
+      if (
+        (isKitchenClosed && !drinkCategories.has(suggestedItem.category)) ||
+        (isBarClosed && drinkCategories.has(suggestedItem.category))
+      ) {
+        continue;
+      }
+
+      const suggestionKey = `item:${suggestedItem.id}`;
+
+      if (seenSuggestions.has(suggestionKey)) {
+        continue;
+      }
+
+      seenSuggestions.add(suggestionKey);
+      nextRecommendations.push({
+        kind: "item" as const,
+        triggerItem,
+        suggestedItem
+      });
+
+      if (nextRecommendations.length >= MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM) {
+        break;
+      }
+    }
+
+    return nextRecommendations;
+  }, [detailedItems, isBarClosed, isKitchenClosed, menu, recommendations, visibleMenu]);
 
   function createOrderPayloadSignature(serveMode: ServeMode) {
     const normalizedItems = [...items]
@@ -1585,6 +1776,62 @@ export function Cart({
                 ))}
               </div>
             )}
+
+            {activeCartRecommendations.length ? (
+              <div className="cart-recommendations" role="status" aria-live="polite">
+                {activeCartRecommendations.map((recommendation) => (
+                  <div
+                    key={
+                      recommendation.kind === "item"
+                        ? `item-${recommendation.suggestedItem.id}`
+                        : `category-${recommendation.suggestedCategory}`
+                    }
+                    className="cart-recommendation"
+                  >
+                    <div>
+                      <p className="cart-recommendation__eyebrow">
+                        {text.recommendationTitle}
+                      </p>
+                      <p className="cart-recommendation__text">
+                        {text.recommendationPrefix}{" "}
+                        <strong>
+                          {getMenuItemDisplayName(recommendation.triggerItem.id)}
+                        </strong>
+                        {text.recommendationJoiner}{" "}
+                        <strong>
+                          {recommendation.kind === "item"
+                            ? getMenuItemDisplayName(recommendation.suggestedItem.id)
+                            : getMenuCategoryDisplayName(
+                                recommendation.suggestedCategory
+                              )}
+                        </strong>
+                        .
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-neutral cart-recommendation__button"
+                      onClick={() => {
+                        if (recommendation.kind === "item") {
+                          addItem(
+                            recommendation.suggestedItem.id,
+                            null,
+                            recommendation.suggestedItem.volumeOptions?.[0]?.id
+                          );
+                          return;
+                        }
+
+                        setSelectedMenuFilter(recommendation.suggestedCategory);
+                      }}
+                    >
+                      {recommendation.kind === "item"
+                        ? text.recommendationAdd
+                        : text.recommendationView}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             <div className="cart-summary">
               <span>{text.total}</span>

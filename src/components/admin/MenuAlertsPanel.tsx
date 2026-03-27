@@ -4,6 +4,7 @@ import { memo } from "react";
 
 import type {
   EditableBusinessLunch,
+  EditableRecommendationRule,
   EditablePromotion
 } from "@/components/admin/MenuPromotionTypes";
 import { MenuCategory } from "@/lib/types";
@@ -40,6 +41,46 @@ function formatPromotionCategorySummary(
 type Props = {
   notificationsOpen: boolean;
   recommendationsOpen: boolean;
+  settingsRecommendationsOpen: boolean;
+  recommendationRules: EditableRecommendationRule[];
+  recommendationRulesSaving: boolean;
+  recommendationRulesMessage: string | null;
+  recommendationItemOptions: Array<{
+    id: string;
+    label: string;
+  }>;
+  recommendationSmartSuggestions: Record<
+    string,
+    Array<{
+      id: string;
+      label: string;
+      suggestedType: "item" | "category";
+      suggestedItemId: string;
+      suggestedCategory: MenuCategory | "";
+    }>
+  >;
+  updateRecommendationRule: (
+    ruleId: string,
+    field:
+      | "triggerItemId"
+      | "suggestedType"
+      | "suggestedItemId"
+      | "suggestedCategory"
+      | "enabled",
+    value: string | boolean
+  ) => void;
+  addRecommendationRule: () => void;
+  deleteRecommendationRule: (ruleId: string) => void;
+  applyRecommendationSmartSuggestion: (
+    ruleId: string,
+    suggestion: {
+      id: string;
+      label: string;
+      suggestedType: "item" | "category";
+      suggestedItemId: string;
+      suggestedCategory: MenuCategory | "";
+    }
+  ) => void;
   recommendations: Array<{
     id: string;
     title: string;
@@ -108,6 +149,16 @@ type Props = {
 function MenuAlertsPanelComponent({
   notificationsOpen,
   recommendationsOpen,
+  settingsRecommendationsOpen,
+  recommendationRules,
+  recommendationRulesSaving,
+  recommendationRulesMessage,
+  recommendationItemOptions,
+  recommendationSmartSuggestions,
+  updateRecommendationRule,
+  addRecommendationRule,
+  deleteRecommendationRule,
+  applyRecommendationSmartSuggestion,
   recommendations,
   onRunRecommendation,
   kitchenLoadWarningEnabled,
@@ -155,6 +206,10 @@ function MenuAlertsPanelComponent({
   allDrinkCategories,
   categoryLabels
 }: Props) {
+  const recommendationItemLabelById = Object.fromEntries(
+    recommendationItemOptions.map((item) => [item.id, item.label])
+  ) as Record<string, string>;
+
   return (
     <>
       {businessLunchModalOpen && businessLunchDraft ? (
@@ -782,7 +837,210 @@ function MenuAlertsPanelComponent({
               </button>
             </div>
           </div>
+
         </>
+      ) : null}
+
+      {settingsRecommendationsOpen ? (
+        <div className="menu-notice-control menu-notice-control--inline">
+          <div className="menu-notice-control__promo-list">
+            <div className="menu-notice-control__promo-title">Recommendations</div>
+            {recommendationRulesMessage ? (
+              <p className="menu-notice-control__promo-message">
+                {recommendationRulesMessage}
+              </p>
+            ) : (
+              <>
+                <p className="menu-notice-control__summary">
+                  Build guest-facing upsells that feel smart: after one item is added, suggest the most natural next step.
+                </p>
+                <p className="menu-notice-control__summary">
+                  Up to 3 recommendations per trigger item.
+                </p>
+              </>
+            )}
+            {recommendationRules.map((recommendation) => (
+              <div
+                key={recommendation.id}
+                className="menu-notice-control__promo-row menu-notice-control__promo-row--recommendation"
+              >
+                <label className="menu-notice-control__toggle">
+                  <input
+                    type="checkbox"
+                    checked={recommendation.enabled}
+                    disabled={recommendationRulesSaving}
+                    onChange={(event) =>
+                      updateRecommendationRule(
+                        recommendation.id,
+                        "enabled",
+                        event.target.checked
+                      )
+                    }
+                  />
+                  <span
+                    className={
+                      recommendation.enabled
+                        ? "menu-notice-control__text menu-notice-control__text--neutral-active"
+                        : "menu-notice-control__text"
+                    }
+                  >
+                    Recommendation
+                  </span>
+                </label>
+                <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+                  <span>If guest adds</span>
+                  <select
+                    className="modal-input"
+                    value={recommendation.triggerItemId}
+                    disabled={recommendationRulesSaving}
+                    onChange={(event) =>
+                      updateRecommendationRule(
+                        recommendation.id,
+                        "triggerItemId",
+                        event.target.value
+                      )
+                    }
+                  >
+                    <option value="">Select item</option>
+                    {recommendationItemOptions.map((item) => (
+                      <option key={`trigger-${recommendation.id}-${item.id}`} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+                  <span>Suggest</span>
+                  <select
+                    className="modal-input"
+                    value={recommendation.suggestedType}
+                    disabled={recommendationRulesSaving}
+                    onChange={(event) =>
+                      updateRecommendationRule(
+                        recommendation.id,
+                        "suggestedType",
+                        event.target.value
+                      )
+                    }
+                  >
+                    <option value="item">Item</option>
+                    <option value="category">Category</option>
+                  </select>
+                </label>
+                <label className="menu-settings-panel__field menu-settings-panel__field--compact">
+                  <span>
+                    {recommendation.suggestedType === "category"
+                      ? "Suggested category"
+                      : "Suggested item"}
+                  </span>
+                  {recommendation.suggestedType === "category" ? (
+                    <select
+                      className="modal-input"
+                      value={recommendation.suggestedCategory}
+                      disabled={recommendationRulesSaving}
+                      onChange={(event) =>
+                        updateRecommendationRule(
+                          recommendation.id,
+                          "suggestedCategory",
+                          event.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select category</option>
+                      {[...dishCategories, ...allDrinkCategories].map((category) => (
+                        <option
+                          key={`suggested-category-${recommendation.id}-${category}`}
+                          value={category}
+                        >
+                          {categoryLabels[category]}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <select
+                      className="modal-input"
+                      value={recommendation.suggestedItemId}
+                      disabled={recommendationRulesSaving}
+                      onChange={(event) =>
+                        updateRecommendationRule(
+                          recommendation.id,
+                          "suggestedItemId",
+                          event.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select item</option>
+                      {recommendationItemOptions.map((item) => (
+                        <option
+                          key={`suggested-${recommendation.id}-${item.id}`}
+                          value={item.id}
+                        >
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+                <button
+                  className="button-danger button-danger--small"
+                  type="button"
+                  onClick={() => deleteRecommendationRule(recommendation.id)}
+                  disabled={recommendationRulesSaving}
+                >
+                  Delete
+                </button>
+                <p className="menu-notice-control__summary recommendation-builder__preview">
+                  {recommendation.triggerItemId
+                    ? `When guest adds ${
+                        recommendationItemLabelById[recommendation.triggerItemId] ?? "item"
+                      }, suggest ${
+                        recommendation.suggestedType === "category"
+                          ? recommendation.suggestedCategory
+                            ? categoryLabels[recommendation.suggestedCategory]
+                            : "a category"
+                          : recommendationItemLabelById[
+                              recommendation.suggestedItemId
+                            ] ?? "another item"
+                      }.`
+                    : "Pick a trigger item to unlock smart upsell ideas."}
+                </p>
+                {recommendationSmartSuggestions[recommendation.id]?.length ? (
+                  <div className="recommendation-builder__assistant">
+                    <p className="menu-notice-control__promo-message">
+                      AI suggestions
+                    </p>
+                    <div className="orders-filter__chips recommendation-builder__chips">
+                      {recommendationSmartSuggestions[recommendation.id].map((suggestion) => (
+                        <button
+                          key={suggestion.id}
+                          type="button"
+                          className="orders-filter__chip"
+                          disabled={recommendationRulesSaving}
+                          onClick={() =>
+                            applyRecommendationSmartSuggestion(
+                              recommendation.id,
+                              suggestion
+                            )
+                          }
+                        >
+                          {suggestion.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="button-neutral"
+              onClick={addRecommendationRule}
+              disabled={recommendationRulesSaving}
+            >
+              Add recommendation
+            </button>
+          </div>
+        </div>
       ) : null}
     </>
   );

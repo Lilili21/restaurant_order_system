@@ -7,7 +7,8 @@ import type { MenuCategory } from "@/lib/types";
 import type {
   BusinessLunchSettings,
   MenuSettings,
-  PromotionSettings
+  PromotionSettings,
+  RecommendationRuleSettings
 } from "@/lib/menu-settings";
 
 const MENU_CATEGORIES: MenuCategory[] = [
@@ -50,6 +51,7 @@ export async function GET() {
     happyHourUntil: settings.happyHourUntil,
     promotions: settings.promotions,
     businessLunches: settings.businessLunches,
+    recommendations: settings.recommendations,
     kitchenOpenEnabled: settings.kitchenOpenEnabled,
     kitchenOpenUntil: settings.kitchenOpenUntil,
     barOpenEnabled: settings.barOpenEnabled,
@@ -114,6 +116,14 @@ export async function PATCH(request: NextRequest) {
         days?: number[];
         startsFrom?: string | null;
         until?: string | null;
+      }>;
+      recommendations?: Array<{
+        id?: string;
+        enabled?: boolean;
+        triggerItemId?: string;
+        suggestedType?: "item" | "category";
+        suggestedItemId?: string;
+        suggestedCategory?: MenuCategory | null;
       }>;
       kitchenOpenEnabled?: boolean;
       kitchenOpenUntil?: string | null;
@@ -288,6 +298,48 @@ export async function PATCH(request: NextRequest) {
           if (!Number.isFinite(parsed)) {
             throw new Error("businessLunches until is invalid");
           }
+        }
+      }
+    }
+
+    if (body.recommendations !== undefined && !Array.isArray(body.recommendations)) {
+      throw new Error("recommendations is invalid");
+    }
+
+    if (Array.isArray(body.recommendations)) {
+      for (const recommendation of body.recommendations) {
+        if (!recommendation || typeof recommendation !== "object") {
+          throw new Error("recommendations contains invalid item");
+        }
+
+        if (
+          recommendation.triggerItemId !== undefined &&
+          typeof recommendation.triggerItemId !== "string"
+        ) {
+          throw new Error("recommendations triggerItemId is invalid");
+        }
+
+        if (
+          recommendation.suggestedItemId !== undefined &&
+          typeof recommendation.suggestedItemId !== "string"
+        ) {
+          throw new Error("recommendations suggestedItemId is invalid");
+        }
+
+        if (
+          recommendation.suggestedType !== undefined &&
+          recommendation.suggestedType !== "item" &&
+          recommendation.suggestedType !== "category"
+        ) {
+          throw new Error("recommendations suggestedType is invalid");
+        }
+
+        if (
+          recommendation.suggestedCategory !== undefined &&
+          recommendation.suggestedCategory !== null &&
+          !MENU_CATEGORIES.includes(recommendation.suggestedCategory)
+        ) {
+          throw new Error("recommendations suggestedCategory is invalid");
         }
       }
     }
@@ -509,6 +561,50 @@ export async function PATCH(request: NextRequest) {
               : null
         })
       );
+    }
+
+    if (Array.isArray(body.recommendations)) {
+      updates.recommendations = body.recommendations
+        .map(
+          (recommendation, index): RecommendationRuleSettings | null => {
+            const triggerItemId =
+              typeof recommendation.triggerItemId === "string"
+                ? recommendation.triggerItemId.trim()
+                : "";
+            const suggestedItemId =
+              typeof recommendation.suggestedItemId === "string"
+                ? recommendation.suggestedItemId.trim()
+                : "";
+            const suggestedType =
+              recommendation.suggestedType === "category" ? "category" : "item";
+            const suggestedCategory =
+              typeof recommendation.suggestedCategory === "string" &&
+              MENU_CATEGORIES.includes(recommendation.suggestedCategory)
+                ? recommendation.suggestedCategory
+                : null;
+
+            if (
+              !triggerItemId ||
+              (suggestedType === "item" && !suggestedItemId) ||
+              (suggestedType === "category" && !suggestedCategory)
+            ) {
+              return null;
+            }
+
+            return {
+              id:
+                typeof recommendation.id === "string" && recommendation.id.trim()
+                  ? recommendation.id.trim()
+                  : `recommendation-${index + 1}`,
+              enabled: Boolean(recommendation.enabled),
+              triggerItemId,
+              suggestedType,
+              suggestedItemId: suggestedType === "item" ? suggestedItemId : "",
+              suggestedCategory: suggestedType === "category" ? suggestedCategory : null
+            };
+          }
+        )
+        .filter(Boolean) as RecommendationRuleSettings[];
     }
 
     if (

@@ -29,6 +29,8 @@ type Props = {
   onToggleNotifications: () => void;
   recommendationsOpen: boolean;
   onToggleRecommendations: () => void;
+  settingsRecommendationsOpen: boolean;
+  onToggleSettingsRecommendations: () => void;
   selectedKind: "dishes" | "drinks";
   onSelectDishes: () => void;
   onSelectDrinks: () => void;
@@ -53,6 +55,8 @@ function ControlCenterToolbarComponent({
   onToggleNotifications,
   recommendationsOpen,
   onToggleRecommendations,
+  settingsRecommendationsOpen,
+  onToggleSettingsRecommendations,
   selectedKind,
   onSelectDishes,
   onSelectDrinks
@@ -160,6 +164,17 @@ function ControlCenterToolbarComponent({
             onClick={onToggleNotifications}
           >
             Alarm
+          </button>
+          <button
+            className={
+              settingsRecommendationsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            type="button"
+            onClick={onToggleSettingsRecommendations}
+          >
+            Recommendations
           </button>
         </div>
       ) : null}

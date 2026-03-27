@@ -20,3 +20,12 @@ export type EditableBusinessLunch = {
   startsFrom: string;
   until: string;
 };
+
+export type EditableRecommendationRule = {
+  id: string;
+  enabled: boolean;
+  triggerItemId: string;
+  suggestedType: "item" | "category";
+  suggestedItemId: string;
+  suggestedCategory: MenuCategory | "";
+};

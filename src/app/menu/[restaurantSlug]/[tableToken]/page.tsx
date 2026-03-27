@@ -48,6 +48,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
           showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
           promotions={menuSettings.promotions}
           businessLunches={menuSettings.businessLunches}
+          recommendations={menuSettings.recommendations}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
           showBarOpen={menuSettings.barOpenEnabled}
@@ -80,6 +81,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
         showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
         promotions={menuSettings.promotions}
         businessLunches={menuSettings.businessLunches}
+        recommendations={menuSettings.recommendations}
         showKitchenOpen={menuSettings.kitchenOpenEnabled}
         kitchenOpenUntil={menuSettings.kitchenOpenUntil}
         showBarOpen={menuSettings.barOpenEnabled}
