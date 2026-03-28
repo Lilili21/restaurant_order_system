@@ -546,7 +546,16 @@ export function MenuEditor() {
     topDish: "—",
     lowDish: "—",
     peakHour: "—",
-    waiterCalls: "—"
+    waiterCalls: "—",
+    globalInsight: "",
+    globalInsightStatus: "same",
+    vsYesterday: {
+      revenue: null,
+      avgCheck: null,
+      orders: null,
+      activeOrders: null,
+      waiterCalls: null
+    }
   });
   const [dashboardCharts, setDashboardCharts] = useState<DashboardCharts>({
     labels: [],
@@ -1256,7 +1265,9 @@ export function MenuEditor() {
 
         if (!cancelled && analyticsResponse.ok) {
           const analytics = (await analyticsResponse.json()) as {
-            insights?: Partial<InsightStats>;
+            insights?: Partial<InsightStats> & {
+              vsYesterday?: Partial<InsightStats["vsYesterday"]>;
+            };
             charts?: Partial<DashboardCharts>;
           };
 
@@ -1283,7 +1294,23 @@ export function MenuEditor() {
             waiterCalls:
               analytics.insights?.waiterCalls !== undefined
                 ? String(analytics.insights.waiterCalls)
-                : "—"
+                : "—",
+            globalInsight:
+              typeof analytics.insights?.globalInsight === "string"
+                ? analytics.insights.globalInsight
+                : "",
+            globalInsightStatus:
+              analytics.insights?.globalInsightStatus === "better" ||
+              analytics.insights?.globalInsightStatus === "worse"
+                ? analytics.insights.globalInsightStatus
+                : "same",
+            vsYesterday: {
+              revenue: analytics.insights?.vsYesterday?.revenue ?? null,
+              avgCheck: analytics.insights?.vsYesterday?.avgCheck ?? null,
+              orders: analytics.insights?.vsYesterday?.orders ?? null,
+              activeOrders: analytics.insights?.vsYesterday?.activeOrders ?? null,
+              waiterCalls: analytics.insights?.vsYesterday?.waiterCalls ?? null
+            }
           });
           setDashboardCharts({
             labels: Array.isArray(analytics.charts?.labels) ? analytics.charts.labels : [],

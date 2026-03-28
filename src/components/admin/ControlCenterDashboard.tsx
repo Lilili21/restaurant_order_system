@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 
@@ -13,12 +13,27 @@ type InsightStats = {
   lowDish: string;
   peakHour: string;
   waiterCalls: string;
+  globalInsight: string;
+  globalInsightStatus: "better" | "same" | "worse";
+  vsYesterday: {
+    revenue: string | null;
+    avgCheck: string | null;
+    orders: string | null;
+    activeOrders: string | null;
+    waiterCalls: string | null;
+  };
 };
 
 type DashboardCharts = {
   labels: string[];
   ordersByHour: number[];
   revenueTrend: number[];
+};
+
+type DashboardInsight = {
+  id: string;
+  text: string;
+  priority: "high" | "medium" | "low";
 };
 
 const analyticsBlocks = [
@@ -77,6 +92,41 @@ function buildSmoothLineChartPath(values: number[]) {
   return path;
 }
 
+function buildAreaChartPath(values: number[]) {
+  if (!values.length) {
+    return "";
+  }
+
+  const width = 100;
+  const height = 100;
+  const maxValue = Math.max(...values, 1);
+  const points = values.map((value, index) => {
+    const x =
+      values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
+    const y = height - (value / maxValue) * height;
+
+    return { x, y: Number.isFinite(y) ? y : height };
+  });
+
+  if (points.length === 1) {
+    return `M ${points[0].x} ${height} L ${points[0].x} ${points[0].y} L ${points[0].x} ${height} Z`;
+  }
+
+  let path = `M ${points[0].x} ${height} L ${points[0].x} ${points[0].y}`;
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const current = points[index];
+    const next = points[index + 1];
+    const controlX = (current.x + next.x) / 2;
+
+    path += ` C ${controlX} ${current.y}, ${controlX} ${next.y}, ${next.x} ${next.y}`;
+  }
+
+  path += ` L ${points[points.length - 1].x} ${height} Z`;
+
+  return path;
+}
+
 function getChartMinWidth(labelsLength: number) {
   return Math.max(720, labelsLength * 88);
 }
@@ -84,11 +134,259 @@ function getChartMinWidth(labelsLength: number) {
 function getChartTicks(maxValue: number) {
   const safeMaxValue = Math.max(maxValue, 1);
   const tickCount = safeMaxValue <= 4 ? safeMaxValue : 4;
-  const ticks = Array.from({ length: tickCount + 1 }, (_, index) =>
+  const ticks = Array.from({ length: tickCount }, (_, index) =>
     Math.round((safeMaxValue / tickCount) * (tickCount - index))
   );
 
-  return [...new Set(ticks)];
+  const uniqueTicks = [...new Set(ticks)].filter((tick) => tick > 0);
+
+  return uniqueTicks.length ? uniqueTicks : [safeMaxValue];
+}
+
+function getPeakIndex(values: number[]) {
+  if (!values.length) {
+    return -1;
+  }
+
+  return values.indexOf(Math.max(...values));
+}
+
+function getSlowIndex(values: number[]) {
+  if (!values.length) {
+    return -1;
+  }
+
+  return values.indexOf(Math.min(...values));
+}
+
+function getEverySecondLabel(label: string, index: number) {
+  return index % 2 === 0 ? label : "";
+}
+
+function getNextHourLabel(label: string) {
+  const [hours] = label.split(":");
+  const parsedHours = Number.parseInt(hours ?? "", 10);
+
+  if (!Number.isFinite(parsedHours)) {
+    return label;
+  }
+
+  return `${String((parsedHours + 1) % 24).padStart(2, "0")}:00`;
+}
+
+function getPeakTrafficRange(labels: string[], values: number[]) {
+  if (!labels.length || !values.length) {
+    return null;
+  }
+
+  const maxValue = Math.max(...values);
+
+  if (maxValue <= 0) {
+    return null;
+  }
+
+  const threshold = Math.max(1, Math.ceil(maxValue * 0.75));
+  const peakIndex = getPeakIndex(values);
+
+  if (peakIndex < 0) {
+    return null;
+  }
+
+  let startIndex = peakIndex;
+  let endIndex = peakIndex;
+
+  while (startIndex > 0 && values[startIndex - 1] >= threshold) {
+    startIndex -= 1;
+  }
+
+  while (endIndex < values.length - 1 && values[endIndex + 1] >= threshold) {
+    endIndex += 1;
+  }
+
+  return `${labels[startIndex]}–${getNextHourLabel(labels[endIndex] ?? labels[startIndex])}`;
+}
+
+function getHourNumber(label: string) {
+  const [hours] = label.split(":");
+  const parsedHours = Number.parseInt(hours ?? "", 10);
+  return Number.isFinite(parsedHours) ? parsedHours : null;
+}
+
+function isHourWithin(label: string, start: number, end: number) {
+  const hour = getHourNumber(label);
+
+  return hour !== null && hour >= start && hour < end;
+}
+
+function getFilteredInsights(insights: DashboardInsight[]) {
+  return insights.filter((insight) => insight.priority !== "low").slice(0, 3);
+}
+
+function buildOrderChartSuggestions(labels: string[], ordersByHour: number[]) {
+  const insights: DashboardInsight[] = [];
+  const totalOrders = ordersByHour.reduce((sum, value) => sum + value, 0);
+  const peakIndex = getPeakIndex(ordersByHour);
+  const peakHour = peakIndex >= 0 ? labels[peakIndex] ?? null : null;
+  const slowIndex = getSlowIndex(ordersByHour);
+  const slowHour = slowIndex >= 0 ? labels[slowIndex] ?? null : null;
+  const peakWindow = getPeakTrafficRange(labels, ordersByHour);
+  const lunchPeakCount = labels.filter((label, index) =>
+    isHourWithin(label, 12, 16) && (ordersByHour[index] ?? 0) > 0
+  ).length;
+  const eveningOrders = labels
+    .map((label, index) => (isHourWithin(label, 19, 23) ? ordersByHour[index] ?? 0 : 0))
+    .filter((value) => value > 0);
+
+  if (peakHour) {
+    insights.push({
+      id: "peak-hour",
+      text: `Peak traffic starts at ${peakHour}`,
+      priority: "medium"
+    });
+  }
+
+  if (slowHour && totalOrders > 0) {
+    insights.push({
+      id: "slow-hour",
+      text: `${slowHour} is your slowest hour`,
+      priority: "low"
+    });
+  }
+
+  if (lunchPeakCount >= 2) {
+    insights.push({
+      id: "peak-window",
+      text: "Lunch hours are your busiest period",
+      priority: "medium"
+    });
+  }
+
+  for (let index = 1; index < ordersByHour.length; index += 1) {
+    const previous = ordersByHour[index - 1] ?? 0;
+    const current = ordersByHour[index] ?? 0;
+
+    if (previous >= 2 && current <= Math.max(0, previous - 1)) {
+      insights.push({
+        id: `sharp-drop-${index}`,
+        text: `Orders drop after ${labels[index - 1]}`,
+        priority: "high"
+      });
+      break;
+    }
+  }
+
+  if (
+    eveningOrders.length >= 2 &&
+    Math.max(...eveningOrders) - Math.min(...eveningOrders) <= 1
+  ) {
+    insights.push({
+      id: "steady-evening",
+      text: "Evening traffic is steady",
+      priority: "medium"
+    });
+  }
+
+  if (peakWindow && totalOrders > 0) {
+    insights.push({
+      id: "staffing",
+      text: `You may need more staff during ${peakWindow}`,
+      priority: "high"
+    });
+  }
+
+  return getFilteredInsights(insights);
+}
+
+function buildRevenueChartSuggestions(
+  labels: string[],
+  ordersByHour: number[],
+  revenueTrend: number[]
+) {
+  const insights: DashboardInsight[] = [];
+  const totalOrders = ordersByHour.reduce((sum, value) => sum + value, 0);
+  const totalRevenue = revenueTrend.reduce((sum, value) => sum + value, 0);
+  const topRevenueHour = labels[getPeakIndex(revenueTrend)] ?? null;
+  const lunchRevenue = labels.reduce(
+    (sum, label, index) => sum + (isHourWithin(label, 12, 16) ? revenueTrend[index] ?? 0 : 0),
+    0
+  );
+  const eveningRevenue = labels.reduce(
+    (sum, label, index) => sum + (isHourWithin(label, 19, 23) ? revenueTrend[index] ?? 0 : 0),
+    0
+  );
+  const eveningOrders = labels.reduce(
+    (sum, label, index) => sum + (isHourWithin(label, 19, 23) ? ordersByHour[index] ?? 0 : 0),
+    0
+  );
+  const overallAverageRevenuePerOrder =
+    totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const eveningAverageRevenuePerOrder =
+    eveningOrders > 0 ? eveningRevenue / eveningOrders : 0;
+
+  if (topRevenueHour && isHourWithin(topRevenueHour, 12, 16)) {
+    insights.push({
+      id: "revenue-peak-lunch",
+      text: "Revenue peaks during lunch",
+      priority: "medium"
+    });
+  }
+
+  if (eveningOrders > 0 && eveningAverageRevenuePerOrder < overallAverageRevenuePerOrder) {
+    insights.push({
+      id: "avg-spend-low-evening",
+      text: "Average spend is low in the evening",
+      priority: "medium"
+    });
+  }
+
+  for (let index = 0; index < labels.length; index += 1) {
+    const orders = ordersByHour[index] ?? 0;
+    const revenue = revenueTrend[index] ?? 0;
+    const revenuePerOrder = orders > 0 ? revenue / orders : 0;
+
+    if (
+      orders >= Math.max(2, Math.ceil(Math.max(...ordersByHour, 0) * 0.75)) &&
+      revenuePerOrder > 0 &&
+      revenuePerOrder < overallAverageRevenuePerOrder * 0.85
+    ) {
+      insights.push({
+        id: `high-orders-low-revenue-${index}`,
+        text: "Traffic is strong, but revenue is underperforming",
+        priority: "high"
+      });
+      break;
+    }
+  }
+
+  for (let index = 0; index < labels.length; index += 1) {
+    const orders = ordersByHour[index] ?? 0;
+    const revenue = revenueTrend[index] ?? 0;
+    const revenuePerOrder = orders > 0 ? revenue / orders : 0;
+
+    if (
+      isHourWithin(labels[index] ?? "", 19, 23) &&
+      orders > 0 &&
+      orders <= 1 &&
+      revenuePerOrder >= overallAverageRevenuePerOrder * 1.15
+    ) {
+      insights.push({
+        id: `low-orders-high-revenue-${index}`,
+        text: `You have an upsell opportunity after ${labels[index]}`,
+        priority: "medium"
+      });
+      break;
+    }
+  }
+
+  if (topRevenueHour) {
+    insights.push({
+      id: "promote-margin",
+      text: "Promote high-margin items during peak hours",
+      priority: "medium"
+    });
+  }
+
+  return getFilteredInsights(insights);
 }
 
 type LineChartProps = {
@@ -100,6 +398,7 @@ type LineChartProps = {
   pointClassName: string;
   formatValue: (value: number) => string;
   yAxisLabel: string;
+  insights?: DashboardInsight[];
 };
 
 function DashboardLineChart({
@@ -110,18 +409,85 @@ function DashboardLineChart({
   pathClassName,
   pointClassName,
   formatValue,
-  yAxisLabel
+  yAxisLabel,
+  insights = []
 }: LineChartProps) {
+  const isOrdersChart = yAxisLabel === "Orders";
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const maxValue = Math.max(...values, 1);
   const ticks = getChartTicks(maxValue);
+  const latestValue = values[values.length - 1] ?? 0;
+  const peakValue = values.length ? Math.max(...values) : 0;
+  const totalValue = values.reduce((sum, value) => sum + value, 0);
+  const peakIndex = getPeakIndex(values);
+  const slowIndex = getSlowIndex(values);
+  const peakLabel = peakIndex >= 0 ? labels[peakIndex] ?? "—" : "—";
+  const slowLabel = slowIndex >= 0 ? labels[slowIndex] ?? "—" : "—";
+  const chartId = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const areaClassName =
+    pathClassName === "control-center-chart__path--orders"
+      ? "control-center-chart__area--orders"
+      : "control-center-chart__area--revenue";
+  const pointLabelClassName =
+    pointClassName === "control-center-chart__point--orders"
+      ? "control-center-chart__point-label control-center-chart__point-label--orders"
+      : "control-center-chart__point-label control-center-chart__point-label--revenue";
+  const resolvedActiveIndex =
+    activeIndex !== null && activeIndex >= 0 && activeIndex < values.length
+      ? activeIndex
+      : null;
+  const activeLabel = resolvedActiveIndex === null ? "" : labels[resolvedActiveIndex] ?? "";
+  const activeValue = resolvedActiveIndex === null ? 0 : values[resolvedActiveIndex] ?? 0;
+  const activePointX =
+    resolvedActiveIndex === null
+      ? null
+      : values.length <= 1
+        ? 50
+        : (resolvedActiveIndex / (values.length - 1)) * 100;
+  const activePointY =
+    resolvedActiveIndex === null ? null : 100 - (activeValue / maxValue) * 100;
 
   return (
     <article className="control-center-chart">
       <header className="control-center-analytics__header">
-        <span className="control-center-analytics__icon" aria-hidden="true">
-          {icon}
-        </span>
-        <h2>{title}</h2>
+        <div className="control-center-chart__title-group">
+          <span className="control-center-analytics__icon" aria-hidden="true">
+            {icon}
+          </span>
+          <h2>{title}</h2>
+        </div>
+        <div className="control-center-chart__summary" aria-label={`${title} summary`}>
+          {isOrdersChart ? (
+            <>
+              <div className="control-center-chart__summary-pill control-center-chart__summary-pill--peak">
+                <span className="control-center-chart__summary-label">Peak hour</span>
+                <strong>{peakLabel}</strong>
+              </div>
+              <div className="control-center-chart__summary-pill control-center-chart__summary-pill--slow">
+                <span className="control-center-chart__summary-label">Slow hour</span>
+                <strong>{slowLabel}</strong>
+              </div>
+              <div className="control-center-chart__summary-pill">
+                <span className="control-center-chart__summary-label">Total orders</span>
+                <strong>{totalValue}</strong>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="control-center-chart__summary-pill">
+                <span className="control-center-chart__summary-label">Peak</span>
+                <strong>
+                  {formatValue(peakValue)}
+                  {peakLabel !== "—" ? ` at ${peakLabel}` : ""}
+                </strong>
+              </div>
+              <div className="control-center-chart__summary-pill">
+                <span className="control-center-chart__summary-label">Total today</span>
+                <strong>{formatValue(totalValue)}</strong>
+              </div>
+            </>
+          )}
+        </div>
       </header>
       <div className="control-center-chart__plot">
         {labels.length ? (
@@ -130,19 +496,39 @@ function DashboardLineChart({
             style={{ minWidth: `${getChartMinWidth(labels.length)}px` }}
           >
             <div className="control-center-chart__frame">
-              <div className="control-center-chart__y-axis" aria-hidden="true">
-                <span className="control-center-chart__axis-title">{yAxisLabel}</span>
+              <div
+                className="control-center-chart__y-axis"
+                style={{ gridTemplateRows: `repeat(${ticks.length}, 1fr)` }}
+                aria-hidden="true"
+              >
                 {ticks.map((tick) => (
                   <span
                     key={`${title}-${tick}`}
                     className="control-center-chart__y-tick"
                   >
-                    {tick}
+                    {isOrdersChart ? tick : `${tick} ₪`}
                   </span>
                 ))}
               </div>
               <div className="control-center-chart__canvas">
-                <div className="control-center-chart__grid" aria-hidden="true">
+                {isOrdersChart ? (
+                  <div className="control-center-chart__bands" aria-hidden="true">
+                    <div className="control-center-chart__band control-center-chart__band--peak">
+                      <span>Peak</span>
+                    </div>
+                    <div className="control-center-chart__band control-center-chart__band--medium">
+                      <span>Medium</span>
+                    </div>
+                    <div className="control-center-chart__band control-center-chart__band--low">
+                      <span>Low</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div
+                  className="control-center-chart__grid"
+                  style={{ gridTemplateRows: `repeat(${ticks.length}, 1fr)` }}
+                  aria-hidden="true"
+                >
                   {ticks.map((tick) => (
                     <span
                       key={`${title}-grid-${tick}`}
@@ -156,26 +542,81 @@ function DashboardLineChart({
                   preserveAspectRatio="none"
                   aria-hidden="true"
                 >
+                  <defs>
+                    <linearGradient id={`${chartId}-area`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="currentColor" stopOpacity="0.14" />
+                      <stop offset="100%" stopColor="currentColor" stopOpacity="0.01" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    className={`control-center-chart__area ${areaClassName}`}
+                    d={buildAreaChartPath(values)}
+                    fill={`url(#${chartId}-area)`}
+                  />
                   <path
                     className={`control-center-chart__path ${pathClassName}`}
                     d={buildSmoothLineChartPath(values)}
                   />
-                  {values.map((value, index) => {
-                    const x =
-                      values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
-                    const y = 100 - (value / maxValue) * 100;
-
-                    return (
-                      <circle
-                        key={`${labels[index]}-${value}`}
-                        className={`control-center-chart__point ${pointClassName}`}
-                        cx={x}
-                        cy={Number.isFinite(y) ? y : 100}
-                        r="1.7"
+                  {activePointX !== null && activePointY !== null ? (
+                    <>
+                      <line
+                        className="control-center-chart__active-line"
+                        x1={activePointX}
+                        y1="0"
+                        x2={activePointX}
+                        y2="100"
                       />
-                    );
-                  })}
+                      <circle
+                        className="control-center-chart__active-dot"
+                        cx={activePointX}
+                        cy={Number.isFinite(activePointY) ? activePointY : 100}
+                        r="1.9"
+                      />
+                      <text
+                        x={activePointX}
+                        y={Math.max(8, activePointY - 5)}
+                        textAnchor="middle"
+                        className={pointLabelClassName}
+                      >
+                        {formatValue(activeValue)}
+                      </text>
+                    </>
+                  ) : null}
                 </svg>
+                {activePointX !== null ? (
+                  <div
+                    className="control-center-chart__tooltip"
+                    style={{
+                      left: `clamp(56px, calc(${activePointX}% - 42px), calc(100% - 96px))`
+                    }}
+                  >
+                    <span className="control-center-chart__tooltip-label">{activeLabel}</span>
+                    <strong>{formatValue(activeValue)}</strong>
+                  </div>
+                ) : null}
+                <div
+                  className="control-center-chart__hotspots"
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(labels.length, 1)}, minmax(0, 1fr))`
+                  }}
+                  onMouseLeave={() => setActiveIndex(null)}
+                >
+                  {labels.map((label, index) => (
+                    <button
+                      key={`${title}-hotspot-${label}`}
+                      type="button"
+                      className="control-center-chart__hotspot"
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onFocus={() => setActiveIndex(index)}
+                      onClick={() => setActiveIndex(index)}
+                      onTouchStart={() => setActiveIndex(index)}
+                    >
+                      <span className="sr-only">
+                        {label} {formatValue(values[index] ?? 0)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
                 <div
                   className="control-center-chart__legend"
                   style={{
@@ -184,7 +625,13 @@ function DashboardLineChart({
                 >
                   {labels.map((label, index) => (
                     <div key={`${title}-${label}`} className="control-center-chart__legend-item">
-                      <span className="control-center-chart__label">{label}</span>
+                      {getEverySecondLabel(label, index) ? (
+                        <span className="control-center-chart__label">
+                          {getEverySecondLabel(label, index)}
+                        </span>
+                      ) : (
+                        <span className="control-center-chart__legend-spacer" aria-hidden="true" />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -195,6 +642,15 @@ function DashboardLineChart({
           <div className="control-center-chart__empty">—</div>
         )}
       </div>
+      {insights.length ? (
+        <div className="control-center-chart__insights">
+          {insights.map((insight) => (
+            <p key={insight.id} className="control-center-chart__insight">
+              {insight.text}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -210,11 +666,30 @@ function ControlCenterDashboardComponent({
   dashboardCharts,
   currentShiftLabel
 }: Props) {
+  const orderChartSuggestions = buildOrderChartSuggestions(
+    dashboardCharts.labels,
+    dashboardCharts.ordersByHour
+  );
+  const revenueChartSuggestions = buildRevenueChartSuggestions(
+    dashboardCharts.labels,
+    dashboardCharts.ordersByHour,
+    dashboardCharts.revenueTrend
+  );
+
   return (
     <>
       <section className="control-center-shift" aria-label="Current shift">
         <div className="control-center-shift__label">Current shift</div>
         <div className="control-center-shift__value">{currentShiftLabel}</div>
+      </section>
+      <section
+        className={`control-center-global-insight control-center-global-insight--${insightStats.globalInsightStatus}`}
+        aria-label="Global insight"
+      >
+        <div className="control-center-global-insight__label">Global insight</div>
+        <div className="control-center-global-insight__value">
+          {insightStats.globalInsight || "Live comparison with yesterday will appear here."}
+        </div>
       </section>
       <section className="control-center-analytics" aria-label="Control Center analytics">
         {analyticsBlocks.map((block) => (
@@ -262,9 +737,22 @@ function ControlCenterDashboardComponent({
                             : stat.label === "Active Orders"
                               ? insightStats.activeOrders || "—"
                               : stat.label === "Waiter Calls"
-                                ? insightStats.waiterCalls || "—"
+                                ? insightStats.waiterCalls
                                 : "—"}
                     </strong>
+                    <span className="control-center-analytics__stat-comparison">
+                      {stat.label === "Revenue"
+                        ? insightStats.vsYesterday.revenue
+                        : stat.label === "Avg Check"
+                          ? insightStats.vsYesterday.avgCheck
+                          : stat.label === "Orders"
+                            ? insightStats.vsYesterday.orders
+                            : stat.label === "Active Orders"
+                              ? insightStats.vsYesterday.activeOrders
+                              : stat.label === "Waiter Calls"
+                                ? insightStats.vsYesterday.waiterCalls
+                                : null}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -299,6 +787,7 @@ function ControlCenterDashboardComponent({
           pointClassName="control-center-chart__point--orders"
           formatValue={(value) => String(value)}
           yAxisLabel="Orders"
+          insights={orderChartSuggestions}
         />
         <DashboardLineChart
           labels={dashboardCharts.labels}
@@ -309,18 +798,8 @@ function ControlCenterDashboardComponent({
           pointClassName="control-center-chart__point--revenue"
           formatValue={(value) => (value ? formatCurrency(value) : "—")}
           yAxisLabel="Revenue"
+          insights={revenueChartSuggestions}
         />
-      </section>
-      <section className="control-center-suggestions" aria-label="Dashboard suggestions">
-        <article className="control-center-analytics__card">
-          <header className="control-center-analytics__header">
-            <span className="control-center-analytics__icon" aria-hidden="true">
-              🧠
-            </span>
-            <h2>Suggestions</h2>
-          </header>
-          <div className="control-center-analytics__body" />
-        </article>
       </section>
     </>
   );

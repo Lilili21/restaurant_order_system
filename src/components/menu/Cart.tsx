@@ -1216,11 +1216,6 @@ export function Cart({
   async function callWaiter() {
     setMessage(null);
 
-    if (serviceRequestDisabled) {
-      setDialogMessage(text.waiterAlreadyCalled);
-      return;
-    }
-
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -1662,7 +1657,6 @@ export function Cart({
                   className="button-danger button-danger--call"
                   type="button"
                   onClick={() => setServiceMenuOpen((current) => !current)}
-                  disabled={serviceRequestDisabled}
                   aria-expanded={serviceMenuOpen}
                   aria-controls="service-action-menu"
                 >
@@ -1688,7 +1682,6 @@ export function Cart({
                         setServiceMenuOpen(false);
                         void callWaiter();
                       }}
-                      disabled={serviceRequestDisabled}
                     >
                       {text.serviceHelp}
                     </button>

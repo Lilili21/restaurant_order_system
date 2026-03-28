@@ -1,6 +1,231 @@
 {
   "orders": [
     {
+      "id": "ord_1774732312652",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:11:52.652Z",
+      "updatedAt": "2026-03-28T21:11:52.652Z",
+      "items": [
+        {
+          "id": "item_1774732312652_p54cfs",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 32
+    },
+    {
+      "id": "ord_demo_today_open_3",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 3,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T18:05:00.000Z",
+      "updatedAt": "2026-03-28T18:05:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_3_item_1",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "ord_demo_today_open_3_item_2",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 61
+    },
+    {
+      "id": "ord_demo_today_open_2",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 5,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T17:10:00.000Z",
+      "updatedAt": "2026-03-28T17:18:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_2_item_1",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 54
+    },
+    {
+      "id": "ord_demo_today_open_1",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "status": "new",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T16:30:00.000Z",
+      "updatedAt": "2026-03-28T16:30:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_1_item_1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "ord_demo_today_open_1_item_2",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 42
+    },
+    {
+      "id": "ord_demo_today_closed_5",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T14:55:00.000Z",
+      "updatedAt": "2026-03-28T15:18:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_5_item_1",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 2,
+          "served": true
+        }
+      ],
+      "total": 36
+    },
+    {
+      "id": "ord_demo_today_closed_4",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T13:40:00.000Z",
+      "updatedAt": "2026-03-28T13:58:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_4_item_1",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 32
+    },
+    {
+      "id": "ord_demo_today_closed_3",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T12:25:00.000Z",
+      "updatedAt": "2026-03-28T12:49:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_3_item_1",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 29
+    },
+    {
+      "id": "ord_demo_today_closed_2",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T11:20:00.000Z",
+      "updatedAt": "2026-03-28T11:44:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_2_item_1",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 18
+    },
+    {
+      "id": "ord_demo_today_closed_1",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 8,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T10:40:00.000Z",
+      "updatedAt": "2026-03-28T10:58:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_1_item_1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
       "id": "ord_1774550271918",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -3968,6 +4193,191 @@
     ]
   ],
   "closedTableSummaries": [
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 2,
+      "closedAt": "2026-03-28T15:20:00.000Z",
+      "total": 36,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_5"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_5",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 5,
+          "sessionId": 2,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T14:55:00.000Z",
+          "updatedAt": "2026-03-28T15:18:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_5_item_1",
+              "menuItemId": "m5",
+              "category": "drinks",
+              "name": "Mint lemonade",
+              "price": 18,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 36
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T14:00:00.000Z",
+      "total": 32,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_4"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_4",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T13:40:00.000Z",
+          "updatedAt": "2026-03-28T13:58:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_4_item_1",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 32
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T12:50:00.000Z",
+      "total": 29,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_3"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_3",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T12:25:00.000Z",
+          "updatedAt": "2026-03-28T12:49:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_3_item_1",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "closedAt": "2026-03-28T11:45:00.000Z",
+      "total": 18,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_2"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_2",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 2,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T11:20:00.000Z",
+          "updatedAt": "2026-03-28T11:44:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_2_item_1",
+              "menuItemId": "m5",
+              "category": "drinks",
+              "name": "Mint lemonade",
+              "price": 18,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 18
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 8,
+      "sessionId": 1,
+      "closedAt": "2026-03-28T11:00:00.000Z",
+      "total": 24,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_1"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_1",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 8,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T10:40:00.000Z",
+          "updatedAt": "2026-03-28T10:58:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_1_item_1",
+              "menuItemId": "m1",
+              "category": "starters",
+              "name": "Hummus with pita",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        }
+      ]
+    },
     {
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

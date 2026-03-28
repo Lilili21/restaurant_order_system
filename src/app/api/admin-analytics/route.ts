@@ -77,6 +77,23 @@ function getCurrentDayRuleTime(
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
+function getRuleTimeForDate(
+  rules: Array<{
+    id: string;
+    days: number[];
+    from: string | null;
+    until: string | null;
+  }>,
+  date: Date,
+  field: "from" | "until",
+  fallback: string | null
+) {
+  const matchedRule = rules.find((rule) => rule.days.includes(date.getDay()));
+  const value = matchedRule?.[field];
+
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 function getAnalyticsDayBounds(
   rules: Array<{
     id: string;
@@ -85,28 +102,48 @@ function getAnalyticsDayBounds(
     until: string | null;
   }>,
   fallbackFrom: string | null,
-  fallbackUntil: string | null
+  fallbackUntil: string | null,
+  now = new Date()
 ) {
-  const fromValue = getCurrentDayRuleTime(rules, "from", fallbackFrom);
-  const untilValue = getCurrentDayRuleTime(rules, "until", fallbackUntil);
-  const fromTime = parseTime(fromValue);
-  const untilTime = parseTime(untilValue);
+  const candidates = [new Date(now.getTime() - 24 * 60 * 60 * 1000), now]
+    .map((date) => {
+      const fromValue = getRuleTimeForDate(rules, date, "from", fallbackFrom);
+      const untilValue = getRuleTimeForDate(rules, date, "until", fallbackUntil);
+      const fromTime = parseTime(fromValue);
+      const untilTime = parseTime(untilValue);
 
-  if (!fromTime || !untilTime) {
-    return null;
+      if (!fromTime || !untilTime) {
+        return null;
+      }
+
+      const start = new Date(date);
+      start.setHours(fromTime.hours, fromTime.minutes, 0, 0);
+
+      const end = new Date(date);
+      end.setHours(untilTime.hours, untilTime.minutes, 0, 0);
+
+      if (end.getTime() <= start.getTime()) {
+        end.setDate(end.getDate() + 1);
+      }
+
+      return { start, end };
+    })
+    .filter((candidate): candidate is { start: Date; end: Date } => candidate !== null);
+
+  const nowTs = now.getTime();
+  const activeCandidate = candidates.find(
+    (candidate) => nowTs >= candidate.start.getTime() && nowTs < candidate.end.getTime()
+  );
+
+  if (activeCandidate) {
+    return activeCandidate;
   }
 
-  const start = new Date();
-  start.setHours(fromTime.hours, fromTime.minutes, 0, 0);
+  const previousCandidate = [...candidates].sort(
+    (left, right) => right.start.getTime() - left.start.getTime()
+  )[0];
 
-  const end = new Date();
-  end.setHours(untilTime.hours, untilTime.minutes, 0, 0);
-
-  if (end.getTime() <= start.getTime()) {
-    end.setDate(end.getDate() + 1);
-  }
-
-  return { start, end };
+  return previousCandidate ?? null;
 }
 
 function getCurrentShiftStartTimestamp(
@@ -136,6 +173,28 @@ function getCurrentShiftStartTimestamp(
   const previousDayStart = new Date(startToday);
   previousDayStart.setDate(previousDayStart.getDate() - 1);
   return previousDayStart.getTime();
+}
+
+function getShiftStartTimestampForDate(
+  date: Date,
+  rules: Array<{
+    id: string;
+    days: number[];
+    from: string | null;
+    until: string | null;
+  }>,
+  fallbackFrom: string | null
+) {
+  const fromValue = getRuleTimeForDate(rules, date, "from", fallbackFrom);
+  const fromTime = parseTime(fromValue);
+
+  if (!fromTime) {
+    return null;
+  }
+
+  const start = new Date(date);
+  start.setHours(fromTime.hours, fromTime.minutes, 0, 0);
+  return start.getTime();
 }
 
 function getWindowBounds(
@@ -233,9 +292,15 @@ function buildHourlyLabels(start: Date, end: Date) {
   const cursor = new Date(start);
   cursor.setMinutes(0, 0, 0);
 
-  while (cursor.getTime() <= end.getTime()) {
+  while (cursor.getTime() < end.getTime()) {
     labels.push(formatHourLabel(cursor));
     cursor.setHours(cursor.getHours() + 1, 0, 0, 0);
+  }
+
+  const endLabel = formatHourLabel(end);
+
+  if (labels[labels.length - 1] === endLabel) {
+    labels.pop();
   }
 
   return labels;
@@ -278,6 +343,120 @@ function buildHourlySeries(
     revenueTrend: labels.map((label) =>
       Number((revenueCounts.get(label) ?? 0).toFixed(2))
     )
+  };
+}
+
+function getSessionKey(input: {
+  restaurantSlug: string;
+  tableNumber: number;
+  sessionId: number;
+}) {
+  return `${input.restaurantSlug}:${input.tableNumber}:${input.sessionId}`;
+}
+
+function getActiveSessionCountAtTime(
+  orders: Order[],
+  closedSessions: Array<{
+    restaurantSlug: string;
+    tableNumber: number;
+    sessionId: number;
+    closedAt: string;
+  }>,
+  startTs: number,
+  endTs: number
+) {
+  const closedSessionKeys = new Set(
+    closedSessions
+      .filter((session) => {
+        const closedAtTs = new Date(session.closedAt).getTime();
+        return Number.isFinite(closedAtTs) && closedAtTs >= startTs && closedAtTs <= endTs;
+      })
+      .map((session) => getSessionKey(session))
+  );
+
+  const activeSessionKeys = new Set(
+    orders
+      .filter((order) => {
+        if (
+          order.kind === "waiter_call" ||
+          order.kind === "bill_request" ||
+          order.status === "cancelled"
+        ) {
+          return false;
+        }
+
+        const createdAtTs = new Date(order.createdAt).getTime();
+        return Number.isFinite(createdAtTs) && createdAtTs >= startTs && createdAtTs <= endTs;
+      })
+      .map((order) => getSessionKey(order))
+      .filter((sessionKey) => !closedSessionKeys.has(sessionKey))
+  );
+
+  return activeSessionKeys.size;
+}
+
+function formatVsYesterday(current: number, previous: number, suffix = "") {
+  if (current === previous) {
+    return "Same as yesterday";
+  }
+
+  if (previous === 0) {
+    return current > 0 ? `Up from 0 yesterday${suffix}` : "Same as yesterday";
+  }
+
+  const change = ((current - previous) / previous) * 100;
+  const direction = change > 0 ? "+" : "";
+
+  return `${direction}${Math.round(change)}% vs yesterday${suffix}`;
+}
+
+function buildGlobalInsight(input: {
+  currentRevenue: number;
+  previousRevenue: number;
+  currentOrders: number;
+  previousOrders: number;
+  peakHour: string;
+}) {
+  let status: "better" | "same" | "worse" = "same";
+
+  if (
+    input.currentOrders >= input.previousOrders &&
+    input.currentRevenue < input.previousRevenue
+  ) {
+    status = "worse";
+    return {
+      status,
+      text: `Traffic is healthy so far, but revenue is trailing yesterday. Push upsells before ${input.peakHour}.`
+    };
+  }
+
+  if (input.currentRevenue > input.previousRevenue) {
+    status = "better";
+    return {
+      status,
+      text: `Revenue is ahead of yesterday at this point. Keep the team ready around ${input.peakHour}.`
+    };
+  }
+
+  if (input.currentRevenue === input.previousRevenue && input.currentOrders === input.previousOrders) {
+    return {
+      status,
+      text: `Performance is tracking close to yesterday so far. Watch ${input.peakHour} for the next shift in momentum.`
+    };
+  }
+
+  if (input.currentOrders > input.previousOrders) {
+    status = "better";
+    return {
+      status,
+      text: `Order volume is ahead of yesterday so far. Watch service speed around ${input.peakHour}.`
+    };
+  }
+
+  status = "worse";
+  return {
+    status,
+    text: `Peak traffic is building around ${input.peakHour}. Prepare staff and best-sellers just before that window.`
   };
 }
 
@@ -325,14 +504,6 @@ export async function GET(request: NextRequest) {
         return createdAt >= currentShiftStartTs && createdAt <= Date.now();
       })
     : [];
-  const currentSessionVisibleOrders = tables
-    .flatMap((table) => table.orders ?? [])
-    .filter(
-      (order) =>
-        order.kind !== "waiter_call" &&
-        order.kind !== "bill_request" &&
-        order.status !== "cancelled"
-    );
   const analyticsOrders = shiftOrdersToNow;
   const closedSessionsInCurrentShift = currentShiftStartTs
     ? closedSessions.filter((session) => {
@@ -344,9 +515,6 @@ export async function GET(request: NextRequest) {
         );
       })
     : [];
-  const currentShiftTrackedOrders = [
-    ...new Map(shiftOrdersToNow.map((order) => [order.id, order])).values()
-  ];
   const closedSessionsInCurrentShiftRevenue = closedSessionsInCurrentShift.reduce(
     (sum, session) => sum + session.total,
     0
@@ -355,7 +523,8 @@ export async function GET(request: NextRequest) {
     closedSessionsInCurrentShift.length > 0
       ? closedSessionsInCurrentShiftRevenue / closedSessionsInCurrentShift.length
       : 0;
-  const liveOrdersCount = currentSessionVisibleOrders.length;
+  const activeTablesCount = tables.length;
+  const totalTablesOrdersCount = activeTablesCount + closedSessionsInCurrentShift.length;
   const waiterCallsCount = currentShiftStartTs
     ? allOrders.filter((order) => {
         if (order.kind !== "waiter_call") {
@@ -366,13 +535,84 @@ export async function GET(request: NextRequest) {
         return createdAt >= currentShiftStartTs && createdAt <= Date.now();
       }).length
     : 0;
+  const currentShiftStartDate = currentShiftStartTs ? new Date(currentShiftStartTs) : null;
+  const previousShiftStartTs = currentShiftStartDate
+    ? getShiftStartTimestampForDate(
+        new Date(currentShiftStartDate.getTime() - 24 * 60 * 60 * 1000),
+        settings.workingHoursRules,
+        settings.workingHoursFrom
+      )
+    : null;
+  const elapsedInCurrentShiftMs = currentShiftStartTs ? Date.now() - currentShiftStartTs : 0;
+  const previousComparableEndTs = previousShiftStartTs
+    ? previousShiftStartTs + elapsedInCurrentShiftMs
+    : null;
+  const previousClosedSessionsAtComparableTime =
+    previousShiftStartTs && previousComparableEndTs
+      ? closedSessions.filter((session) => {
+          const closedAtTs = new Date(session.closedAt).getTime();
+          return (
+            Number.isFinite(closedAtTs) &&
+            closedAtTs >= previousShiftStartTs &&
+            closedAtTs <= previousComparableEndTs
+          );
+        })
+      : [];
+  const previousRevenue = previousClosedSessionsAtComparableTime.reduce(
+    (sum, session) => sum + session.total,
+    0
+  );
+  const previousAvgCheck =
+    previousClosedSessionsAtComparableTime.length > 0
+      ? previousRevenue / previousClosedSessionsAtComparableTime.length
+      : 0;
+  const previousActiveTablesCount =
+    previousShiftStartTs && previousComparableEndTs
+      ? getActiveSessionCountAtTime(
+          allOrders,
+          closedSessions,
+          previousShiftStartTs,
+          previousComparableEndTs
+        )
+      : 0;
+  const previousOrdersCount =
+    previousActiveTablesCount + previousClosedSessionsAtComparableTime.length;
+  const previousWaiterCallsCount =
+    previousShiftStartTs && previousComparableEndTs
+      ? allOrders.filter((order) => {
+          if (order.kind !== "waiter_call") {
+            return false;
+          }
+
+          const createdAtTs = new Date(order.createdAt).getTime();
+          return (
+            Number.isFinite(createdAtTs) &&
+            createdAtTs >= previousShiftStartTs &&
+            createdAtTs <= previousComparableEndTs
+          );
+        }).length
+      : 0;
 
   const recentDishItems = currentShiftWindow
     ? getRecentDishItems(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
     : [];
   const hourlySeries = analyticsDayBounds
-    ? buildHourlySeries(analyticsOrders, analyticsDayBounds.start, analyticsDayBounds.end)
+    ? buildHourlySeries(
+        analyticsOrders,
+        analyticsDayBounds.start,
+        new Date(Math.min(analyticsDayBounds.end.getTime(), Date.now()))
+      )
     : { labels: [], ordersByHour: [], revenueTrend: [] };
+
+  const globalInsight = buildGlobalInsight({
+    currentRevenue: closedSessionsInCurrentShiftRevenue,
+    previousRevenue,
+    currentOrders: totalTablesOrdersCount,
+    previousOrders: previousOrdersCount,
+    peakHour: currentShiftWindow
+      ? getPeakHourLabel(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
+      : "the next busy hour"
+  });
 
   return NextResponse.json({
     insights: {
@@ -382,8 +622,8 @@ export async function GET(request: NextRequest) {
       avgCheck: closedSessionsInCurrentShift.length
         ? Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2))
         : "—",
-      orders: currentShiftTrackedOrders.length || "—",
-      activeOrders: liveOrdersCount || "—",
+      orders: totalTablesOrdersCount || "—",
+      activeOrders: activeTablesCount || "—",
       topDish: currentShiftWindow
         ? getUniqueDishNames(recentDishItems, "desc")
         : "—",
@@ -393,7 +633,22 @@ export async function GET(request: NextRequest) {
       peakHour: currentShiftWindow
         ? getPeakHourLabel(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
         : "—",
-      waiterCalls: waiterCallsCount || "—"
+      waiterCalls: String(waiterCallsCount),
+      globalInsight: globalInsight.text,
+      globalInsightStatus: globalInsight.status,
+      vsYesterday: {
+        revenue: formatVsYesterday(
+          Number(closedSessionsInCurrentShiftRevenue.toFixed(2)),
+          Number(previousRevenue.toFixed(2))
+        ),
+        avgCheck: formatVsYesterday(
+          Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2)),
+          Number(previousAvgCheck.toFixed(2))
+        ),
+        orders: formatVsYesterday(totalTablesOrdersCount, previousOrdersCount),
+        activeOrders: formatVsYesterday(activeTablesCount, previousActiveTablesCount),
+        waiterCalls: formatVsYesterday(waiterCallsCount, previousWaiterCallsCount)
+      }
     },
     charts: {
       labels: hourlySeries.labels,

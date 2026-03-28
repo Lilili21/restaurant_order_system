@@ -1487,20 +1487,6 @@ export async function createWaiterCall(input: {
     input.tableNumber
   );
 
-  const existingActiveWaiterCall = state.ordersStore.find(
-    (order) =>
-      order.restaurantSlug === restaurant.slug &&
-      order.tableNumber === input.tableNumber &&
-      order.sessionId === sessionId &&
-      order.kind === "waiter_call" &&
-      order.status !== "cancelled" &&
-      order.status !== "served"
-  );
-
-  if (existingActiveWaiterCall) {
-    return existingActiveWaiterCall;
-  }
-
   const waiterCall: Order = {
     id: `call_${Date.now()}`,
     restaurantSlug: restaurant.slug,

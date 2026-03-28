@@ -982,7 +982,7 @@ export function TablesOverview() {
 
                 return (
                   <article
-                    key={`${session.restaurantSlug}_${session.tableNumber}_${session.sessionId}`}
+                    key={`${session.restaurantSlug}_${session.tableNumber}_${session.sessionId}_${session.closedAt}_${session.orderIds.join("_")}`}
                     className="info-card"
                   >
                     <h2>Table {session.tableNumber}</h2>
