@@ -105,6 +105,8 @@ export type Order = {
   restaurantName: string;
   tableNumber: number;
   sessionId: number;
+  guestContactName?: string;
+  guestContactPhone?: string;
   kind?: "order" | "waiter_call" | "bill_request";
   serveMode?: ServeMode;
   status: OrderStatus;

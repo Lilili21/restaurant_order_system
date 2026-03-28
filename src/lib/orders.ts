@@ -425,6 +425,28 @@ function rememberRecentOrderPayload(
   });
 }
 
+function normalizeGuestContactValue(value: string | null | undefined) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function hasGuestContactConflict(
+  existingOrder: Order,
+  incomingContact: {
+    guestContactName?: string;
+    guestContactPhone?: string;
+  }
+) {
+  const nextName = normalizeGuestContactValue(incomingContact.guestContactName);
+  const nextPhone = normalizeGuestContactValue(incomingContact.guestContactPhone);
+  const currentName = normalizeGuestContactValue(existingOrder.guestContactName);
+  const currentPhone = normalizeGuestContactValue(existingOrder.guestContactPhone);
+
+  return Boolean(
+    (currentName && nextName && currentName !== nextName) ||
+      (currentPhone && nextPhone && currentPhone !== nextPhone)
+  );
+}
+
 function toOrdersMetaPersistence(
   state: OrdersPersistence | RuntimeState
 ): OrdersMetaPersistence {
@@ -1628,6 +1650,8 @@ export async function createOrder(input: {
   items: CartItem[];
   serveMode?: ServeMode;
   clientRequestId?: string;
+  guestContactName?: string;
+  guestContactPhone?: string;
 }) {
   const state = await readRuntimeStateAsync();
   const restaurant = await getRestaurantBySlug(input.restaurantSlug);
@@ -1715,8 +1739,22 @@ export async function createOrder(input: {
       order.status === "new"
   );
 
-  if (existingNewOrder) {
+  if (
+    existingNewOrder &&
+    !hasGuestContactConflict(existingNewOrder, {
+      guestContactName: input.guestContactName,
+      guestContactPhone: input.guestContactPhone
+    })
+  ) {
     const mergedOrder = await mergeOrderItems(existingNewOrder, items);
+
+    if (!normalizeGuestContactValue(mergedOrder.guestContactName)) {
+      mergedOrder.guestContactName = normalizeGuestContactValue(input.guestContactName);
+    }
+
+    if (!normalizeGuestContactValue(mergedOrder.guestContactPhone)) {
+      mergedOrder.guestContactPhone = normalizeGuestContactValue(input.guestContactPhone);
+    }
 
     if (input.serveMode) {
       mergedOrder.serveMode = input.serveMode;
@@ -1749,6 +1787,8 @@ export async function createOrder(input: {
     restaurantName: restaurant.name,
     tableNumber: input.tableNumber,
     sessionId,
+    guestContactName: normalizeGuestContactValue(input.guestContactName),
+    guestContactPhone: normalizeGuestContactValue(input.guestContactPhone),
     status: "new",
     serveMode: input.serveMode ?? "all_at_once",
     createdAt: new Date().toISOString(),
@@ -1804,6 +1844,42 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
       served: false
     }));
   }
+
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
+
+  return normalizedOrder;
+}
+
+export async function updateOrderGuestContact(
+  orderId: string,
+  guestContact: {
+    guestContactName?: string;
+    guestContactPhone?: string;
+  }
+) {
+  const state = await readRuntimeStateAsync();
+  const order = state.ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
+    throw new Error("Service request contact cannot be updated");
+  }
+
+  order.guestContactName =
+    typeof guestContact.guestContactName === "string" &&
+    guestContact.guestContactName.trim()
+      ? guestContact.guestContactName.trim()
+      : undefined;
+  order.guestContactPhone =
+    typeof guestContact.guestContactPhone === "string" &&
+    guestContact.guestContactPhone.trim()
+      ? guestContact.guestContactPhone.trim()
+      : undefined;
+  order.updatedAt = new Date().toISOString();
 
   const normalizedOrder = await normalizeOrderState(order);
   await persistStateAsync(state);

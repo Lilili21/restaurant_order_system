@@ -146,6 +146,9 @@ const uiText = {
     orderServed: "הוגש",
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
+    orderStatusOptIn: "רוצים לקבל עדכון על סטטוס ההזמנה?",
+    orderStatusName: "שם",
+    orderStatusPhone: "מספר טלפון",
     waiterCalled: "המלצר הוזמן",
     billRequested: "המלצר יביא את החשבון לשולחן שלכם בקרוב.\nתודה שסעדתם אצלנו!",
     waiterServiceNote: "המלצר יהיה אצלכם בקרוב.",
@@ -235,6 +238,9 @@ const uiText = {
     orderServed: "Served",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
+    orderStatusOptIn: "Would you like to get your order status?",
+    orderStatusName: "Name",
+    orderStatusPhone: "Phone number",
     waiterCalled: "Waiter has been called",
     billRequested: "A waiter will bring your bill shortly.\nThank you for dining with us!",
     waiterServiceNote: "Waiter is on the way.",
@@ -317,6 +323,12 @@ export function Cart({
   const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const [isOrderPanelVisible, setIsOrderPanelVisible] = useState(false);
+  const [wantsOrderStatusUpdates, setWantsOrderStatusUpdates] = useState(false);
+  const [guestContactName, setGuestContactName] = useState("");
+  const [guestContactPhone, setGuestContactPhone] = useState("");
+  const [latestSubmittedOrderId, setLatestSubmittedOrderId] = useState<string | null>(
+    null
+  );
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const orderPanelRef = useRef<HTMLElement | null>(null);
@@ -1336,7 +1348,15 @@ export function Cart({
           tableNumber,
           items,
           serveMode,
-          clientRequestId
+          clientRequestId,
+          guestContactName:
+            wantsOrderStatusUpdates && guestContactName.trim()
+              ? guestContactName.trim()
+              : undefined,
+          guestContactPhone:
+            wantsOrderStatusUpdates && guestContactPhone.trim()
+              ? guestContactPhone.trim()
+              : undefined
         })
       });
 
@@ -1346,6 +1366,7 @@ export function Cart({
 
       const order = (await response.json()) as Order;
       setItems([]);
+      setLatestSubmittedOrderId(order.id);
       lastSuccessfulOrderSignatureRef.current = {
         signature: payloadSignature,
         submittedAt: Date.now()
@@ -1493,6 +1514,33 @@ export function Cart({
     scrollToOrder();
   }
 
+  async function closeDialogMessage() {
+    if (
+      dialogMessage === text.orderSent &&
+      latestSubmittedOrderId &&
+      wantsOrderStatusUpdates &&
+      (guestContactName.trim() || guestContactPhone.trim())
+    ) {
+      try {
+        await fetch("/api/orders", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            orderId: latestSubmittedOrderId,
+            guestContactName: guestContactName.trim() || undefined,
+            guestContactPhone: guestContactPhone.trim() || undefined
+          })
+        });
+      } catch {
+        // Keep guest flow uninterrupted even if contact save fails.
+      }
+    }
+
+    setDialogMessage(null);
+  }
+
   function getUpsellPromptType() {
     if (!hasDessertInOrder && !hasDrinksInOrder) {
       return "dessert_drinks" as const;
@@ -1561,10 +1609,44 @@ export function Cart({
             }
           >
             <p className="modal-card__message">{dialogMessage}</p>
+            {dialogMessage === text.orderSent ? (
+              <div className="modal-card__status-opt-in">
+                <label className="modal-card__status-toggle">
+                  <input
+                    type="checkbox"
+                    checked={wantsOrderStatusUpdates}
+                    onChange={(event) =>
+                      setWantsOrderStatusUpdates(event.target.checked)
+                    }
+                  />
+                  <span>{text.orderStatusOptIn}</span>
+                </label>
+                {wantsOrderStatusUpdates ? (
+                  <div className="modal-card__status-fields">
+                    <input
+                      className="modal-input"
+                      type="text"
+                      placeholder={text.orderStatusName}
+                      value={guestContactName}
+                      onChange={(event) => setGuestContactName(event.target.value)}
+                    />
+                    <input
+                      className="modal-input"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder={text.orderStatusPhone}
+                      value={guestContactPhone}
+                      onChange={(event) => setGuestContactPhone(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <button
               className="button-success modal-card__ack"
               type="button"
-              onClick={() => setDialogMessage(null)}
+              onClick={() => void closeDialogMessage()}
             >
               {text.thankYou}
             </button>

@@ -2050,6 +2050,33 @@ button:disabled {
   white-space: pre-line;
 }
 
+.modal-card__status-opt-in {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.modal-card__status-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #5b4634;
+}
+
+.modal-card__status-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-card__status-fields {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 360px);
+  margin: 0 auto;
+}
+
 .modal-card__ack {
   min-width: 108px;
   min-height: 54px;

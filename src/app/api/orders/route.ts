@@ -8,6 +8,7 @@ import {
   createOrder,
   createWaiterCall,
   getOrders,
+  updateOrderGuestContact,
   updateOrderItemServed,
   updateOrderStatus
 } from "@/lib/orders";
@@ -115,6 +116,20 @@ function validateCreateOrderPayload(body: unknown) {
   ) {
     throw new Error("clientRequestId is too long");
   }
+
+  if (
+    typeof body.guestContactName === "string" &&
+    body.guestContactName.length > 120
+  ) {
+    throw new Error("guestContactName is too long");
+  }
+
+  if (
+    typeof body.guestContactPhone === "string" &&
+    body.guestContactPhone.length > 40
+  ) {
+    throw new Error("guestContactPhone is too long");
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -183,6 +198,41 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const body = (await request.json()) as {
+    orderId?: string;
+    status?: OrderStatus;
+    orderItemId?: string;
+    served?: boolean;
+    quantityDelta?: number;
+    guestContactName?: string;
+    guestContactPhone?: string;
+  };
+
+  if (
+    body.orderId &&
+    (body.guestContactName !== undefined || body.guestContactPhone !== undefined) &&
+    !body.status &&
+    !body.orderItemId &&
+    body.quantityDelta === undefined &&
+    body.served === undefined
+  ) {
+    try {
+      const order = await updateOrderGuestContact(body.orderId, {
+        guestContactName: body.guestContactName,
+        guestContactPhone: body.guestContactPhone
+      });
+
+      return NextResponse.json(order);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          message: error instanceof Error ? error.message : "Unknown error"
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const clientId = getRequestClientId(request);
   const limited = applyRateLimit({
     id: `orders:patch:${clientId}`,
@@ -202,14 +252,6 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as {
-      orderId?: string;
-      status?: OrderStatus;
-      orderItemId?: string;
-      served?: boolean;
-      quantityDelta?: number;
-    };
-
     if (!body.orderId) {
       throw new Error("orderId is required");
     }

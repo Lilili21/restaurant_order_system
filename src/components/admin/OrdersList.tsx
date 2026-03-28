@@ -640,6 +640,15 @@ export function OrdersList() {
                     serveModeLabel ? (
                       <p className="muted">{serveModeLabel}</p>
                     ) : null}
+                    {order.kind !== "waiter_call" &&
+                    order.kind !== "bill_request" &&
+                    isHallView &&
+                    (order.guestContactName || order.guestContactPhone) ? (
+                      <p className="muted">
+                        Guest: {order.guestContactName || "—"}
+                        {order.guestContactPhone ? ` · ${order.guestContactPhone}` : ""}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="order-header-meta">
                     <div className="order-time">
