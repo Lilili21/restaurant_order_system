@@ -125,10 +125,17 @@ const uiText = {
     newOrder: "ההזמנה שלי",
     emptyCart: "ההזמנה שלכם עדיין ריקה. הוסיפו משהו טעים מהתפריט.",
     recommendationTitle: "אולי תוסיפו גם",
+    priorityHintTitle: "מומלץ להוסיף",
+    addDrinkHint: "אין עדיין שתייה בהזמנה. תרצו לבחור משהו לשתות?",
+    addDessertHint: "אין עדיין קינוח בהזמנה. תרצו להוסיף משהו מתוק?",
+    addStarterHint: "יש כרגע רק שתייה בהזמנה. תרצו להוסיף מנת פתיחה?",
     recommendationPrefix: "בחרתם",
     recommendationJoiner: ". תוסיפו גם",
     recommendationAdd: "הוספה",
     recommendationView: "צפו",
+    recommendationViewDrinks: "למשקאות",
+    recommendationViewDesserts: "לקינוחים",
+    recommendationViewStarters: "למנות פתיחה",
     total: "סה\"כ",
     happyHourDiscount: "הנחת Happy hour",
     submit: "שלח הזמנה",
@@ -207,10 +214,17 @@ const uiText = {
     newOrder: "My order",
     emptyCart: "Your order is empty. Add something tasty from the menu.",
     recommendationTitle: "You may also like",
+    priorityHintTitle: "Recommended",
+    addDrinkHint: "There are no drinks in your order yet. Add something to drink?",
+    addDessertHint: "There is no dessert in your order yet. Add something sweet?",
+    addStarterHint: "Your cart has drinks only. Add a starter?",
     recommendationPrefix: "You chose",
     recommendationJoiner: ". Add",
     recommendationAdd: "Add",
     recommendationView: "View",
+    recommendationViewDrinks: "View drinks",
+    recommendationViewDesserts: "View desserts",
+    recommendationViewStarters: "View starters",
     total: "Total",
     happyHourDiscount: "Happy hour discount",
     submit: "Place order",
@@ -589,6 +603,10 @@ export function Cart({
     Math.max(0, total - currentOrderDiscountAmount).toFixed(2)
   );
 
+  const cartStorageKey = useMemo(
+    () => `cart:${restaurantSlug}:${tableToken}`,
+    [restaurantSlug, tableToken]
+  );
   const pendingOrderStorageKey = useMemo(
     () => `pending-order:${restaurantSlug}:${tableToken}`,
     [restaurantSlug, tableToken]
@@ -808,6 +826,58 @@ export function Cart({
 
     return nextRecommendations;
   }, [detailedItems, isBarClosed, isKitchenClosed, menu, recommendations, visibleMenu]);
+  const priorityCartSuggestions = useMemo(() => {
+    if (!detailedItems.length) {
+      return [];
+    }
+
+    const suggestions: Array<{
+      id: "drinks" | "desserts" | "starters";
+      text: string;
+      buttonLabel: string;
+      filter: MenuFilter;
+    }> = [];
+
+    if (!hasDrinksInOrder && !isBarClosed) {
+      suggestions.push({
+        id: "drinks",
+        text: text.addDrinkHint,
+        buttonLabel: text.recommendationViewDrinks,
+        filter: "drinks"
+      });
+    }
+
+    if (!hasDessertInOrder && !isKitchenClosed && !hasDishesInOrder) {
+      suggestions.push({
+        id: "starters",
+        text: text.addStarterHint,
+        buttonLabel: text.recommendationViewStarters,
+        filter: "starters"
+      });
+    } else if (!hasDessertInOrder && !isKitchenClosed) {
+      suggestions.push({
+        id: "desserts",
+        text: text.addDessertHint,
+        buttonLabel: text.recommendationViewDesserts,
+        filter: "desserts"
+      });
+    }
+
+    return suggestions;
+  }, [
+    detailedItems.length,
+    hasDessertInOrder,
+    hasDishesInOrder,
+    hasDrinksInOrder,
+    isBarClosed,
+    isKitchenClosed,
+    text.addDessertHint,
+    text.addDrinkHint,
+    text.addStarterHint,
+    text.recommendationViewDesserts,
+    text.recommendationViewDrinks,
+    text.recommendationViewStarters
+  ]);
 
   function createOrderPayloadSignature(serveMode: ServeMode) {
     const normalizedItems = [...items]
@@ -853,6 +923,80 @@ export function Cart({
       pendingOrderRequestIdRef.current = savedRequestId;
     }
   }, [pendingOrderStorageKey]);
+
+  useEffect(() => {
+    const savedCart = window.localStorage.getItem(cartStorageKey);
+
+    if (!savedCart) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedCart) as unknown;
+
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      const restoredItems = parsed
+        .filter((item): item is CartItem => {
+          if (!item || typeof item !== "object") {
+            return false;
+          }
+
+          const candidate = item as Partial<CartItem>;
+
+          return (
+            typeof candidate.menuItemId === "string" &&
+            candidate.menuItemId.trim().length > 0 &&
+            typeof candidate.quantity === "number" &&
+            Number.isFinite(candidate.quantity) &&
+            candidate.quantity > 0
+          );
+        })
+        .map((item) => {
+          const menuItem = menu.find((candidate) => candidate.id === item.menuItemId);
+          const matchedVolumeOption = menuItem?.volumeOptions?.find(
+            (option) => option.id === item.volumeOptionId
+          );
+
+          return {
+            menuItemId: item.menuItemId,
+            quantity: Math.max(1, Math.trunc(item.quantity)),
+            note: typeof item.note === "string" ? item.note : undefined,
+            volumeOptionId:
+              typeof item.volumeOptionId === "string" && item.volumeOptionId.trim()
+                ? item.volumeOptionId
+                : undefined,
+            volumeLabel:
+              matchedVolumeOption?.label ??
+              (typeof item.volumeLabel === "string" && item.volumeLabel.trim()
+                ? item.volumeLabel
+                : undefined),
+            priceOverride:
+              typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
+                ? item.priceOverride
+                : matchedVolumeOption?.price
+          };
+        })
+        .filter((item) => menu.some((menuItem) => menuItem.id === item.menuItemId));
+
+      if (restoredItems.length) {
+        setItems(restoredItems);
+      }
+    } catch {
+      window.localStorage.removeItem(cartStorageKey);
+    }
+  }, [cartStorageKey, menu]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      window.localStorage.removeItem(cartStorageKey);
+      return;
+    }
+
+    window.localStorage.setItem(cartStorageKey, JSON.stringify(items));
+  }, [cartStorageKey, items]);
 
   useEffect(() => {
     const panelElement = orderPanelRef.current;
@@ -1207,6 +1351,7 @@ export function Cart({
         submittedAt: Date.now()
       };
       pendingOrderRequestIdRef.current = null;
+      window.localStorage.removeItem(cartStorageKey);
       window.localStorage.removeItem(pendingOrderStorageKey);
       setSubmittedOrders((current) => {
         const existingIndex = current.findIndex((item) => item.id === order.id);
@@ -1618,6 +1763,13 @@ export function Cart({
                 </button>
               </div>
             </div>
+            <div className="menu-quick-info" aria-label="Guest information shortcuts">
+              {text.quickInfo.map((label) => (
+                <span key={label} className="menu-quick-info__chip">
+                  {label}
+                </span>
+              ))}
+            </div>
             <p className="lead">
               {orderingEnabled
                 ? `${text.tableOrderingHint} ${tableNumber}`
@@ -1805,6 +1957,30 @@ export function Cart({
               </div>
             )}
 
+            {priorityCartSuggestions.length ? (
+              <div className="cart-recommendations cart-recommendations--priority" role="status" aria-live="polite">
+                {priorityCartSuggestions.map((suggestion) => (
+                  <div key={suggestion.id} className="cart-recommendation cart-recommendation--priority">
+                    <div>
+                      <p className="cart-recommendation__eyebrow">
+                        {text.priorityHintTitle}
+                      </p>
+                      <p className="cart-recommendation__text">
+                        {suggestion.text}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="button-success cart-recommendation__button cart-recommendation__button--priority"
+                      onClick={() => setSelectedMenuFilter(suggestion.filter)}
+                    >
+                      {suggestion.buttonLabel}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
             {activeCartRecommendations.length ? (
               <div className="cart-recommendations" role="status" aria-live="polite">
                 {activeCartRecommendations.map((recommendation) => (
@@ -1978,13 +2154,6 @@ export function Cart({
             ) : null}
           </aside>
           ) : null}
-        </div>
-        <div className="menu-quick-info menu-quick-info--bottom" aria-label="Guest information shortcuts">
-          {text.quickInfo.map((label) => (
-            <span key={label} className="menu-quick-info__chip">
-              {label}
-            </span>
-          ))}
         </div>
       </div>
     </>
