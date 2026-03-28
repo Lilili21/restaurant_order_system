@@ -1,15 +1,72 @@
 {
   "orders": [
     {
-      "id": "ord_1774732312652",
+      "id": "ord_1774734899992",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
       "tableNumber": 4,
       "sessionId": 5,
       "status": "new",
       "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:54:59.992Z",
+      "updatedAt": "2026-03-28T21:55:09.747Z",
+      "items": [
+        {
+          "id": "item_1774734899991_lbivx3",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 64
+    },
+    {
+      "id": "ord_1774734314850",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "preparing",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:45:14.850Z",
+      "updatedAt": "2026-03-28T21:51:02.968Z",
+      "items": [
+        {
+          "id": "item_1774734314850_5kkcki",
+          "menuItemId": "m_soft_iced_tea",
+          "category": "non_alcoholic_drinks",
+          "name": "Peach Iced Tea",
+          "volumeOptionId": "volume_soft_iced_tea_330",
+          "volumeLabel": "330ml",
+          "price": 14,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1774734429408_6e53uo",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 4,
+          "served": false
+        }
+      ],
+      "total": 142
+    },
+    {
+      "id": "ord_1774732312652",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "preparing",
+      "serveMode": "as_ready",
       "createdAt": "2026-03-28T21:11:52.652Z",
-      "updatedAt": "2026-03-28T21:11:52.652Z",
+      "updatedAt": "2026-03-28T21:42:43.435Z",
       "items": [
         {
           "id": "item_1774732312652_p54cfs",
@@ -19,9 +76,20 @@
           "price": 32,
           "quantity": 1,
           "served": false
+        },
+        {
+          "id": "item_1774734163435_rwcpnm",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "Captain Morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": false
         }
       ],
-      "total": 32
+      "total": 82
     },
     {
       "id": "ord_demo_today_open_3",
@@ -84,7 +152,7 @@
       "restaurantName": "Olive Bistro",
       "tableNumber": 1,
       "sessionId": 7,
-      "status": "new",
+      "status": "preparing",
       "serveMode": "all_at_once",
       "createdAt": "2026-03-28T16:30:00.000Z",
       "updatedAt": "2026-03-28T16:30:00.000Z",

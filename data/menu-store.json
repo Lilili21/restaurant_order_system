@@ -4,14 +4,14 @@
     "restaurantSlug": "olive-bistro",
     "category": "rum",
     "name": "קפטן מורגן",
-    "description": "רום ורום ורום",
+    "description": "רום כהה קלאסי, מוגש לפי הנפח שתבחרו.",
     "nameHe": "קפטן מורגן",
-    "nameEn": "captain morgan",
-    "descriptionHe": "רום ורום ורום",
-    "descriptionEn": "rum wrum wrum wrum",
+    "nameEn": "Captain Morgan",
+    "descriptionHe": "רום כהה קלאסי, מוגש לפי הנפח שתבחרו.",
+    "descriptionEn": "Classic dark rum, served in your selected pour.",
     "price": 50,
     "image": "/images/default-menu-item.svg",
-    "showImage": true,
+    "showImage": false,
     "available": true,
     "badges": [
       "new"
@@ -28,15 +28,15 @@
     "id": "m_1773757074844",
     "restaurantSlug": "olive-bistro",
     "category": "two_component_mixture",
-    "name": "פינה קולהדה",
-    "description": "גכגכ",
-    "nameHe": "פינה קולהדה",
-    "nameEn": "pina colada",
-    "descriptionHe": "גכגכ",
-    "descriptionEn": "גכגכ",
+    "name": "פינה קולדה",
+    "description": "קוקטייל טרופי עם רום, אננס וקוקוס.",
+    "nameHe": "פינה קולדה",
+    "nameEn": "Pina Colada",
+    "descriptionHe": "קוקטייל טרופי עם רום, אננס וקוקוס.",
+    "descriptionEn": "A tropical cocktail with rum, pineapple and coconut.",
     "price": 20,
     "image": "/images/default-menu-item.svg",
-    "showImage": true,
+    "showImage": false,
     "available": true,
     "badges": [],
     "volumeOptions": [
@@ -51,15 +51,15 @@
     "id": "m_1773741164354",
     "restaurantSlug": "olive-bistro",
     "category": "non_alcoholic_drinks",
-    "name": "מיץץ2",
-    "description": "",
-    "nameHe": "מיץץ2",
-    "nameEn": "orange juice2",
-    "descriptionHe": "",
-    "descriptionEn": "",
-    "price": 10,
+    "name": "מיץ תפוזים סחוט",
+    "description": "מיץ תפוזים סחוט וקר.",
+    "nameHe": "מיץ תפוזים סחוט",
+    "nameEn": "Fresh Orange Juice",
+    "descriptionHe": "מיץ תפוזים סחוט וקר.",
+    "descriptionEn": "Freshly squeezed orange juice, served cold.",
+    "price": 16,
     "image": "/images/default-menu-item.svg",
-    "showImage": true,
+    "showImage": false,
     "available": true,
     "badges": [
       "most_popular"
@@ -67,18 +67,110 @@
     "volumeOptions": [
       {
         "id": "volume_0_1L_10",
-        "label": "1L",
-        "price": 10
+        "label": "250ml",
+        "price": 16
       },
       {
         "id": "volume_1_2L_20",
-        "label": "2L",
-        "price": 20
+        "label": "500ml",
+        "price": 28
       },
       {
         "id": "volume_2_3L_30",
-        "label": "3L",
-        "price": 30
+        "label": "1L",
+        "price": 42
+      }
+    ]
+  },
+  {
+    "id": "m_soft_cola",
+    "restaurantSlug": "olive-bistro",
+    "category": "non_alcoholic_drinks",
+    "name": "קוקה-קולה",
+    "description": "בקבוק אישי קר של קוקה-קולה.",
+    "nameHe": "קוקה-קולה",
+    "nameEn": "Coca-Cola",
+    "descriptionHe": "בקבוק אישי קר של קוקה-קולה.",
+    "descriptionEn": "A chilled personal bottle of Coca-Cola.",
+    "price": 14,
+    "image": "/images/default-menu-item.svg",
+    "showImage": false,
+    "available": true,
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_soft_cola_330",
+        "label": "330ml",
+        "price": 14
+      }
+    ]
+  },
+  {
+    "id": "m_soft_water",
+    "restaurantSlug": "olive-bistro",
+    "category": "non_alcoholic_drinks",
+    "name": "מים מינרליים",
+    "description": "בקבוק מים מינרליים קרים.",
+    "nameHe": "מים מינרליים",
+    "nameEn": "Still Water",
+    "descriptionHe": "בקבוק מים מינרליים קרים.",
+    "descriptionEn": "A chilled bottle of still mineral water.",
+    "price": 10,
+    "image": "/images/default-menu-item.svg",
+    "showImage": false,
+    "available": true,
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_soft_water_500",
+        "label": "500ml",
+        "price": 10
+      }
+    ]
+  },
+  {
+    "id": "m_soft_sparkling",
+    "restaurantSlug": "olive-bistro",
+    "category": "non_alcoholic_drinks",
+    "name": "מים מוגזים",
+    "description": "בקבוק מים מוגזים קלים ומרעננים.",
+    "nameHe": "מים מוגזים",
+    "nameEn": "Sparkling Water",
+    "descriptionHe": "בקבוק מים מוגזים קלים ומרעננים.",
+    "descriptionEn": "A refreshing bottle of sparkling water.",
+    "price": 12,
+    "image": "/images/default-menu-item.svg",
+    "showImage": false,
+    "available": true,
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_soft_sparkling_330",
+        "label": "330ml",
+        "price": 12
+      }
+    ]
+  },
+  {
+    "id": "m_soft_iced_tea",
+    "restaurantSlug": "olive-bistro",
+    "category": "non_alcoholic_drinks",
+    "name": "תה קר אפרסק",
+    "description": "תה קר בטעם אפרסק, מוגש קר.",
+    "nameHe": "תה קר אפרסק",
+    "nameEn": "Peach Iced Tea",
+    "descriptionHe": "תה קר בטעם אפרסק, מוגש קר.",
+    "descriptionEn": "Peach iced tea, served chilled.",
+    "price": 14,
+    "image": "/images/default-menu-item.svg",
+    "showImage": false,
+    "available": true,
+    "badges": [],
+    "volumeOptions": [
+      {
+        "id": "volume_soft_iced_tea_330",
+        "label": "330ml",
+        "price": 14
       }
     ]
   },

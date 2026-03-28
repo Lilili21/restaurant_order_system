@@ -16,6 +16,7 @@ import {
   MenuItem,
   MenuLanguage,
   Order,
+  OrderStatus,
   ServeMode
 } from "@/lib/types";
 
@@ -133,6 +134,9 @@ const uiText = {
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
+    orderNew: "חדש",
+    orderPreparing: "בהכנה",
+    orderServed: "הוגש",
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
     waiterCalled: "המלצר הוזמן",
@@ -212,6 +216,9 @@ const uiText = {
     submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
+    orderNew: "New",
+    orderPreparing: "Preparing",
+    orderServed: "Served",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
     waiterCalled: "Waiter has been called",
@@ -345,6 +352,25 @@ export function Cart({
     (sum, order) => sum + order.total,
     0
   );
+  const submittedOrdersSummaryStatus = useMemo(() => {
+    const visibleStatuses = submittedOrders
+      .map((order) => order.status)
+      .filter((status) => status !== "cancelled");
+
+    if (visibleStatuses.includes("new")) {
+      return "new" as const;
+    }
+
+    if (visibleStatuses.includes("preparing")) {
+      return "preparing" as const;
+    }
+
+    if (visibleStatuses.includes("served")) {
+      return "served" as const;
+    }
+
+    return null;
+  }, [submittedOrders]);
   const OPEN_COUNTDOWN_VISIBILITY_MS = 30 * 60 * 1000;
   const serviceRequestDisabled =
     hasActiveServiceRequest || serviceRequestBlockedUntil > Date.now();
@@ -588,6 +614,22 @@ export function Cart({
 
   function getCartItemKey(cartItem: CartItem) {
     return `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`;
+  }
+
+  function getOrderStatusLabel(status: OrderStatus) {
+    if (status === "new") {
+      return text.orderNew;
+    }
+
+    if (status === "served") {
+      return text.orderServed;
+    }
+
+    if (status === "preparing") {
+      return text.orderPreparing;
+    }
+
+    return null;
   }
 
   function getMenuCategoryDisplayName(category: MenuCategory) {
@@ -1449,15 +1491,8 @@ export function Cart({
                 className="button-success"
                 type="button"
                 onClick={() => {
-                  const nextUpsellPrompt = getUpsellPromptType();
-
-                  if (!nextUpsellPrompt) {
-                    void submitOrder("as_ready");
-                    return;
-                  }
-
-                  setShowReviewDialog(false);
-                  setUpsellPrompt(nextUpsellPrompt);
+                  setUpsellPrompt(null);
+                  void submitOrder("as_ready");
                 }}
               >
                 {text.reviewOrderOk}
@@ -1880,6 +1915,13 @@ export function Cart({
                         ({formatCurrency(submittedOrdersTotal)})
                       </span>
                     </h2>
+                    {submittedOrdersSummaryStatus ? (
+                      <span
+                        className={`status-pill status-pill--${submittedOrdersSummaryStatus}`}
+                      >
+                        {getOrderStatusLabel(submittedOrdersSummaryStatus)}
+                      </span>
+                    ) : null}
                   </div>
                   <span
                     className="submitted-orders__chevron"
@@ -1909,6 +1951,11 @@ export function Cart({
                             {formatOrderLabel(order.updatedAt || order.createdAt)}
                           </strong>
                         </div>
+                        {getOrderStatusLabel(order.status) ? (
+                          <span className={`status-pill status-pill--${order.status}`}>
+                            {getOrderStatusLabel(order.status)}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="table-order-items">
                         {order.items.map((item) => (

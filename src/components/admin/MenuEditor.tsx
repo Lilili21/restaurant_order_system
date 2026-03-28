@@ -96,6 +96,15 @@ type InsightStats = {
   lowDish: string;
   peakHour: string;
   waiterCalls: string;
+  globalInsight: string;
+  globalInsightStatus: "better" | "same" | "worse";
+  vsYesterday: {
+    revenue: string | null;
+    avgCheck: string | null;
+    orders: string | null;
+    activeOrders: string | null;
+    waiterCalls: string | null;
+  };
 };
 
 type DashboardCharts = {
