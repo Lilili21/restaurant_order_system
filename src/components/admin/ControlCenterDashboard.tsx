@@ -77,34 +77,145 @@ function buildSmoothLineChartPath(values: number[]) {
   return path;
 }
 
-function shouldShowChartLabel(index: number, labelsLength: number) {
-  if (labelsLength <= 1) {
-    return true;
-  }
-
-  if (index === 0 || index === labelsLength - 1) {
-    return true;
-  }
-
-  return index % 2 === 0;
-}
-
-function formatCompactChartLabel(label: string) {
-  return label.endsWith(":00") ? label.slice(0, 2) : label;
-}
-
 function getChartMinWidth(labelsLength: number) {
-  return Math.max(100, labelsLength * 54);
+  return Math.max(720, labelsLength * 88);
+}
+
+function getChartTicks(maxValue: number) {
+  const safeMaxValue = Math.max(maxValue, 1);
+  const tickCount = safeMaxValue <= 4 ? safeMaxValue : 4;
+  const ticks = Array.from({ length: tickCount + 1 }, (_, index) =>
+    Math.round((safeMaxValue / tickCount) * (tickCount - index))
+  );
+
+  return [...new Set(ticks)];
+}
+
+type LineChartProps = {
+  labels: string[];
+  values: number[];
+  title: string;
+  icon: string;
+  pathClassName: string;
+  pointClassName: string;
+  formatValue: (value: number) => string;
+  yAxisLabel: string;
+};
+
+function DashboardLineChart({
+  labels,
+  values,
+  title,
+  icon,
+  pathClassName,
+  pointClassName,
+  formatValue,
+  yAxisLabel
+}: LineChartProps) {
+  const maxValue = Math.max(...values, 1);
+  const ticks = getChartTicks(maxValue);
+
+  return (
+    <article className="control-center-chart">
+      <header className="control-center-analytics__header">
+        <span className="control-center-analytics__icon" aria-hidden="true">
+          {icon}
+        </span>
+        <h2>{title}</h2>
+      </header>
+      <div className="control-center-chart__plot">
+        {labels.length ? (
+          <div
+            className="control-center-chart__line-chart"
+            style={{ minWidth: `${getChartMinWidth(labels.length)}px` }}
+          >
+            <div className="control-center-chart__frame">
+              <div className="control-center-chart__y-axis" aria-hidden="true">
+                <span className="control-center-chart__axis-title">{yAxisLabel}</span>
+                {ticks.map((tick) => (
+                  <span
+                    key={`${title}-${tick}`}
+                    className="control-center-chart__y-tick"
+                  >
+                    {tick}
+                  </span>
+                ))}
+              </div>
+              <div className="control-center-chart__canvas">
+                <div className="control-center-chart__grid" aria-hidden="true">
+                  {ticks.map((tick) => (
+                    <span
+                      key={`${title}-grid-${tick}`}
+                      className="control-center-chart__grid-line"
+                    />
+                  ))}
+                </div>
+                <svg
+                  className="control-center-chart__svg"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    className={`control-center-chart__path ${pathClassName}`}
+                    d={buildSmoothLineChartPath(values)}
+                  />
+                  {values.map((value, index) => {
+                    const x =
+                      values.length === 1 ? 50 : (index / (values.length - 1)) * 100;
+                    const y = 100 - (value / maxValue) * 100;
+
+                    return (
+                      <circle
+                        key={`${labels[index]}-${value}`}
+                        className={`control-center-chart__point ${pointClassName}`}
+                        cx={x}
+                        cy={Number.isFinite(y) ? y : 100}
+                        r="1.7"
+                      />
+                    );
+                  })}
+                </svg>
+                <div
+                  className="control-center-chart__legend"
+                  style={{
+                    gridTemplateColumns: `repeat(${labels.length}, minmax(70px, 1fr))`
+                  }}
+                >
+                  {labels.map((label, index) => (
+                    <div key={`${title}-${label}`} className="control-center-chart__legend-item">
+                      <span className="control-center-chart__label">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="control-center-chart__empty">—</div>
+        )}
+      </div>
+    </article>
+  );
 }
 
 type Props = {
   insightStats: InsightStats;
   dashboardCharts: DashboardCharts;
+  currentShiftLabel: string;
 };
 
-function ControlCenterDashboardComponent({ insightStats, dashboardCharts }: Props) {
+function ControlCenterDashboardComponent({
+  insightStats,
+  dashboardCharts,
+  currentShiftLabel
+}: Props) {
   return (
     <>
+      <section className="control-center-shift" aria-label="Current shift">
+        <div className="control-center-shift__label">Current shift</div>
+        <div className="control-center-shift__value">{currentShiftLabel}</div>
+      </section>
       <section className="control-center-analytics" aria-label="Control Center analytics">
         {analyticsBlocks.map((block) => (
           <article key={block.title} className="control-center-analytics__card">
@@ -179,142 +290,26 @@ function ControlCenterDashboardComponent({ insightStats, dashboardCharts }: Prop
         ))}
       </section>
       <section className="control-center-charts" aria-label="Control Center charts">
-        <article className="control-center-chart">
-          <header className="control-center-analytics__header">
-            <span className="control-center-analytics__icon" aria-hidden="true">
-              🟠
-            </span>
-            <h2>Orders by Hour</h2>
-          </header>
-          <div className="control-center-chart__plot">
-            {dashboardCharts.labels.length ? (
-              <div
-                className="control-center-chart__line-chart"
-                style={{ minWidth: `${getChartMinWidth(dashboardCharts.labels.length)}px` }}
-              >
-                <svg
-                  className="control-center-chart__svg"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    className="control-center-chart__path control-center-chart__path--orders"
-                    d={buildSmoothLineChartPath(dashboardCharts.ordersByHour)}
-                  />
-                  {dashboardCharts.ordersByHour.map((value, index) => {
-                    const maxValue = Math.max(...dashboardCharts.ordersByHour, 1);
-                    const x =
-                      dashboardCharts.ordersByHour.length === 1
-                        ? 50
-                        : (index / (dashboardCharts.ordersByHour.length - 1)) * 100;
-                    const y = 100 - (value / maxValue) * 100;
-
-                    return (
-                      <circle
-                        key={`${dashboardCharts.labels[index]}-${value}`}
-                        className="control-center-chart__point control-center-chart__point--orders"
-                        cx={x}
-                        cy={Number.isFinite(y) ? y : 100}
-                        r="2.2"
-                      />
-                    );
-                  })}
-                </svg>
-                <div
-                  className="control-center-chart__legend"
-                  style={{
-                    gridTemplateColumns: `repeat(${dashboardCharts.labels.length}, minmax(0, 1fr))`
-                  }}
-                >
-                  {dashboardCharts.labels.map((label, index) => (
-                    <div key={label} className="control-center-chart__legend-item">
-                      <span className="control-center-chart__value">
-                        {dashboardCharts.ordersByHour[index] ?? 0}
-                      </span>
-                      <span className="control-center-chart__label">
-                        {shouldShowChartLabel(index, dashboardCharts.labels.length)
-                          ? formatCompactChartLabel(label)
-                          : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="control-center-chart__empty">—</div>
-            )}
-          </div>
-        </article>
-        <article className="control-center-chart">
-          <header className="control-center-analytics__header">
-            <span className="control-center-analytics__icon" aria-hidden="true">
-              🔵
-            </span>
-            <h2>Revenue Trend</h2>
-          </header>
-          <div className="control-center-chart__plot">
-            {dashboardCharts.labels.length ? (
-              <div
-                className="control-center-chart__line-chart"
-                style={{ minWidth: `${getChartMinWidth(dashboardCharts.labels.length)}px` }}
-              >
-                <svg
-                  className="control-center-chart__svg"
-                  viewBox="0 0 100 100"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  <path
-                    className="control-center-chart__path control-center-chart__path--revenue"
-                    d={buildSmoothLineChartPath(dashboardCharts.revenueTrend)}
-                  />
-                  {dashboardCharts.revenueTrend.map((value, index) => {
-                    const maxValue = Math.max(...dashboardCharts.revenueTrend, 1);
-                    const x =
-                      dashboardCharts.revenueTrend.length === 1
-                        ? 50
-                        : (index / (dashboardCharts.revenueTrend.length - 1)) * 100;
-                    const y = 100 - (value / maxValue) * 100;
-
-                    return (
-                      <circle
-                        key={`${dashboardCharts.labels[index]}-${value}`}
-                        className="control-center-chart__point control-center-chart__point--revenue"
-                        cx={x}
-                        cy={Number.isFinite(y) ? y : 100}
-                        r="2.2"
-                      />
-                    );
-                  })}
-                </svg>
-                <div
-                  className="control-center-chart__legend"
-                  style={{
-                    gridTemplateColumns: `repeat(${dashboardCharts.labels.length}, minmax(0, 1fr))`
-                  }}
-                >
-                  {dashboardCharts.labels.map((label, index) => (
-                    <div key={label} className="control-center-chart__legend-item">
-                      <span className="control-center-chart__value">
-                        {dashboardCharts.revenueTrend[index]
-                          ? formatCurrency(dashboardCharts.revenueTrend[index] ?? 0)
-                          : "—"}
-                      </span>
-                      <span className="control-center-chart__label">
-                        {shouldShowChartLabel(index, dashboardCharts.labels.length)
-                          ? formatCompactChartLabel(label)
-                          : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="control-center-chart__empty">—</div>
-            )}
-          </div>
-        </article>
+        <DashboardLineChart
+          labels={dashboardCharts.labels}
+          values={dashboardCharts.ordersByHour}
+          title="Orders by Hour"
+          icon="🟠"
+          pathClassName="control-center-chart__path--orders"
+          pointClassName="control-center-chart__point--orders"
+          formatValue={(value) => String(value)}
+          yAxisLabel="Orders"
+        />
+        <DashboardLineChart
+          labels={dashboardCharts.labels}
+          values={dashboardCharts.revenueTrend}
+          title="Revenue Trend"
+          icon="🔵"
+          pathClassName="control-center-chart__path--revenue"
+          pointClassName="control-center-chart__point--revenue"
+          formatValue={(value) => (value ? formatCurrency(value) : "—")}
+          yAxisLabel="Revenue"
+        />
       </section>
       <section className="control-center-suggestions" aria-label="Dashboard suggestions">
         <article className="control-center-analytics__card">

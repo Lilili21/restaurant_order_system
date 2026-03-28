@@ -65,6 +65,13 @@ const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
+const SHIFT_CLOSE_GRACE_MS = 60 * 60 * 1000;
+
+type MenuSettingsSnapshot = Awaited<ReturnType<typeof getMenuSettings>>;
+type ShiftWindow = {
+  start: Date;
+  end: Date;
+};
 
 type OrdersStateCacheEntry = {
   state: OrdersPersistence;
@@ -104,6 +111,134 @@ declare global {
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
+}
+
+function parseClockValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+
+  if (
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null;
+  }
+
+  return { hours, minutes };
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function getRuleForDate(settings: MenuSettingsSnapshot, date: Date) {
+  return settings.workingHoursRules.find((rule) => rule.days.includes(date.getDay()));
+}
+
+function getShiftWindowForDate(
+  settings: MenuSettingsSnapshot,
+  date: Date
+): ShiftWindow {
+  const rule = getRuleForDate(settings, date);
+  const fromValue =
+    typeof rule?.from === "string" && rule.from.trim()
+      ? rule.from.trim()
+      : settings.workingHoursFrom;
+  const untilValue =
+    typeof rule?.until === "string" && rule.until.trim()
+      ? rule.until.trim()
+      : settings.workingHoursUntil;
+  const from = parseClockValue(fromValue);
+  const until = parseClockValue(untilValue);
+
+  if (!from || !until) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  const start = new Date(date);
+  start.setHours(from.hours, from.minutes, 0, 0);
+
+  const end = new Date(date);
+  end.setHours(until.hours, until.minutes, 0, 0);
+
+  if (end.getTime() <= start.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return { start, end };
+}
+
+function getShiftWindowForTimestamp(
+  settings: MenuSettingsSnapshot,
+  timestamp: number
+): ShiftWindow {
+  const date = new Date(timestamp);
+  const candidates = [
+    getShiftWindowForDate(settings, addDays(date, -1)),
+    getShiftWindowForDate(settings, date)
+  ];
+
+  return (
+    candidates.find(
+      (candidate) =>
+        timestamp >= candidate.start.getTime() &&
+        timestamp < candidate.end.getTime()
+    ) ?? candidates[1]
+  );
+}
+
+function getCurrentAdminShiftWindow(
+  settings: MenuSettingsSnapshot,
+  now = new Date()
+): ShiftWindow | null {
+  const candidates = [
+    getShiftWindowForDate(settings, addDays(now, -1)),
+    getShiftWindowForDate(settings, now)
+  ];
+  const nowTs = now.getTime();
+  const matched = candidates
+    .filter(
+      (candidate) =>
+        nowTs >= candidate.start.getTime() &&
+        nowTs < candidate.end.getTime() + SHIFT_CLOSE_GRACE_MS
+    )
+    .sort((left, right) => right.start.getTime() - left.start.getTime())[0];
+
+  return matched ?? null;
+}
+
+function isOrderWithinAdminShiftWindow(order: Order, shiftWindow: ShiftWindow | null) {
+  if (!shiftWindow) {
+    return false;
+  }
+
+  const createdAtTs = new Date(order.createdAt).getTime();
+
+  return (
+    Number.isFinite(createdAtTs) &&
+    createdAtTs >= shiftWindow.start.getTime() &&
+    createdAtTs < shiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS
+  );
 }
 
 function cloneInitialOrders() {
@@ -493,6 +628,100 @@ function autoCloseStaleServiceRequests(state: RuntimeState) {
       order.updatedAt = new Date().toISOString();
       changed = true;
     }
+  }
+
+  return changed;
+}
+
+function autoCloseExpiredShiftOrders(
+  state: RuntimeState,
+  settings: MenuSettingsSnapshot
+) {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  let changed = false;
+
+  for (const order of state.ordersStore) {
+    if (order.status === "served" || order.status === "cancelled") {
+      continue;
+    }
+
+    const createdAtTs = new Date(order.createdAt).getTime();
+
+    if (!Number.isFinite(createdAtTs)) {
+      continue;
+    }
+
+    const shiftWindow = getShiftWindowForTimestamp(settings, createdAtTs);
+
+    if (now < shiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS) {
+      continue;
+    }
+
+    if (isServiceRequest(order)) {
+      order.status = "cancelled";
+      order.updatedAt = nowIso;
+      changed = true;
+      continue;
+    }
+
+    order.items = order.items.map((item) => ({
+      ...item,
+      served: true
+    }));
+    order.status = "served";
+    order.updatedAt = nowIso;
+    changed = true;
+  }
+
+  return changed;
+}
+
+function rotateSessionsForNewShift(
+  state: RuntimeState,
+  settings: MenuSettingsSnapshot
+) {
+  const currentShiftWindow = getCurrentAdminShiftWindow(settings);
+
+  if (!currentShiftWindow) {
+    return false;
+  }
+
+  let changed = false;
+
+  for (const [tableKey, sessionId] of state.currentTableSessions.entries()) {
+    const sessionOrders = state.ordersStore.filter(
+      (order) =>
+        createTableKey(order.restaurantSlug, order.tableNumber) === tableKey &&
+        order.sessionId === sessionId
+    );
+
+    if (!sessionOrders.length) {
+      continue;
+    }
+
+    const hasCurrentShiftOrder = sessionOrders.some((order) =>
+      isOrderWithinAdminShiftWindow(order, currentShiftWindow)
+    );
+
+    if (hasCurrentShiftOrder) {
+      continue;
+    }
+
+    const hasOlderOrders = sessionOrders.some((order) => {
+      const createdAtTs = new Date(order.createdAt).getTime();
+      return (
+        Number.isFinite(createdAtTs) &&
+        createdAtTs < currentShiftWindow.start.getTime()
+      );
+    });
+
+    if (!hasOlderOrders) {
+      continue;
+    }
+
+    state.currentTableSessions.set(tableKey, sessionId + 1);
+    changed = true;
   }
 
   return changed;
@@ -902,13 +1131,21 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     ),
     closedTableSummaries: persistedState.closedTableSummaries
   };
+  const settings = await getMenuSettings();
 
+  const expiredShiftOrdersClosed = autoCloseExpiredShiftOrders(state, settings);
   const staleServiceRequestsClosed = autoCloseStaleServiceRequests(state);
+  const shiftedSessionsRotated = rotateSessionsForNewShift(state, settings);
   const staleClosedSummariesPruned = await pruneClosedTableSummariesByWorkingDay(
     state
   );
 
-  if (staleServiceRequestsClosed || staleClosedSummariesPruned) {
+  if (
+    expiredShiftOrdersClosed ||
+    staleServiceRequestsClosed ||
+    shiftedSessionsRotated ||
+    staleClosedSummariesPruned
+  ) {
     await persistStateAsync(state);
   }
 
@@ -1190,6 +1427,11 @@ async function normalizeOrderState(order: Order) {
 
 export async function getOrders(restaurantSlug?: string) {
   const { ordersStore } = await readRuntimeStateAsync();
+  const shiftWindow = getCurrentAdminShiftWindow(await getMenuSettings());
+
+  if (!shiftWindow) {
+    return [];
+  }
 
   return ordersStore
     .filter((order) => {
@@ -1197,7 +1439,11 @@ export async function getOrders(restaurantSlug?: string) {
         return false;
       }
 
-      return order.status !== "served" && order.status !== "cancelled";
+      return (
+        order.status !== "served" &&
+        order.status !== "cancelled" &&
+        isOrderWithinAdminShiftWindow(order, shiftWindow)
+      );
     })
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
@@ -1694,7 +1940,12 @@ export async function getTableOverviews(
   restaurantSlug?: string
 ): Promise<TableOverview[]> {
   const state = await readRuntimeStateAsync();
+  const shiftWindow = getCurrentAdminShiftWindow(await getMenuSettings());
   let shouldPersist = false;
+
+  if (!shiftWindow) {
+    return [];
+  }
 
   const overviews = (await getRestaurants())
     .filter((restaurant) =>
@@ -1724,7 +1975,8 @@ export async function getTableOverviews(
           (order) =>
             order.status !== "cancelled" &&
             order.kind !== "waiter_call" &&
-            order.kind !== "bill_request"
+            order.kind !== "bill_request" &&
+            isOrderWithinAdminShiftWindow(order, shiftWindow)
         );
 
         return {

@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
 import { getMenuSettings } from "@/lib/menu-settings";
-import { getAllStoredOrders, getTableOverviews } from "@/lib/orders";
-import { MenuCategory, Order } from "@/lib/types";
+import {
+  getAllStoredOrders,
+  getClosedTableSummaries,
+  getTableOverviews
+} from "@/lib/orders";
+import type { MenuCategory, Order } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
 
 const DRINK_CATEGORIES = new Set<MenuCategory>([
   "drinks",
@@ -293,8 +299,9 @@ export async function GET(request: NextRequest) {
     settings.workingHoursRules,
     settings.workingHoursFrom
   );
-  const [allOrders, tables] = await Promise.all([
+  const [allOrders, closedSessions, tables] = await Promise.all([
     getAllStoredOrders(restaurantSlug ?? undefined),
+    getClosedTableSummaries(restaurantSlug ?? undefined),
     getTableOverviews(restaurantSlug ?? undefined)
   ]);
 
@@ -327,16 +334,26 @@ export async function GET(request: NextRequest) {
         order.status !== "cancelled"
     );
   const analyticsOrders = shiftOrdersToNow;
+  const closedSessionsInCurrentShift = currentShiftStartTs
+    ? closedSessions.filter((session) => {
+        const closedAtTs = new Date(session.closedAt).getTime();
+        return (
+          Number.isFinite(closedAtTs) &&
+          closedAtTs >= currentShiftStartTs &&
+          closedAtTs <= Date.now()
+        );
+      })
+    : [];
   const currentShiftTrackedOrders = [
     ...new Map(shiftOrdersToNow.map((order) => [order.id, order])).values()
   ];
-  const currentShiftRevenue = currentShiftTrackedOrders.reduce(
-    (sum, order) => sum + order.total,
+  const closedSessionsInCurrentShiftRevenue = closedSessionsInCurrentShift.reduce(
+    (sum, session) => sum + session.total,
     0
   );
-  const currentShiftAvgCheck =
-    currentShiftTrackedOrders.length > 0
-      ? currentShiftRevenue / currentShiftTrackedOrders.length
+  const closedSessionsInCurrentShiftAvgCheck =
+    closedSessionsInCurrentShift.length > 0
+      ? closedSessionsInCurrentShiftRevenue / closedSessionsInCurrentShift.length
       : 0;
   const liveOrdersCount = currentSessionVisibleOrders.length;
   const waiterCallsCount = currentShiftStartTs
@@ -359,11 +376,11 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     insights: {
-      revenue: currentShiftTrackedOrders.length
-        ? Number(currentShiftRevenue.toFixed(2))
+      revenue: closedSessionsInCurrentShift.length
+        ? Number(closedSessionsInCurrentShiftRevenue.toFixed(2))
         : "—",
-      avgCheck: currentShiftTrackedOrders.length
-        ? Number(currentShiftAvgCheck.toFixed(2))
+      avgCheck: closedSessionsInCurrentShift.length
+        ? Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2))
         : "—",
       orders: currentShiftTrackedOrders.length || "—",
       activeOrders: liveOrdersCount || "—",

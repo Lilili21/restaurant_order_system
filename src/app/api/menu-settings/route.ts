@@ -11,6 +11,8 @@ import type {
   RecommendationRuleSettings
 } from "@/lib/menu-settings";
 
+export const dynamic = "force-dynamic";
+
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
   "mains",

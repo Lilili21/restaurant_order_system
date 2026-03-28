@@ -104,6 +104,13 @@ type DashboardCharts = {
   revenueTrend: number[];
 };
 
+type WorkingHoursRule = {
+  id: string;
+  days: number[];
+  from: string | null;
+  until: string | null;
+};
+
 type RecommendationItem = {
   id: string;
   title: string;
@@ -169,6 +176,20 @@ function formatTimeInputValue(value: string | null | undefined) {
     minute: "2-digit",
     hour12: false
   });
+}
+
+function formatShiftTimeLabel(value: string | null | undefined) {
+  if (!value || !value.trim()) {
+    return null;
+  }
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
 }
 
 function createEditablePromotion(): EditablePromotion {
@@ -532,6 +553,9 @@ export function MenuEditor() {
     ordersByHour: [],
     revenueTrend: []
   });
+  const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
+  const [workingHoursUntil, setWorkingHoursUntil] = useState<string | null>(null);
+  const [workingHoursRules, setWorkingHoursRules] = useState<WorkingHoursRule[]>([]);
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
@@ -1100,163 +1124,184 @@ export function MenuEditor() {
     let cancelled = false;
 
     async function load() {
-      const [menuResponse, settingsResponse, analyticsResponse] = await Promise.all([
-        fetch("/api/menu?restaurantSlug=olive-bistro", {
-          cache: "no-store",
-          headers: authHeaders
-        }),
-        fetch("/api/menu-settings", {
-          cache: "no-store"
-        }),
-        fetch(`/api/admin-analytics?restaurantSlug=${restaurantSlug}`, {
-          cache: "no-store",
-          headers: authHeaders
-        })
-      ]);
+      try {
+        const [menuResponse, settingsResponse, analyticsResponse] = await Promise.all([
+          fetch("/api/menu?restaurantSlug=olive-bistro", {
+            cache: "no-store",
+            headers: authHeaders
+          }),
+          fetch("/api/menu-settings", {
+            cache: "no-store"
+          }),
+          fetch(`/api/admin-analytics?restaurantSlug=${restaurantSlug}`, {
+            cache: "no-store",
+            headers: authHeaders
+          })
+        ]);
 
-      if (!menuResponse.ok) {
-        return;
-      }
+        if (!menuResponse.ok) {
+          if (!cancelled) {
+            setLoading(false);
+            setMessage("Failed to load menu.");
+          }
+          return;
+        }
 
-      const data = (await menuResponse.json()) as MenuItem[];
+        const data = (await menuResponse.json()) as MenuItem[];
 
-      if (!cancelled) {
-        setItems(data.map(toEditableItem));
-        setLoading(false);
-      }
+        if (!cancelled) {
+          setItems(data.map(toEditableItem));
+          setLoading(false);
+        }
 
-      if (!cancelled && settingsResponse.ok) {
-        const settings = (await settingsResponse.json()) as {
-          kitchenLoadWarningEnabled?: boolean;
-          promotions?: PromotionSettings[];
-          businessLunches?: BusinessLunchSettings[];
-          recommendations?: RecommendationRuleSettings[];
-          happyHourEnabled?: boolean;
-          happyHourText?: string;
-          happyHourCategories?: MenuCategory[];
-          happyHourDays?: number[];
-          happyHourDiscountPercent?: number;
-          happyHourStartsFrom?: string | null;
-          happyHourUntil?: string | null;
-          kitchenOpenEnabled?: boolean;
-          kitchenOpenUntil?: string | null;
-          barOpenEnabled?: boolean;
-          barOpenUntil?: string | null;
-        };
+        if (!cancelled && settingsResponse.ok) {
+          const settings = (await settingsResponse.json()) as {
+            kitchenLoadWarningEnabled?: boolean;
+            workingHoursRules?: WorkingHoursRule[];
+            workingHoursFrom?: string | null;
+            workingHoursUntil?: string | null;
+            promotions?: PromotionSettings[];
+            businessLunches?: BusinessLunchSettings[];
+            recommendations?: RecommendationRuleSettings[];
+            happyHourEnabled?: boolean;
+            happyHourText?: string;
+            happyHourCategories?: MenuCategory[];
+            happyHourDays?: number[];
+            happyHourDiscountPercent?: number;
+            happyHourStartsFrom?: string | null;
+            happyHourUntil?: string | null;
+            kitchenOpenEnabled?: boolean;
+            kitchenOpenUntil?: string | null;
+            barOpenEnabled?: boolean;
+            barOpenUntil?: string | null;
+          };
 
-        setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
-        const nextPromotions =
-          Array.isArray(settings.promotions) && settings.promotions.length > 0
-            ? settings.promotions.map(toEditablePromotion)
-            : settings.happyHourEnabled ||
-                (typeof settings.happyHourText === "string" &&
-                  settings.happyHourText.trim()) ||
-                (Array.isArray(settings.happyHourCategories) &&
-                  settings.happyHourCategories.length > 0) ||
-                (Array.isArray(settings.happyHourDays) &&
-                  settings.happyHourDays.length > 0) ||
-                typeof settings.happyHourDiscountPercent === "number"
-              ? [
-                  {
-                    id: "promo-1",
-                    enabled: Boolean(settings.happyHourEnabled),
-                    text:
-                      typeof settings.happyHourText === "string"
-                        ? settings.happyHourText
-                        : "",
-                    categories: Array.isArray(settings.happyHourCategories)
-                      ? settings.happyHourCategories
-                      : [],
-                    days: Array.isArray(settings.happyHourDays)
-                      ? settings.happyHourDays
-                      : [],
-                    discountPercent:
-                      typeof settings.happyHourDiscountPercent === "number"
-                        ? String(settings.happyHourDiscountPercent)
-                        : "0",
-                    startsFrom: formatTimeInputValue(settings.happyHourStartsFrom),
-                    until: formatTimeInputValue(settings.happyHourUntil)
-                  }
-                ]
+          setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
+          const nextPromotions =
+            Array.isArray(settings.promotions) && settings.promotions.length > 0
+              ? settings.promotions.map(toEditablePromotion)
+              : settings.happyHourEnabled ||
+                  (typeof settings.happyHourText === "string" &&
+                    settings.happyHourText.trim()) ||
+                  (Array.isArray(settings.happyHourCategories) &&
+                    settings.happyHourCategories.length > 0) ||
+                  (Array.isArray(settings.happyHourDays) &&
+                    settings.happyHourDays.length > 0) ||
+                  typeof settings.happyHourDiscountPercent === "number"
+                ? [
+                    {
+                      id: "promo-1",
+                      enabled: Boolean(settings.happyHourEnabled),
+                      text:
+                        typeof settings.happyHourText === "string"
+                          ? settings.happyHourText
+                          : "",
+                      categories: Array.isArray(settings.happyHourCategories)
+                        ? settings.happyHourCategories
+                        : [],
+                      days: Array.isArray(settings.happyHourDays)
+                        ? settings.happyHourDays
+                        : [],
+                      discountPercent:
+                        typeof settings.happyHourDiscountPercent === "number"
+                          ? String(settings.happyHourDiscountPercent)
+                          : "0",
+                      startsFrom: formatTimeInputValue(settings.happyHourStartsFrom),
+                      until: formatTimeInputValue(settings.happyHourUntil)
+                    }
+                  ]
+                : [];
+          const nextBusinessLunches =
+            Array.isArray(settings.businessLunches) &&
+            settings.businessLunches.length > 0
+              ? settings.businessLunches.map(toEditableBusinessLunch)
               : [];
-        const nextBusinessLunches =
-          Array.isArray(settings.businessLunches) &&
-          settings.businessLunches.length > 0
-            ? settings.businessLunches.map(toEditableBusinessLunch)
-            : [];
-        const nextRecommendationRules =
-          Array.isArray(settings.recommendations) &&
-          settings.recommendations.length > 0
-            ? settings.recommendations.map(toEditableRecommendationRule)
-            : [];
-        setBusinessLunches(nextBusinessLunches);
-        setBusinessLunchMessage(null);
-        setPromotions(nextPromotions);
-        setPromotionMessage(null);
-        setRecommendationRules(nextRecommendationRules);
-        setRecommendationRulesMessage(null);
-        setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
-        setKitchenOpenUntil(
-          settings.kitchenOpenUntil
-            ? new Date(settings.kitchenOpenUntil).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false
-              })
-            : ""
-        );
-        setBarOpenEnabled(Boolean(settings.barOpenEnabled));
-        setBarOpenUntil(
-          settings.barOpenUntil
-            ? new Date(settings.barOpenUntil).toLocaleTimeString("en-GB", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false
-              })
-            : ""
-        );
-      }
+          const nextRecommendationRules =
+            Array.isArray(settings.recommendations) &&
+            settings.recommendations.length > 0
+              ? settings.recommendations.map(toEditableRecommendationRule)
+              : [];
+          setBusinessLunches(nextBusinessLunches);
+          setBusinessLunchMessage(null);
+          setPromotions(nextPromotions);
+          setPromotionMessage(null);
+          setRecommendationRules(nextRecommendationRules);
+          setRecommendationRulesMessage(null);
+          setWorkingHoursRules(
+            Array.isArray(settings.workingHoursRules) ? settings.workingHoursRules : []
+          );
+          setWorkingHoursFrom(settings.workingHoursFrom ?? null);
+          setWorkingHoursUntil(settings.workingHoursUntil ?? null);
+          setKitchenOpenEnabled(Boolean(settings.kitchenOpenEnabled));
+          setKitchenOpenUntil(
+            settings.kitchenOpenUntil
+              ? new Date(settings.kitchenOpenUntil).toLocaleTimeString("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false
+                })
+              : ""
+          );
+          setBarOpenEnabled(Boolean(settings.barOpenEnabled));
+          setBarOpenUntil(
+            settings.barOpenUntil
+              ? new Date(settings.barOpenUntil).toLocaleTimeString("en-GB", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false
+                })
+              : ""
+          );
+        }
 
-      if (!cancelled && analyticsResponse.ok) {
-        const analytics = (await analyticsResponse.json()) as {
-          insights?: Partial<InsightStats>;
-          charts?: Partial<DashboardCharts>;
-        };
+        if (!cancelled && analyticsResponse.ok) {
+          const analytics = (await analyticsResponse.json()) as {
+            insights?: Partial<InsightStats>;
+            charts?: Partial<DashboardCharts>;
+          };
 
-        setInsightStats({
-          revenue:
-            typeof analytics.insights?.revenue === "number"
-              ? formatCurrency(analytics.insights.revenue)
-              : "—",
-          avgCheck:
-            typeof analytics.insights?.avgCheck === "number"
-              ? formatCurrency(analytics.insights.avgCheck)
-              : "—",
-          orders:
-            analytics.insights?.orders !== undefined
-              ? String(analytics.insights.orders)
-              : "—",
-          activeOrders:
-            analytics.insights?.activeOrders !== undefined
-              ? String(analytics.insights.activeOrders)
-              : "—",
-          topDish: analytics.insights?.topDish || "—",
-          lowDish: analytics.insights?.lowDish || "—",
-          peakHour: analytics.insights?.peakHour || "—",
-          waiterCalls:
-            analytics.insights?.waiterCalls !== undefined
-              ? String(analytics.insights.waiterCalls)
-              : "—"
-        });
-        setDashboardCharts({
-          labels: Array.isArray(analytics.charts?.labels) ? analytics.charts.labels : [],
-          ordersByHour: Array.isArray(analytics.charts?.ordersByHour)
-            ? analytics.charts.ordersByHour
-            : [],
-          revenueTrend: Array.isArray(analytics.charts?.revenueTrend)
-            ? analytics.charts.revenueTrend
-            : []
-        });
+          setInsightStats({
+            revenue:
+              typeof analytics.insights?.revenue === "number"
+                ? formatCurrency(analytics.insights.revenue)
+                : "—",
+            avgCheck:
+              typeof analytics.insights?.avgCheck === "number"
+                ? formatCurrency(analytics.insights.avgCheck)
+                : "—",
+            orders:
+              analytics.insights?.orders !== undefined
+                ? String(analytics.insights.orders)
+                : "—",
+            activeOrders:
+              analytics.insights?.activeOrders !== undefined
+                ? String(analytics.insights.activeOrders)
+                : "—",
+            topDish: analytics.insights?.topDish || "—",
+            lowDish: analytics.insights?.lowDish || "—",
+            peakHour: analytics.insights?.peakHour || "—",
+            waiterCalls:
+              analytics.insights?.waiterCalls !== undefined
+                ? String(analytics.insights.waiterCalls)
+                : "—"
+          });
+          setDashboardCharts({
+            labels: Array.isArray(analytics.charts?.labels) ? analytics.charts.labels : [],
+            ordersByHour: Array.isArray(analytics.charts?.ordersByHour)
+              ? analytics.charts.ordersByHour
+              : [],
+            revenueTrend: Array.isArray(analytics.charts?.revenueTrend)
+              ? analytics.charts.revenueTrend
+              : []
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoading(false);
+          setMessage(
+            error instanceof Error ? error.message : "Failed to load admin data."
+          );
+        }
       }
     }
 
@@ -1271,6 +1316,19 @@ export function MenuEditor() {
       window.clearInterval(intervalId);
     };
   }, [isAuthorized, secondaryCredentials]);
+
+  const currentShiftLabel = useMemo(() => {
+    const today = new Date().getDay();
+    const matchedRule = workingHoursRules.find((rule) => rule.days.includes(today));
+    const from = formatShiftTimeLabel(matchedRule?.from ?? workingHoursFrom);
+    const until = formatShiftTimeLabel(matchedRule?.until ?? workingHoursUntil);
+
+    if (!from || !until) {
+      return "Calendar day 00:00–24:00";
+    }
+
+    return `${from}–${until}`;
+  }, [workingHoursFrom, workingHoursRules, workingHoursUntil]);
 
   async function submitAuth() {
     const response = await fetch("/api/admin-auth", {
@@ -2885,6 +2943,7 @@ export function MenuEditor() {
         <ControlCenterDashboard
           insightStats={insightStats}
           dashboardCharts={dashboardCharts}
+          currentShiftLabel={currentShiftLabel}
         />
       ) : null}
       {message ? <p className="status-message">{message}</p> : null}

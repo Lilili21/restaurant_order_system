@@ -1,8 +1,7 @@
 import "@/styles/globals.css";
 
 import type { Metadata } from "next";
-import { ReactNode } from "react";
-import Script from "next/script";
+import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: "Restaurant QR Orders",
@@ -14,22 +13,10 @@ export default function RootLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
-  const shouldLoadVercelScripts =
-    process.env.NODE_ENV === "production" && process.env.VERCEL === "1";
-
   return (
-    <html lang="ru">
+    <html lang="en">
       <body>
         {children}
-        {shouldLoadVercelScripts ? (
-          <>
-            <Script src="/_vercel/insights/script.js" strategy="afterInteractive" />
-            <Script
-              src="/_vercel/speed-insights/script.js"
-              strategy="afterInteractive"
-            />
-          </>
-        ) : null}
       </body>
     </html>
   );

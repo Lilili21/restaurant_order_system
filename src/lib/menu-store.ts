@@ -1,9 +1,15 @@
-import { menuItems } from "@/lib/mock-data";
-import { getRestaurantBySlug } from "@/lib/restaurants";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-import { MenuBadge, MenuItem, MenuVolumeOption, TableSession } from "@/lib/types";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+
+import { menuItems as defaultMenuItems } from "@/lib/mock-data";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import type {
+  MenuBadge,
+  MenuCategory,
+  MenuItem,
+  MenuVolumeOption,
+  TableSession
+} from "@/lib/types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
@@ -41,13 +47,9 @@ declare global {
   // eslint-disable-next-line no-var
   var __menuStoreCache: MenuStoreCacheEntry | undefined;
   // eslint-disable-next-line no-var
-  var __availableMenuCache:
-    | Map<string, AvailableMenuCacheEntry>
-    | undefined;
+  var __availableMenuCache: Map<string, AvailableMenuCacheEntry> | undefined;
   // eslint-disable-next-line no-var
-  var __tableSessionCache:
-    | Map<string, TableSessionCacheEntry>
-    | undefined;
+  var __tableSessionCache: Map<string, TableSessionCacheEntry> | undefined;
 }
 
 function cloneMenuItems(items: MenuItem[]): MenuItem[] {
@@ -58,6 +60,10 @@ function cloneMenuItems(items: MenuItem[]): MenuItem[] {
       ? item.volumeOptions.map((option) => ({ ...option }))
       : []
   }));
+}
+
+function cloneDefaultMenuItems(): MenuItem[] {
+  return cloneMenuItems(defaultMenuItems);
 }
 
 function getMenuStoreCache() {
@@ -135,10 +141,6 @@ function cloneTableSession(session: TableSession | null): TableSession | null {
   };
 }
 
-function cloneDefaultMenuItems(): MenuItem[] {
-  return menuItems.map((item) => ({ ...item }));
-}
-
 function normalizeVolumeOptions(
   volumeOptions: MenuItem["volumeOptions"]
 ): MenuVolumeOption[] {
@@ -175,6 +177,7 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     item.descriptionHe?.trim() || item.description?.trim() || "";
   const nameEn = item.nameEn?.trim() || nameHe;
   const descriptionEn = item.descriptionEn?.trim() || descriptionHe;
+  const image = item.image?.trim() || DEFAULT_MENU_IMAGE;
 
   return {
     ...item,
@@ -184,18 +187,20 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     nameEn,
     descriptionHe,
     descriptionEn,
+    price: Number.isFinite(item.price) ? Math.max(0, Math.round(item.price)) : 0,
+    available: item.available ?? true,
+    showImage: item.showImage ?? true,
+    image,
     badges: Array.isArray(item.badges)
       ? item.badges.filter((badge): badge is MenuBadge =>
           ALLOWED_BADGES.includes(badge as MenuBadge)
         )
       : [],
-    volumeOptions: normalizeVolumeOptions(item.volumeOptions),
-    showImage: item.showImage ?? true,
-    image: item.image?.trim() || DEFAULT_MENU_IMAGE
+    volumeOptions: normalizeVolumeOptions(item.volumeOptions)
   };
 }
 
-function loadMenuItems(): MenuItem[] {
+function loadMenuItemsFromDisk(): MenuItem[] {
   if (!existsSync(MENU_STORE_PATH)) {
     return cloneDefaultMenuItems();
   }
@@ -204,15 +209,17 @@ function loadMenuItems(): MenuItem[] {
     const raw = readFileSync(MENU_STORE_PATH, "utf8");
     const parsed = JSON.parse(raw) as MenuItem[];
 
-    return Array.isArray(parsed)
-      ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
-      : cloneDefaultMenuItems();
+    if (!Array.isArray(parsed)) {
+      return cloneDefaultMenuItems();
+    }
+
+    return parsed.map((item) => normalizeMenuItem(item));
   } catch {
     return cloneDefaultMenuItems();
   }
 }
 
-function persistMenuItemsWith(items: MenuItem[]) {
+function persistMenuItemsToDisk(items: MenuItem[]) {
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
@@ -230,7 +237,7 @@ async function loadMenuItemsAsync(): Promise<MenuItem[]> {
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    const localItems = loadMenuItems();
+    const localItems = loadMenuItemsFromDisk();
     setMenuStoreCache(localItems);
     return cloneMenuItems(localItems);
   }
@@ -249,30 +256,30 @@ async function loadMenuItemsAsync(): Promise<MenuItem[]> {
     if (!data?.value) {
       const defaults = cloneDefaultMenuItems();
       await persistMenuItemsAsync(defaults);
-      setMenuStoreCache(defaults);
       return cloneMenuItems(defaults);
     }
 
     const parsed = data.value as MenuItem[];
     const normalized = Array.isArray(parsed)
-      ? parsed.map((item) => normalizeMenuItem(item as MenuItem))
+      ? parsed.map((item) => normalizeMenuItem(item))
       : cloneDefaultMenuItems();
 
     setMenuStoreCache(normalized);
     return cloneMenuItems(normalized);
   } catch {
-    const localItems = loadMenuItems();
+    const localItems = loadMenuItemsFromDisk();
     setMenuStoreCache(localItems);
     return cloneMenuItems(localItems);
   }
 }
 
 async function persistMenuItemsAsync(items: MenuItem[]) {
+  const normalized = items.map((item) => normalizeMenuItem(item));
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    persistMenuItemsWith(items);
-    setMenuStoreCache(items);
+    persistMenuItemsToDisk(normalized);
+    setMenuStoreCache(normalized);
     clearDerivedMenuCaches();
     return;
   }
@@ -280,7 +287,7 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
   const { error } = await supabase.from("app_state").upsert(
     {
       key: MENU_STORE_KEY,
-      value: items,
+      value: normalized,
       updated_at: new Date().toISOString()
     },
     { onConflict: "key" }
@@ -290,16 +297,25 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
     throw new Error(`Supabase persist failed: ${error.message}`);
   }
 
-  setMenuStoreCache(items);
+  setMenuStoreCache(normalized);
   clearDerivedMenuCaches();
 }
 
 if (!existsSync(MENU_STORE_PATH)) {
-  persistMenuItemsWith(cloneDefaultMenuItems());
+  persistMenuItemsToDisk(cloneDefaultMenuItems());
+}
+
+function buildMenuItemId() {
+  return `m_${Date.now()}`;
+}
+
+function buildSessionCacheKey(restaurantSlug: string, tableToken: string) {
+  return `${restaurantSlug}:${tableToken}`;
 }
 
 export async function getAllMenuItems(restaurantSlug?: string) {
-  return (await loadMenuItemsAsync()).filter((item) =>
+  const items = await loadMenuItemsAsync();
+  return items.filter((item) =>
     restaurantSlug ? item.restaurantSlug === restaurantSlug : true
   );
 }
@@ -329,6 +345,20 @@ export async function getMenuItemById(menuItemId: string) {
   return (await loadMenuItemsAsync()).find((item) => item.id === menuItemId) ?? null;
 }
 
+export async function createMenuItem(
+  item: Omit<MenuItem, "id"> & Partial<Pick<MenuItem, "id">>
+) {
+  const items = await loadMenuItemsAsync();
+  const nextItem = normalizeMenuItem({
+    ...item,
+    id: item.id?.trim() || buildMenuItemId()
+  } as MenuItem);
+
+  items.push(nextItem);
+  await persistMenuItemsAsync(items);
+  return nextItem;
+}
+
 export async function updateMenuItem(
   menuItemId: string,
   updates: Partial<
@@ -350,183 +380,86 @@ export async function updateMenuItem(
     >
   >
 ) {
-  const menuStore = await loadMenuItemsAsync();
-  const menuItem = menuStore.find((item) => item.id === menuItemId);
+  const items = await loadMenuItemsAsync();
+  const index = items.findIndex((item) => item.id === menuItemId);
 
-  if (!menuItem) {
+  if (index === -1) {
     throw new Error("Menu item not found");
   }
 
-  if (typeof updates.name === "string") {
-    menuItem.name = updates.name.trim() || menuItem.name;
-  }
+  const current = items[index];
+  const next = normalizeMenuItem({
+    ...current,
+    ...updates,
+    id: current.id,
+    restaurantSlug: current.restaurantSlug
+  });
 
-  if (typeof updates.description === "string") {
-    menuItem.description = updates.description.trim();
-  }
-
-  if (typeof updates.nameHe === "string") {
-    menuItem.nameHe = updates.nameHe.trim() || menuItem.nameHe;
-  }
-
-  if (typeof updates.nameEn === "string") {
-    menuItem.nameEn = updates.nameEn.trim() || menuItem.nameEn;
-  }
-
-  if (typeof updates.descriptionHe === "string") {
-    menuItem.descriptionHe = updates.descriptionHe.trim();
-  }
-
-  if (typeof updates.descriptionEn === "string") {
-    menuItem.descriptionEn = updates.descriptionEn.trim();
-  }
-
-  if (typeof updates.price === "number" && Number.isFinite(updates.price)) {
-    menuItem.price = Math.max(0, Math.round(updates.price));
-  }
-
-  if (typeof updates.available === "boolean") {
-    menuItem.available = updates.available;
-  }
-
-  if (typeof updates.showImage === "boolean") {
-    menuItem.showImage = updates.showImage;
-  }
-
-  if (typeof updates.category === "string") {
-    menuItem.category = updates.category;
-  }
-
-  if (typeof updates.image === "string") {
-    menuItem.image = updates.image.trim() || DEFAULT_MENU_IMAGE;
-  }
-
-  if (Array.isArray(updates.badges)) {
-    menuItem.badges = updates.badges.filter((badge): badge is MenuBadge =>
-      ALLOWED_BADGES.includes(badge)
-    );
-  }
-
-  if (Array.isArray(updates.volumeOptions)) {
-    menuItem.volumeOptions = normalizeVolumeOptions(updates.volumeOptions);
-  }
-
-  menuItem.nameHe = menuItem.nameHe?.trim() || menuItem.name?.trim() || "";
-  menuItem.descriptionHe =
-    menuItem.descriptionHe?.trim() || menuItem.description?.trim() || "";
-  menuItem.nameEn = menuItem.nameEn?.trim() || menuItem.nameHe;
-  menuItem.descriptionEn =
-    menuItem.descriptionEn?.trim() || menuItem.descriptionHe;
-  menuItem.name = menuItem.nameHe;
-  menuItem.description = menuItem.descriptionHe;
-
-  await persistMenuItemsAsync(menuStore);
-  return normalizeMenuItem(menuItem);
-}
-
-export async function createMenuItem(input: {
-  restaurantSlug: string;
-  category: MenuItem["category"];
-  name: string;
-  description: string;
-  nameHe?: string;
-  nameEn?: string;
-  descriptionHe?: string;
-  descriptionEn?: string;
-  price: number;
-  available: boolean;
-  showImage?: boolean;
-  image?: string;
-  badges?: MenuBadge[];
-  volumeOptions?: MenuVolumeOption[];
-}) {
-  const menuStore = await loadMenuItemsAsync();
-  const menuItem: MenuItem = {
-    id: `m_${Date.now()}`,
-    restaurantSlug: input.restaurantSlug,
-    category: input.category,
-    name: (input.nameHe ?? input.name).trim(),
-    description: (input.descriptionHe ?? input.description).trim(),
-    nameHe: (input.nameHe ?? input.name).trim(),
-    nameEn: (input.nameEn ?? input.nameHe ?? input.name).trim(),
-    descriptionHe: (input.descriptionHe ?? input.description).trim(),
-    descriptionEn: (input.descriptionEn ?? input.descriptionHe ?? input.description).trim(),
-    price: Math.max(0, Math.round(input.price)),
-    image: input.image?.trim() || DEFAULT_MENU_IMAGE,
-    showImage: input.showImage ?? true,
-    available: input.available,
-    badges: Array.isArray(input.badges)
-      ? input.badges.filter((badge): badge is MenuBadge =>
-          ALLOWED_BADGES.includes(badge)
-        )
-      : [],
-    volumeOptions: normalizeVolumeOptions(input.volumeOptions)
-  };
-
-  menuStore.unshift(menuItem);
-  await persistMenuItemsAsync(menuStore);
-  return normalizeMenuItem(menuItem);
+  items[index] = next;
+  await persistMenuItemsAsync(items);
+  return next;
 }
 
 export async function deleteMenuItem(menuItemId: string) {
-  const menuStore = await loadMenuItemsAsync();
-  const nextMenuStore = menuStore.filter((item) => item.id !== menuItemId);
+  const items = await loadMenuItemsAsync();
+  const index = items.findIndex((item) => item.id === menuItemId);
 
-  if (nextMenuStore.length === menuStore.length) {
+  if (index === -1) {
     throw new Error("Menu item not found");
   }
 
-  await persistMenuItemsAsync(nextMenuStore);
-  return { ok: true };
+  const [deletedItem] = items.splice(index, 1);
+  await persistMenuItemsAsync(items);
+  return deletedItem;
 }
 
 export async function getTableSession(
   restaurantSlug: string,
-  tableRef: number | string
+  tableToken: string
 ): Promise<TableSession | null> {
-  const cacheKey = `${restaurantSlug}:${String(tableRef)}`;
-  const cached = getTableSessionCache().get(cacheKey);
+  const cache = getTableSessionCache();
+  const cacheKey = buildSessionCacheKey(restaurantSlug, tableToken);
+  const cached = cache.get(cacheKey);
 
   if (cached && cached.expiresAt > Date.now()) {
     return cloneTableSession(cached.session);
   }
 
-  const [restaurant, menu] = await Promise.all([
-    getRestaurantBySlug(restaurantSlug),
-    getAvailableMenuByRestaurant(restaurantSlug)
-  ]);
+  const { getRestaurantBySlug } = await import("@/lib/restaurants");
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
+    cache.set(cacheKey, {
+      session: null,
+      expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+    });
     return null;
   }
 
-  const table = restaurant.tables.find((item) =>
-    typeof tableRef === "number"
-      ? item.number === tableRef
-      : item.accessToken === tableRef
-  );
+  const table = restaurant.tables.find((item) => item.accessToken === tableToken);
 
   if (!table) {
+    cache.set(cacheKey, {
+      session: null,
+      expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+    });
     return null;
   }
 
-  const session = {
+  const session: TableSession = {
     restaurant,
     table,
-    menu
+    menu: await getAvailableMenuByRestaurant(restaurantSlug)
   };
 
-  getTableSessionCache().set(cacheKey, {
+  cache.set(cacheKey, {
     session: cloneTableSession(session),
     expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
   });
 
-  return session;
+  return cloneTableSession(session);
 }
 
-export function preloadTableSession(
-  restaurantSlug: string,
-  tableRef: number | string
-) {
-  void getTableSession(restaurantSlug, tableRef);
+export function preloadTableSession(restaurantSlug: string, tableToken: string) {
+  void getTableSession(restaurantSlug, tableToken);
 }
