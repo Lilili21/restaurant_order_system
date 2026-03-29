@@ -843,6 +843,62 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.menu-editor__toolbar-group {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-editor__toolbar-group--open {
+  padding: 12px;
+  border-radius: 28px;
+  background: rgba(255, 252, 246, 0.92);
+  border: 1px solid rgba(91, 70, 54, 0.08);
+  box-shadow:
+    0 14px 28px rgba(55, 36, 20, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.menu-editor__toolbar-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.admin-menu-bubble--group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.menu-editor__toolbar .admin-menu-bubble--group-open:not(.admin-menu-bubble--active) {
+  background: rgba(255, 252, 246, 0.96);
+  color: #5b4636;
+  border: 1px solid rgba(91, 70, 54, 0.12);
+  box-shadow:
+    0 10px 20px rgba(55, 36, 20, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.admin-menu-bubble__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 1.16rem;
+  font-weight: 700;
+  transform: rotate(0deg);
+  transition: transform 0.2s ease;
+}
+
+.admin-menu-bubble__chevron--open {
+  transform: rotate(180deg);
+}
+
 .control-center-analytics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -3835,6 +3891,37 @@ textarea.modal-input {
 
   .menu-editor__toolbar-row {
     justify-content: stretch;
+    gap: 14px;
+  }
+
+  .menu-editor__toolbar-group,
+  .menu-editor__toolbar-group--open {
+    width: 100%;
+  }
+
+  .menu-editor__toolbar-subrow {
+    justify-content: stretch;
+    gap: 10px;
+  }
+
+  .menu-editor__toolbar-subrow > * {
+    width: 100%;
+  }
+
+  .menu-editor__toolbar .admin-menu-bubble {
+    width: 100%;
+  }
+
+  .menu-editor__toolbar .admin-menu-bubble--group-open {
+    box-shadow:
+      0 10px 22px rgba(55, 36, 20, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  .menu-editor__toolbar .admin-menu-bubble--active {
+    box-shadow:
+      0 16px 28px rgba(180, 83, 9, 0.18),
+      inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
 
   .menu-editor__kind-switch {

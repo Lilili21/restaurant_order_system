@@ -83,101 +83,139 @@ function ControlCenterToolbarComponent({
         >
           Live Orders
         </button>
-        <button
+        <div
           className={
             menuButtonsOpen
-              ? "admin-menu-bubble admin-menu-bubble--active"
-              : "admin-menu-bubble"
+              ? "menu-editor__toolbar-group menu-editor__toolbar-group--open"
+              : "menu-editor__toolbar-group"
           }
-          type="button"
-          onClick={onToggleMenu}
         >
-          Menu
-        </button>
-        <button
+          <button
+            className={
+              menuButtonsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active admin-menu-bubble--group admin-menu-bubble--group-open"
+                : "admin-menu-bubble admin-menu-bubble--group"
+            }
+            type="button"
+            onClick={onToggleMenu}
+            aria-expanded={menuButtonsOpen}
+          >
+            <span>Menu</span>
+            <span
+              className={
+                menuButtonsOpen
+                  ? "admin-menu-bubble__chevron admin-menu-bubble__chevron--open"
+                  : "admin-menu-bubble__chevron"
+              }
+              aria-hidden="true"
+            >
+              ▾
+            </span>
+          </button>
+          {menuButtonsOpen ? (
+            <div className="menu-editor__toolbar-subrow">
+              <button
+                className={
+                  recommendationsOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={onToggleRecommendations}
+              >
+                Advices
+              </button>
+              <button
+                className={
+                  previewOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={onTogglePreview}
+              >
+                Preview (customer view)
+              </button>
+              <button
+                className={
+                  menuOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={onToggleEdit}
+              >
+                Edit
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <div
           className={
             settingsButtonsOpen
-              ? "admin-menu-bubble admin-menu-bubble--active"
-              : "admin-menu-bubble"
+              ? "menu-editor__toolbar-group menu-editor__toolbar-group--open"
+              : "menu-editor__toolbar-group"
           }
-          type="button"
-          onClick={onToggleSettings}
         >
-          Settings
-        </button>
+          <button
+            className={
+              settingsButtonsOpen
+                ? "admin-menu-bubble admin-menu-bubble--active admin-menu-bubble--group admin-menu-bubble--group-open"
+                : "admin-menu-bubble admin-menu-bubble--group"
+            }
+            type="button"
+            onClick={onToggleSettings}
+            aria-expanded={settingsButtonsOpen}
+          >
+            <span>Settings</span>
+            <span
+              className={
+                settingsButtonsOpen
+                  ? "admin-menu-bubble__chevron admin-menu-bubble__chevron--open"
+                  : "admin-menu-bubble__chevron"
+              }
+              aria-hidden="true"
+            >
+              ▾
+            </span>
+          </button>
+          {settingsButtonsOpen ? (
+            <div className="menu-editor__toolbar-subrow">
+              {secondaryCredentials ? (
+                <TableCountControl
+                  credentials={secondaryCredentials}
+                  restaurantSlug={restaurantSlug}
+                />
+              ) : null}
+              {secondaryCredentials ? (
+                <WorkingHoursControl credentials={secondaryCredentials} />
+              ) : null}
+              <button
+                className={
+                  notificationsOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={onToggleNotifications}
+              >
+                Notifications
+              </button>
+              <button
+                className={
+                  settingsRecommendationsOpen
+                    ? "admin-menu-bubble admin-menu-bubble--active"
+                    : "admin-menu-bubble"
+                }
+                type="button"
+                onClick={onToggleSettingsRecommendations}
+              >
+                Recommendations
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
-      {menuButtonsOpen ? (
-        <div className="menu-editor__toolbar-row">
-          <button
-            className={
-              recommendationsOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={onToggleRecommendations}
-          >
-            Advices
-          </button>
-          <button
-            className={
-              previewOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={onTogglePreview}
-          >
-            Preview (customer view)
-          </button>
-          <button
-            className={
-              menuOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={onToggleEdit}
-          >
-            Edit
-          </button>
-        </div>
-      ) : null}
-      {settingsButtonsOpen ? (
-        <div className="menu-editor__toolbar-row">
-          {secondaryCredentials ? (
-            <TableCountControl
-              credentials={secondaryCredentials}
-              restaurantSlug={restaurantSlug}
-            />
-          ) : null}
-          {secondaryCredentials ? (
-            <WorkingHoursControl credentials={secondaryCredentials} />
-          ) : null}
-          <button
-            className={
-              notificationsOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={onToggleNotifications}
-          >
-            Alarm
-          </button>
-          <button
-            className={
-              settingsRecommendationsOpen
-                ? "admin-menu-bubble admin-menu-bubble--active"
-                : "admin-menu-bubble"
-            }
-            type="button"
-            onClick={onToggleSettingsRecommendations}
-          >
-            Recommendations
-          </button>
-        </div>
-      ) : null}
       {menuOpen ? (
         <div className="menu-editor__toolbar-row">
           <div className="admin-switch menu-editor__kind-switch">

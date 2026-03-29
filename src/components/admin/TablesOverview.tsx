@@ -39,6 +39,11 @@ type SessionItemSummary = {
   hasHappyHourDiscount: boolean;
 };
 
+type PosSyncState = {
+  status: "idle" | "sending" | "failed" | "success";
+  posOrderNumber?: string;
+};
+
 const DRINK_CATEGORIES = new Set<string>([
   "drinks",
   "non_alcoholic_drinks",
@@ -330,6 +335,11 @@ export function TablesOverview() {
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
   const [workingHoursRules, setWorkingHoursRules] =
     useState<MenuSettingsResponse["workingHoursRules"]>([]);
+  const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
+
+  function getPosSyncKey(table: TableOverview) {
+    return `${table.restaurantSlug}:${table.tableNumber}:${table.currentSessionId}`;
+  }
 
   function normalizeTablesResponse(payload: unknown): TablesResponse {
     if (!payload || typeof payload !== "object") {
@@ -574,6 +584,33 @@ export function TablesOverview() {
 
     const nextData = normalizeTablesResponse(await refreshResponse.json());
     setData(nextData);
+  }
+
+  function sendTableToPos(table: TableOverview) {
+    const posKey = getPosSyncKey(table);
+
+    setPosSyncStates((current) => ({
+      ...current,
+      [posKey]: {
+        status: "sending"
+      }
+    }));
+
+    window.setTimeout(() => {
+      const isSuccess = Math.random() >= 0.4;
+
+      setPosSyncStates((current) => ({
+        ...current,
+        [posKey]: isSuccess
+          ? {
+              status: "success",
+              posOrderNumber: String(7000 + Math.floor(Math.random() * 1000))
+            }
+          : {
+              status: "failed"
+            }
+      }));
+    }, 700);
   }
 
   function exportClosedOrdersForToday() {
@@ -882,6 +919,9 @@ export function TablesOverview() {
           <div className="tables-grid">
             {data.tables.map((table) => {
               const sessionItems = groupSessionItems(table, happyHourSettings);
+              const posSyncState = posSyncStates[getPosSyncKey(table)] ?? {
+                status: "idle"
+              };
 
               return (
                 <article
@@ -937,6 +977,20 @@ export function TablesOverview() {
                       }
                     >
                       Close table
+                    </button>
+                    <button
+                      className="button-neutral tables-action-button"
+                      type="button"
+                      disabled={posSyncState.status === "sending" || posSyncState.status === "success"}
+                      onClick={() => sendTableToPos(table)}
+                    >
+                      {posSyncState.status === "success"
+                        ? `POS order: #${posSyncState.posOrderNumber}`
+                        : posSyncState.status === "failed"
+                          ? "Resent to POS"
+                          : posSyncState.status === "sending"
+                            ? "Sending..."
+                            : "Send to POS"}
                     </button>
                   </div>
                 </article>

@@ -1423,30 +1423,32 @@ export function MenuEditor() {
   }
 
   async function openWaiterPanel() {
-    if (!secondaryCredentials || waiterRedirecting) {
+    if (waiterRedirecting) {
       return;
     }
 
     setWaiterRedirecting(true);
 
-    const response = await fetch("/api/admin-auth", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        scope: "admin",
-        persist: true,
-        secondaryLogin: secondaryCredentials.login,
-        secondaryPassword: secondaryCredentials.password
-      })
-    });
+    if (secondaryCredentials) {
+      const response = await fetch("/api/admin-auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          scope: "admin",
+          persist: true,
+          secondaryLogin: secondaryCredentials.login,
+          secondaryPassword: secondaryCredentials.password
+        })
+      });
 
-    if (!response.ok) {
-      const error = (await response.json()) as { message?: string };
-      setMessage(error.message ?? "Failed to open waiter panel.");
-      setWaiterRedirecting(false);
-      return;
+      if (!response.ok) {
+        const error = (await response.json()) as { message?: string };
+        setMessage(error.message ?? "Failed to open waiter panel.");
+        setWaiterRedirecting(false);
+        return;
+      }
     }
 
     const segments = pathname.split("/").filter(Boolean);
