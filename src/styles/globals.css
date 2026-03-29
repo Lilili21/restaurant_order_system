@@ -2077,6 +2077,14 @@ button:disabled {
   margin: 0 auto;
 }
 
+.modal-card__privacy-link {
+  justify-self: start;
+  font-size: 0.82rem;
+  color: #7a6a59;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .modal-card__ack {
   min-width: 108px;
   min-height: 54px;
@@ -2624,6 +2632,37 @@ textarea.modal-input {
 .order-time__value {
   font-weight: 700;
   color: var(--text);
+}
+
+.order-guest-contact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.order-whatsapp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 16px 0 10px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.order-whatsapp-link__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #7fa043;
+  color: #fffdf7;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .order-item-line,

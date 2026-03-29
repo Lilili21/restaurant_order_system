@@ -20,13 +20,12 @@ export default async function HomePage() {
               href={`/${restaurant.slug}`}
               className="button-link button-link--hero"
             >
-              Demo restaurant {restaurant.name}
+              {restaurant.name}
             </Link>
           </div>
         </div>
 
         <div className="hero-card">
-          <span>Demo restaurant</span>
           <strong>{restaurant.name}</strong>
           <p>{restaurant.description}</p>
         </div>

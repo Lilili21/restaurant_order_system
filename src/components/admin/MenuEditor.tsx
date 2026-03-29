@@ -566,6 +566,32 @@ export function MenuEditor() {
       waiterCalls: null
     }
   });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAccess() {
+      const response = await fetch("/api/admin-auth?scope=secondary", {
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = (await response.json()) as { authorized?: boolean };
+
+      if (!cancelled && data.authorized) {
+        setIsAuthorized(true);
+      }
+    }
+
+    void checkAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [dashboardCharts, setDashboardCharts] = useState<DashboardCharts>({
     labels: [],
     ordersByHour: [],
@@ -1131,14 +1157,16 @@ export function MenuEditor() {
   ]);
 
   useEffect(() => {
-    if (!isAuthorized || !secondaryCredentials) {
+    if (!isAuthorized) {
       return;
     }
 
-    const authHeaders = {
-      "x-admin-secondary-login": secondaryCredentials.login,
-      "x-admin-secondary-password": secondaryCredentials.password
-    };
+    const authHeaders = secondaryCredentials
+      ? {
+          "x-admin-secondary-login": secondaryCredentials.login,
+          "x-admin-secondary-password": secondaryCredentials.password
+        }
+      : undefined;
     let cancelled = false;
 
     async function load() {

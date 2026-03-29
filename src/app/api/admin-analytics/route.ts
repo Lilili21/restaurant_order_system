@@ -59,24 +59,6 @@ function parseTime(value: string | null | undefined) {
   return { hours, minutes };
 }
 
-function getCurrentDayRuleTime(
-  rules: Array<{
-    id: string;
-    days: number[];
-    from: string | null;
-    until: string | null;
-  }>,
-  field: "from" | "until",
-  fallback: string | null
-) {
-  const today = new Date();
-  const day = today.getDay();
-  const matchedRule = rules.find((rule) => rule.days.includes(day));
-  const value = matchedRule?.[field];
-
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
 function getRuleTimeForDate(
   rules: Array<{
     id: string;
@@ -94,7 +76,7 @@ function getRuleTimeForDate(
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-function getAnalyticsDayBounds(
+function getActiveShiftBounds(
   rules: Array<{
     id: string;
     days: number[];
@@ -135,15 +117,7 @@ function getAnalyticsDayBounds(
     (candidate) => nowTs >= candidate.start.getTime() && nowTs < candidate.end.getTime()
   );
 
-  if (activeCandidate) {
-    return activeCandidate;
-  }
-
-  const previousCandidate = [...candidates].sort(
-    (left, right) => right.start.getTime() - left.start.getTime()
-  )[0];
-
-  return previousCandidate ?? null;
+  return activeCandidate ?? null;
 }
 
 function getCurrentShiftStartTimestamp(
@@ -153,26 +127,11 @@ function getCurrentShiftStartTimestamp(
     from: string | null;
     until: string | null;
   }>,
-  fallbackFrom: string | null
+  fallbackFrom: string | null,
+  fallbackUntil: string | null
 ) {
-  const fromValue = getCurrentDayRuleTime(rules, "from", fallbackFrom);
-  const fromTime = parseTime(fromValue);
-
-  if (!fromTime) {
-    return null;
-  }
-
-  const now = new Date();
-  const startToday = new Date(now);
-  startToday.setHours(fromTime.hours, fromTime.minutes, 0, 0);
-
-  if (now.getTime() >= startToday.getTime()) {
-    return startToday.getTime();
-  }
-
-  const previousDayStart = new Date(startToday);
-  previousDayStart.setDate(previousDayStart.getDate() - 1);
-  return previousDayStart.getTime();
+  const activeShiftBounds = getActiveShiftBounds(rules, fallbackFrom, fallbackUntil);
+  return activeShiftBounds ? activeShiftBounds.start.getTime() : null;
 }
 
 function getShiftStartTimestampForDate(
@@ -207,7 +166,7 @@ function getWindowBounds(
   fallbackFrom: string | null,
   fallbackUntil: string | null
 ) {
-  const dayBounds = getAnalyticsDayBounds(rules, fallbackFrom, fallbackUntil);
+  const dayBounds = getActiveShiftBounds(rules, fallbackFrom, fallbackUntil);
 
   if (!dayBounds) {
     return null;
@@ -470,14 +429,15 @@ export async function GET(request: NextRequest) {
   try {
     const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
     const settings = await getMenuSettings();
-    const analyticsDayBounds = getAnalyticsDayBounds(
+    const analyticsDayBounds = getActiveShiftBounds(
       settings.workingHoursRules,
       settings.workingHoursFrom,
       settings.workingHoursUntil
     );
     const currentShiftStartTs = getCurrentShiftStartTimestamp(
       settings.workingHoursRules,
-      settings.workingHoursFrom
+      settings.workingHoursFrom,
+      settings.workingHoursUntil
     );
     const [allOrders, closedSessions, tables] = await Promise.all([
       getAllStoredOrders(restaurantSlug ?? undefined),

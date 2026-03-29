@@ -40,7 +40,6 @@ export function RestaurantLanding({
         </div>
 
         <div className="hero-card">
-          <span>Demo restaurant</span>
           <strong>{restaurantName}</strong>
           <p>{restaurantDescription}</p>
         </div>

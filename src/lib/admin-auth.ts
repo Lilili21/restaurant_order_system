@@ -170,12 +170,17 @@ export function requireSameOrigin(request: NextRequest) {
 }
 
 export async function hasAdminAccess(scope: AdminAuthScope) {
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(getCookieName("admin"))?.value;
+
   if (scope === "secondary") {
-    return false;
+    return (
+      verifyCookieValue("admin", cookieValue) ||
+      verifyCookieValue("secondary", cookieValue)
+    );
   }
 
-  const cookieStore = await cookies();
-  return verifyCookieValue(scope, cookieStore.get(getCookieName(scope))?.value);
+  return verifyCookieValue(scope, cookieValue);
 }
 
 export function setAdminAccessCookie(
@@ -229,6 +234,15 @@ export async function requireAdminAccess(
   }
 
   if (scope === "secondary") {
+    const hasCookieAccess = verifyCookieValue(
+      "admin",
+      request.cookies.get(getCookieName("admin"))?.value
+    );
+
+    if (hasCookieAccess) {
+      return null;
+    }
+
     const login = request.headers.get("x-admin-secondary-login") ?? "";
     const password = request.headers.get("x-admin-secondary-password") ?? "";
 

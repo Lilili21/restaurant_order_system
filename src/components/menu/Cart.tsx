@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
@@ -146,9 +147,11 @@ const uiText = {
     orderServed: "הוגש",
     thankYou: "תודה",
     orderSent: "ההזמנה שלכם נשלחה. אנחנו מכינים באהבה.",
-    orderStatusOptIn: "רוצים לקבל עדכון על סטטוס ההזמנה?",
+    orderStatusOptIn:
+      "אם תרצו לקבל עדכון ב-WhatsApp כשההזמנה תהיה מוכנה, השאירו בבקשה את מספר הטלפון שלכם.",
     orderStatusName: "שם",
     orderStatusPhone: "מספר טלפון",
+    privacyPolicy: "Privacy Policy",
     waiterCalled: "המלצר הוזמן",
     billRequested: "המלצר יביא את החשבון לשולחן שלכם בקרוב.\nתודה שסעדתם אצלנו!",
     waiterServiceNote: "המלצר יהיה אצלכם בקרוב.",
@@ -238,9 +241,10 @@ const uiText = {
     orderServed: "Served",
     thankYou: "Thanks",
     orderSent: "Your order has been sent. We are cooking with love.",
-    orderStatusOptIn: "Would you like to get your order status?",
+    orderStatusOptIn: "Get a WhatsApp update when your order is ready.",
     orderStatusName: "Name",
     orderStatusPhone: "Phone number",
+    privacyPolicy: "Privacy Policy",
     waiterCalled: "Waiter has been called",
     billRequested: "A waiter will bring your bill shortly.\nThank you for dining with us!",
     waiterServiceNote: "Waiter is on the way.",
@@ -423,6 +427,7 @@ export function Cart({
   const isBarClosed = showBarClosedBanner;
   const areKitchenAndBarClosed = isKitchenClosed && isBarClosed;
   const submitDisabled =
+    !orderingEnabled ||
     detailedItems.length === 0 ||
     submitting ||
     areKitchenAndBarClosed ||
@@ -1642,6 +1647,16 @@ export function Cart({
                   </div>
                 ) : null}
               </div>
+            ) : null}
+            {dialogMessage === text.orderSent && wantsOrderStatusUpdates ? (
+              <Link
+                href="/privacy-policy"
+                target="_blank"
+                rel="noreferrer"
+                className="modal-card__privacy-link"
+              >
+                {text.privacyPolicy}
+              </Link>
             ) : null}
             <button
               className="button-success modal-card__ack"

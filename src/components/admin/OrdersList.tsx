@@ -44,6 +44,19 @@ function getOrderItemDisplayName(item: { name: string; volumeLabel?: string }) {
   return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
 }
 
+function getWhatsAppLink(order: Order) {
+  const phone = (order.guestContactPhone ?? "").replace(/[^\d+]/g, "");
+
+  if (!phone) {
+    return null;
+  }
+
+  const normalizedPhone = phone.startsWith("+") ? phone.slice(1) : phone;
+  const message = `Hi ${order.guestContactName ?? ""}, your order for table ${order.tableNumber} at ${order.restaurantName} is ready.`;
+
+  return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
+}
+
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -610,6 +623,7 @@ export function OrdersList() {
               (sum, item) => sum + item.price * item.quantity,
               0
             );
+            const whatsAppLink = getWhatsAppLink(order);
 
             return (
               <article
@@ -644,10 +658,25 @@ export function OrdersList() {
                     order.kind !== "bill_request" &&
                     isHallView &&
                     (order.guestContactName || order.guestContactPhone) ? (
-                      <p className="muted">
-                        Guest: {order.guestContactName || "—"}
-                        {order.guestContactPhone ? ` · ${order.guestContactPhone}` : ""}
-                      </p>
+                      <div className="order-guest-contact">
+                        <p className="muted">
+                          Guest: {order.guestContactName || "—"}
+                          {order.guestContactPhone ? ` · ${order.guestContactPhone}` : ""}
+                        </p>
+                        {whatsAppLink ? (
+                          <a
+                            href={whatsAppLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="button-neutral order-whatsapp-link"
+                          >
+                            <span className="order-whatsapp-link__icon" aria-hidden="true">
+                              W
+                            </span>
+                            <span>WhatsApp</span>
+                          </a>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                   <div className="order-header-meta">
