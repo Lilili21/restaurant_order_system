@@ -13,7 +13,14 @@ import {
 import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
 import { getAllMenuItems, getMenuItemById } from "@/lib/menu-store";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
 import path from "node:path";
 
 type OrdersPersistence = {
@@ -57,6 +64,7 @@ type OrderItemRow = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
+const ORDERS_ARCHIVE_DIR = path.join(DATA_DIR, "orders-archive");
 const AUTO_PREPARING_DELAY_MS = 3 * 60 * 1000;
 const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
 const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
@@ -65,8 +73,23 @@ const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
+const MERGE_ORDER_WINDOW_MS = 3 * 60 * 1000;
 const SHIFT_CLOSE_GRACE_MS = 60 * 60 * 1000;
 const COOKED_MARKER = "__menu_order_cooked__";
+const MAX_WEEKLY_ARCHIVE_FILES = 4;
+
+type WeeklyOrdersArchive = {
+  weekKey: string;
+  orders: Order[];
+  closedTableSummaries: ClosedTableSummary[];
+};
+
+export type WeeklyOrdersArchiveMeta = {
+  weekKey: string;
+  label: string;
+  start: string;
+  end: string;
+};
 
 type MenuSettingsSnapshot = Awaited<ReturnType<typeof getMenuSettings>>;
 type ShiftWindow = {
@@ -176,6 +199,292 @@ function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+function getStartOfIsoWeek(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(start.getDate() + diff);
+  return start;
+}
+
+function getIsoWeekKey(date: Date) {
+  const weekStart = getStartOfIsoWeek(date);
+  const thursday = new Date(weekStart);
+  thursday.setDate(weekStart.getDate() + 3);
+  const year = thursday.getFullYear();
+  const firstWeekStart = getStartOfIsoWeek(new Date(year, 0, 4));
+  const weekNumber =
+    Math.floor(
+      (weekStart.getTime() - firstWeekStart.getTime()) / (7 * 24 * 60 * 60 * 1000)
+    ) + 1;
+
+  return `${year}-W${String(weekNumber).padStart(2, "0")}`;
+}
+
+function getWeekDateRangeForKey(weekKey: string) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(weekKey);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number.parseInt(match[1], 10);
+  const week = Number.parseInt(match[2], 10);
+
+  if (!Number.isFinite(year) || !Number.isFinite(week) || week < 1 || week > 53) {
+    return null;
+  }
+
+  const firstWeekStart = getStartOfIsoWeek(new Date(year, 0, 4));
+  const weekStart = new Date(firstWeekStart);
+  weekStart.setDate(firstWeekStart.getDate() + (week - 1) * 7);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+
+  return {
+    start: formatDate(weekStart),
+    end: formatDate(weekEnd)
+  };
+}
+
+function getWeekLabel(weekKey: string) {
+  const dateRange = getWeekDateRangeForKey(weekKey);
+
+  if (!dateRange) {
+    return weekKey;
+  }
+
+  return `${dateRange.start} - ${dateRange.end}`;
+}
+
+function getWeeklyArchivePath(weekKey: string) {
+  const dateRange = getWeekDateRangeForKey(weekKey);
+  const fileName = dateRange
+    ? `orders-${weekKey}-${dateRange.start}_to_${dateRange.end}.json`
+    : `orders-${weekKey}.json`;
+
+  return path.join(ORDERS_ARCHIVE_DIR, fileName);
+}
+
+function getLegacyWeeklyArchivePath(weekKey: string) {
+  return path.join(ORDERS_ARCHIVE_DIR, `orders-${weekKey}.json`);
+}
+
+function readWeeklyArchive(weekKey: string): WeeklyOrdersArchive {
+  const archivePath = getWeeklyArchivePath(weekKey);
+  const legacyArchivePath = getLegacyWeeklyArchivePath(weekKey);
+
+  if (!existsSync(archivePath) && !existsSync(legacyArchivePath)) {
+    return {
+      weekKey,
+      orders: [],
+      closedTableSummaries: []
+    };
+  }
+
+  try {
+    const raw = readFileSync(
+      existsSync(archivePath) ? archivePath : legacyArchivePath,
+      "utf8"
+    );
+    const parsed = JSON.parse(raw) as Partial<WeeklyOrdersArchive>;
+
+    return {
+      weekKey,
+      orders: Array.isArray(parsed.orders) ? (parsed.orders as Order[]) : [],
+      closedTableSummaries: Array.isArray(parsed.closedTableSummaries)
+        ? (parsed.closedTableSummaries as ClosedTableSummary[])
+        : []
+    };
+  } catch {
+    return {
+      weekKey,
+      orders: [],
+      closedTableSummaries: []
+    };
+  }
+}
+
+export function listWeeklyOrdersArchiveMeta(): WeeklyOrdersArchiveMeta[] {
+  if (!existsSync(ORDERS_ARCHIVE_DIR)) {
+    return [];
+  }
+
+  return readdirSync(ORDERS_ARCHIVE_DIR)
+    .map((fileName) => {
+      const match = /^orders-(\d{4}-W\d{2})(?:-(\d{4}-\d{2}-\d{2})_to_(\d{4}-\d{2}-\d{2}))?\.json$/.exec(
+        fileName
+      );
+
+      if (!match) {
+        return null;
+      }
+
+      const weekKey = match[1];
+      const dateRange = getWeekDateRangeForKey(weekKey);
+
+      return {
+        weekKey,
+        label: getWeekLabel(weekKey),
+        start: match[2] ?? dateRange?.start ?? "",
+        end: match[3] ?? dateRange?.end ?? ""
+      } satisfies WeeklyOrdersArchiveMeta;
+    })
+    .filter(Boolean)
+    .sort((left, right) => right!.weekKey.localeCompare(left!.weekKey))
+    .slice(0, MAX_WEEKLY_ARCHIVE_FILES) as WeeklyOrdersArchiveMeta[];
+}
+
+export function getWeeklyOrdersArchive(
+  weekKey: string
+): WeeklyOrdersArchive | null {
+  const archive = readWeeklyArchive(weekKey);
+
+  if (archive.orders.length === 0 && archive.closedTableSummaries.length === 0) {
+    return null;
+  }
+
+  return archive;
+}
+
+function persistWeeklyArchive(archive: WeeklyOrdersArchive) {
+  if (!existsSync(ORDERS_ARCHIVE_DIR)) {
+    mkdirSync(ORDERS_ARCHIVE_DIR, { recursive: true });
+  }
+
+  const legacyArchivePath = getLegacyWeeklyArchivePath(archive.weekKey);
+
+  writeFileSync(
+    getWeeklyArchivePath(archive.weekKey),
+    JSON.stringify(archive, null, 2),
+    "utf8"
+  );
+
+  if (existsSync(legacyArchivePath)) {
+    unlinkSync(legacyArchivePath);
+  }
+}
+
+function pruneWeeklyArchiveFiles() {
+  if (!existsSync(ORDERS_ARCHIVE_DIR)) {
+    return;
+  }
+
+  const weeklyFiles = readdirSync(ORDERS_ARCHIVE_DIR)
+    .filter(
+      (fileName) =>
+        /^orders-\d{4}-W\d{2}(?:-\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2})?\.json$/.test(
+          fileName
+        )
+    )
+    .sort()
+    .reverse();
+
+  for (const fileName of weeklyFiles.slice(MAX_WEEKLY_ARCHIVE_FILES)) {
+    unlinkSync(path.join(ORDERS_ARCHIVE_DIR, fileName));
+  }
+}
+
+function archiveCompletedShiftsForNewActiveShift(
+  state: RuntimeState,
+  settings: MenuSettingsSnapshot
+) {
+  const currentShiftWindow = getCurrentAdminShiftWindow(settings);
+
+  if (!currentShiftWindow) {
+    return false;
+  }
+
+  const ordersByWeek = new Map<string, Order[]>();
+  const summariesByWeek = new Map<string, ClosedTableSummary[]>();
+
+  const remainingOrders = state.ordersStore.filter((order) => {
+    const createdAtTs = new Date(order.createdAt).getTime();
+
+    if (
+      !Number.isFinite(createdAtTs) ||
+      createdAtTs >= currentShiftWindow.start.getTime()
+    ) {
+      return true;
+    }
+
+    const shiftWeekKey = getIsoWeekKey(
+      getShiftWindowForTimestamp(settings, createdAtTs).start
+    );
+    const current = ordersByWeek.get(shiftWeekKey) ?? [];
+    current.push(order);
+    ordersByWeek.set(shiftWeekKey, current);
+    return false;
+  });
+
+  const remainingClosedSummaries = state.closedTableSummaries.filter((summary) => {
+    const closedAtTs = new Date(summary.closedAt).getTime();
+
+    if (
+      !Number.isFinite(closedAtTs) ||
+      closedAtTs >= currentShiftWindow.start.getTime()
+    ) {
+      return true;
+    }
+
+    const shiftWeekKey = getIsoWeekKey(
+      getShiftWindowForTimestamp(settings, closedAtTs).start
+    );
+    const current = summariesByWeek.get(shiftWeekKey) ?? [];
+    current.push(summary);
+    summariesByWeek.set(shiftWeekKey, current);
+    return false;
+  });
+
+  if (
+    remainingOrders.length === state.ordersStore.length &&
+    remainingClosedSummaries.length === state.closedTableSummaries.length
+  ) {
+    return false;
+  }
+
+  for (const [weekKey, archivedOrders] of ordersByWeek.entries()) {
+    const archive = readWeeklyArchive(weekKey);
+    const mergedOrders = new Map(archive.orders.map((order) => [order.id, order] as const));
+
+    for (const order of archivedOrders) {
+      mergedOrders.set(order.id, order);
+    }
+
+    const mergedSummaries = new Map(
+      archive.closedTableSummaries.map((summary) => [
+        `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
+        summary
+      ] as const)
+    );
+
+    for (const summary of summariesByWeek.get(weekKey) ?? []) {
+      mergedSummaries.set(
+        `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
+        summary
+      );
+    }
+
+    persistWeeklyArchive({
+      weekKey,
+      orders: [...mergedOrders.values()].sort((left, right) =>
+        left.createdAt.localeCompare(right.createdAt)
+      ),
+      closedTableSummaries: [...mergedSummaries.values()].sort((left, right) =>
+        left.closedAt.localeCompare(right.closedAt)
+      )
+    });
+  }
+
+  pruneWeeklyArchiveFiles();
+  state.ordersStore = remainingOrders;
+  state.closedTableSummaries = remainingClosedSummaries;
+  return true;
 }
 
 function getRuleForDate(settings: MenuSettingsSnapshot, date: Date) {
@@ -1190,6 +1499,10 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
   const expiredShiftOrdersClosed = autoCloseExpiredShiftOrders(state, settings);
   const staleServiceRequestsClosed = autoCloseStaleServiceRequests(state);
   const shiftedSessionsRotated = rotateSessionsForNewShift(state, settings);
+  const completedShiftOrdersArchived = archiveCompletedShiftsForNewActiveShift(
+    state,
+    settings
+  );
   const staleClosedSummariesPruned = await pruneClosedTableSummariesByWorkingDay(
     state
   );
@@ -1198,6 +1511,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     expiredShiftOrdersClosed ||
     staleServiceRequestsClosed ||
     shiftedSessionsRotated ||
+    completedShiftOrdersArchived ||
     staleClosedSummariesPruned
   ) {
     await persistStateAsync(state);
@@ -1768,7 +2082,8 @@ export async function createOrder(input: {
       order.sessionId === sessionId &&
       order.kind !== "waiter_call" &&
       order.kind !== "bill_request" &&
-      order.status === "new"
+      order.status === "new" &&
+      Date.now() - new Date(order.createdAt).getTime() < MERGE_ORDER_WINDOW_MS
   );
 
   if (

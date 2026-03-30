@@ -9,10 +9,20 @@ import {
   Order,
   TableOverview
 } from "@/lib/types";
+import type { WeeklyOrdersArchiveMeta } from "@/lib/orders";
 
 type TablesResponse = {
   tables: TableOverview[];
   closedSessions: ClosedTableSummary[];
+};
+
+type WeeklyArchiveResponse = {
+  archives?: WeeklyOrdersArchiveMeta[];
+};
+
+type WeeklyArchivePayload = {
+  weekKey: string;
+  closedTableSummaries: ClosedTableSummary[];
 };
 
 type MenuSettingsResponse = {
@@ -326,6 +336,7 @@ export function TablesOverview() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [weeklyArchives, setWeeklyArchives] = useState<WeeklyOrdersArchiveMeta[]>([]);
   const [serviceRequests, setServiceRequests] = useState<Order[]>([]);
   const [happyHourEnabled, setHappyHourEnabled] = useState(false);
   const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(0);
@@ -434,6 +445,34 @@ export function TablesOverview() {
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadWeeklyArchives() {
+      const response = await fetch("/api/orders-archive", {
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as WeeklyArchiveResponse;
+
+      if (!cancelled) {
+        setWeeklyArchives(
+          Array.isArray(payload.archives) ? payload.archives.slice(0, 4) : []
+        );
+      }
+    }
+
+    void loadWeeklyArchives();
+
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -716,6 +755,113 @@ export function TablesOverview() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportClosedOrdersForWeek(weekKey: string, label: string) {
+    const response = await fetch(
+      `/api/orders-archive?weekKey=${encodeURIComponent(weekKey)}`,
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      setDialogMessage(`There is no archive for ${label}.`);
+      return;
+    }
+
+    const payload = (await response.json()) as WeeklyArchivePayload;
+    const sessions = Array.isArray(payload.closedTableSummaries)
+      ? payload.closedTableSummaries
+      : [];
+
+    if (!sessions.length) {
+      setDialogMessage(`There are no closed orders in ${label}.`);
+      return;
+    }
+
+    const rows = sessions.flatMap((session) =>
+      session.orders.flatMap((order) =>
+        order.items.map((item) => {
+          const closedAtDate = new Date(session.closedAt);
+          return {
+            closedDate: closedAtDate.toLocaleDateString("en-GB"),
+            closedTime: closedAtDate.toLocaleTimeString("en-GB"),
+            type: getItemType(item.category),
+            restaurantName: session.restaurantName,
+            tableNumber: session.tableNumber,
+            sessionId: session.sessionId,
+            orderId: order.id,
+            status: order.status,
+            itemName: item.name,
+            quantity: item.quantity,
+            itemTotal: item.price * item.quantity,
+            sessionTotal: session.total
+          };
+        })
+      )
+    );
+
+    const escapeCell = (value: string | number) =>
+      String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    const html = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <table border="1">
+      <tr>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Restaurant</th>
+        <th>Table</th>
+        <th>Session ID</th>
+        <th>Order ID</th>
+        <th>Status</th>
+        <th>Type</th>
+        <th>Item</th>
+        <th>Qty</th>
+        <th>Item total</th>
+        <th>Session total</th>
+      </tr>
+      ${rows
+        .map(
+          (row) => `<tr>
+            <td>${escapeCell(row.closedDate)}</td>
+            <td>${escapeCell(row.closedTime)}</td>
+            <td>${escapeCell(row.restaurantName)}</td>
+            <td>${escapeCell(row.tableNumber)}</td>
+            <td>${escapeCell(row.sessionId)}</td>
+            <td>${escapeCell(row.orderId)}</td>
+            <td>${escapeCell(row.status)}</td>
+            <td>${escapeCell(row.type)}</td>
+            <td>${escapeCell(row.itemName)}</td>
+            <td>${escapeCell(row.quantity)}</td>
+            <td>${escapeCell(row.itemTotal)}</td>
+            <td>${escapeCell(row.sessionTotal)}</td>
+          </tr>`
+        )
+        .join("")}
+    </table>
+  </body>
+</html>`;
+
+    const blob = new Blob([html], {
+      type: "application/vnd.ms-excel;charset=utf-8;"
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `closed-orders-${weekKey}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   function formatDayLabel(dayKey: string) {
     const [year, month, day] = dayKey.split("-");
 
@@ -758,16 +904,6 @@ export function TablesOverview() {
     const closedAtTs = new Date(session.closedAt).getTime();
     return Number.isFinite(closedAtTs) && closedAtTs >= currentShiftStartTs;
   });
-  const todayDayKey = new Date().toLocaleDateString("sv-SE");
-  const closedDays = [
-    ...new Set(
-      sortedClosedSessions.map((session) =>
-        new Date(session.closedAt).toLocaleDateString("sv-SE")
-      )
-    )
-  ].sort((left, right) => right.localeCompare(left));
-  const previousClosedDays = closedDays.filter((dayKey) => dayKey !== todayDayKey);
-
   return (
     <>
       {dialogMessage ? (
@@ -1012,14 +1148,16 @@ export function TablesOverview() {
             >
               Export today to Excel
             </button>
-            {previousClosedDays.map((dayKey) => (
+            {weeklyArchives.map((archive) => (
               <button
-                key={dayKey}
+                key={archive.weekKey}
                 className="button-neutral tables-action-button"
                 type="button"
-                onClick={() => exportClosedOrdersForDay(dayKey)}
+                onClick={() =>
+                  void exportClosedOrdersForWeek(archive.weekKey, archive.label)
+                }
               >
-                Download {formatDayLabel(dayKey)}
+                Download {archive.label}
               </button>
             ))}
           </div>

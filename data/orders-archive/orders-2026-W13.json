@@ -1,0 +1,2050 @@
+{
+  "weekKey": "2026-W13",
+  "orders": [
+    {
+      "id": "bill_1774470231514",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "kind": "bill_request",
+      "status": "cancelled",
+      "createdAt": "2026-03-25T20:23:51.514Z",
+      "updatedAt": "2026-03-25T20:34:27.809Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1774511525739",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-26T07:52:05.739Z",
+      "updatedAt": "2026-03-28T15:54:38.567Z",
+      "items": [
+        {
+          "id": "item_1774511525739_p5j6vf",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "captain morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774511525739_vzctmy",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "pina colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774525144381_wr9h7t",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 99
+    },
+    {
+      "id": "ord_1774525787038",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-26T11:49:47.038Z",
+      "updatedAt": "2026-03-28T15:54:38.567Z",
+      "items": [
+        {
+          "id": "item_1774525787038_y09lc9",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774531761412_mlukki",
+          "menuItemId": "m4",
+          "category": "mains",
+          "name": "Salmon fillet",
+          "price": 78,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774531761412_0hnkoa",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 164
+    },
+    {
+      "id": "bill_1774528321876",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "kind": "bill_request",
+      "status": "cancelled",
+      "createdAt": "2026-03-26T12:32:01.876Z",
+      "updatedAt": "2026-03-26T12:42:04.130Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1774529323818",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "cancelled",
+      "createdAt": "2026-03-26T12:48:43.818Z",
+      "updatedAt": "2026-03-26T12:58:59.171Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1774531279016",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-26T13:21:19.016Z",
+      "updatedAt": "2026-03-28T15:54:38.567Z",
+      "items": [
+        {
+          "id": "item_1774531279016_0t3pkp",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774531279016_efbvt6",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "captain morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774531279016_7d825i",
+          "menuItemId": "m5",
+          "category": "non_alcoholic_drinks",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 92
+    },
+    {
+      "id": "call_1774531318234",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 3,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "cancelled",
+      "createdAt": "2026-03-26T13:21:58.234Z",
+      "updatedAt": "2026-03-26T13:32:01.624Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "bill_1774531734220",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "kind": "bill_request",
+      "status": "cancelled",
+      "createdAt": "2026-03-26T13:28:54.220Z",
+      "updatedAt": "2026-03-26T13:39:41.699Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "call_1774534943859",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "kind": "waiter_call",
+      "status": "cancelled",
+      "createdAt": "2026-03-26T14:22:23.859Z",
+      "updatedAt": "2026-03-26T14:32:48.736Z",
+      "items": [],
+      "total": 0
+    },
+    {
+      "id": "ord_1774550271918",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-26T18:37:51.919Z",
+      "updatedAt": "2026-03-28T15:54:38.567Z",
+      "items": [
+        {
+          "id": "item_1774550271917_6dftvi",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "captain morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 50
+    },
+    {
+      "id": "ord_1774635000000",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T09:10:00.000Z",
+      "updatedAt": "2026-03-28T09:48:00.000Z",
+      "items": [
+        {
+          "id": "item_1774635000000_a1",
+          "menuItemId": "m2",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true,
+          "category": "starters"
+        },
+        {
+          "id": "item_1774635000000_a2",
+          "menuItemId": "m5",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": true,
+          "category": "non_alcoholic_drinks"
+        }
+      ],
+      "total": 39
+    },
+    {
+      "id": "ord_1774639200000",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T10:20:00.000Z",
+      "updatedAt": "2026-03-28T11:02:00.000Z",
+      "items": [
+        {
+          "id": "item_1774639200000_b1",
+          "menuItemId": "m_1773862719283",
+          "name": "captain morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true,
+          "category": "rum"
+        },
+        {
+          "id": "item_1774639200000_b2",
+          "menuItemId": "m6",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true,
+          "category": "desserts"
+        }
+      ],
+      "total": 82
+    },
+    {
+      "id": "ord_demo_today_closed_1",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 8,
+      "sessionId": 1,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T10:40:00.000Z",
+      "updatedAt": "2026-03-28T10:58:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_1_item_1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_demo_today_closed_2",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T11:20:00.000Z",
+      "updatedAt": "2026-03-28T11:44:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_2_item_1",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 18
+    },
+    {
+      "id": "ord_1774644300000",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 6,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T11:45:00.000Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "item_1774644300000_c1",
+          "menuItemId": "m2",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true,
+          "category": "starters"
+        },
+        {
+          "id": "item_1774644300000_c2",
+          "menuItemId": "m_1773862719283",
+          "name": "captain morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true,
+          "category": "rum"
+        },
+        {
+          "id": "item_1774644300000_c3",
+          "menuItemId": "m5",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": true,
+          "category": "non_alcoholic_drinks"
+        }
+      ],
+      "total": 89
+    },
+    {
+      "id": "ord_demo_today_closed_3",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T12:25:00.000Z",
+      "updatedAt": "2026-03-28T12:49:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_3_item_1",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 29
+    },
+    {
+      "id": "ord_1774649700000",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T13:15:00.000Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "item_1774649700000_d1",
+          "menuItemId": "m6",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 2,
+          "served": true,
+          "category": "desserts"
+        },
+        {
+          "id": "item_1774649700000_d2",
+          "menuItemId": "m5",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": true,
+          "category": "non_alcoholic_drinks"
+        }
+      ],
+      "total": 74
+    },
+    {
+      "id": "ord_demo_today_closed_4",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T13:40:00.000Z",
+      "updatedAt": "2026-03-28T13:58:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_4_item_1",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 32
+    },
+    {
+      "id": "ord_demo_today_closed_5",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T14:55:00.000Z",
+      "updatedAt": "2026-03-28T15:18:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_closed_5_item_1",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 2,
+          "served": true
+        }
+      ],
+      "total": 36
+    },
+    {
+      "id": "ord_demo_today_open_1",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 7,
+      "status": "served",
+      "serveMode": "all_at_once",
+      "createdAt": "2026-03-28T16:30:00.000Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_1_item_1",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "ord_demo_today_open_1_item_2",
+          "menuItemId": "m5",
+          "category": "drinks",
+          "name": "Mint lemonade",
+          "price": 18,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 42
+    },
+    {
+      "id": "ord_demo_today_open_2",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T17:10:00.000Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_2_item_1",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 54
+    },
+    {
+      "id": "ord_demo_today_open_3",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 3,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T18:05:00.000Z",
+      "updatedAt": "2026-03-28T18:05:00.000Z",
+      "items": [
+        {
+          "id": "ord_demo_today_open_3_item_1",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "ord_demo_today_open_3_item_2",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 61
+    },
+    {
+      "id": "ord_1774732312652",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:11:52.652Z",
+      "updatedAt": "2026-03-28T21:42:43.435Z",
+      "items": [
+        {
+          "id": "item_1774732312652_p54cfs",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774734163435_rwcpnm",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "Captain Morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 82
+    },
+    {
+      "id": "ord_1774734314850",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:45:14.850Z",
+      "updatedAt": "2026-03-28T21:51:02.968Z",
+      "items": [
+        {
+          "id": "item_1774734314850_5kkcki",
+          "menuItemId": "m_soft_iced_tea",
+          "category": "non_alcoholic_drinks",
+          "name": "Peach Iced Tea",
+          "volumeOptionId": "volume_soft_iced_tea_330",
+          "volumeLabel": "330ml",
+          "price": 14,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774734429408_6e53uo",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 4,
+          "served": true
+        }
+      ],
+      "total": 142
+    },
+    {
+      "id": "ord_1774734899992",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T21:54:59.992Z",
+      "updatedAt": "2026-03-28T22:07:09.044Z",
+      "items": [
+        {
+          "id": "item_1774734899991_lbivx3",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 3,
+          "served": true
+        }
+      ],
+      "total": 96
+    },
+    {
+      "id": "ord_1774736300794",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T22:18:20.794Z",
+      "updatedAt": "2026-03-28T22:18:20.794Z",
+      "items": [
+        {
+          "id": "item_1774736300794_wkppxh",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "Captain Morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774736300794_43oa0s",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 104
+    },
+    {
+      "id": "ord_1774736522314",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 6,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T22:22:02.314Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "item_1774736522313_pvheo2",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 3,
+          "served": true
+        },
+        {
+          "id": "item_1774736522314_bapof8",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774736522314_mu2naw",
+          "menuItemId": "m_soft_iced_tea",
+          "category": "non_alcoholic_drinks",
+          "name": "Peach Iced Tea",
+          "volumeOptionId": "volume_soft_iced_tea_330",
+          "volumeLabel": "330ml",
+          "price": 14,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 164,
+      "guestContactName": "hk"
+    },
+    {
+      "id": "ord_1774736844438",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 6,
+      "guestContactName": "hk",
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T22:27:24.438Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "item_1774736844438_fnd5lr",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 4,
+          "served": true
+        }
+      ],
+      "total": 128,
+      "guestContactPhone": "+972552554358"
+    },
+    {
+      "id": "ord_1774737206412",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 6,
+      "guestContactName": "hk",
+      "guestContactPhone": "+972552554358",
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-28T22:33:26.412Z",
+      "updatedAt": "2026-03-29T00:10:04.137Z",
+      "items": [
+        {
+          "id": "item_1774737206411_u9ldcu",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774737226467_yul8t7",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 61
+    },
+    {
+      "id": "ord_1774794712457",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 7,
+      "guestContactName": "hk",
+      "guestContactPhone": "+972552554358",
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-29T14:31:52.457Z",
+      "updatedAt": "2026-03-29T22:17:15.219Z",
+      "items": [
+        {
+          "id": "item_1774794712457_ypzuj5",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 2,
+          "served": true
+        },
+        {
+          "id": "item_1774794712457_l63hdh",
+          "menuItemId": "m5",
+          "category": "non_alcoholic_drinks",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 2,
+          "served": true
+        },
+        {
+          "id": "item_1774808831497_ku8khp",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "Captain Morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774808831497_a09pyl",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "Pina Colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774808831497_36agm6",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "Fresh Orange Juice",
+          "volumeOptionId": "volume_2_3L_30",
+          "volumeLabel": "1L",
+          "price": 42,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774808831497_9duk23",
+          "menuItemId": "m_1773741164354",
+          "category": "non_alcoholic_drinks",
+          "name": "Fresh Orange Juice",
+          "volumeOptionId": "volume_1_2L_20",
+          "volumeLabel": "500ml",
+          "price": 28,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 224
+    },
+    {
+      "id": "ord_1774808855248",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 7,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-29T18:27:35.248Z",
+      "updatedAt": "2026-03-29T22:17:13.527Z",
+      "items": [
+        {
+          "id": "item_1774808855247_rirols",
+          "menuItemId": "m5",
+          "category": "non_alcoholic_drinks",
+          "name": "Mint lemonade",
+          "volumeOptionId": "volume_0_empty_10",
+          "volumeLabel": "",
+          "price": 10,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774811485671_l6o0fw",
+          "menuItemId": "m_1773862719283",
+          "category": "rum",
+          "name": "Captain Morgan",
+          "volumeOptionId": "volume_0_empty_50",
+          "volumeLabel": "",
+          "price": 50,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774811485672_kxxn2z",
+          "menuItemId": "m_1773757074844",
+          "category": "two_component_mixture",
+          "name": "Pina Colada",
+          "volumeOptionId": "volume_0_empty_20",
+          "volumeLabel": "",
+          "price": 20,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774811485672_kiqojy",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true
+        },
+        {
+          "id": "item_1774811485672_7ibb5w",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true
+        }
+      ],
+      "total": 166,
+      "guestContactName": "Blabla",
+      "guestContactPhone": "+972552554358"
+    },
+    {
+      "id": "ord_1774811522241",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 7,
+      "guestContactName": "Blabla",
+      "guestContactPhone": "+972552554358",
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-29T19:12:02.241Z",
+      "updatedAt": "2026-03-29T22:17:11.697Z",
+      "items": [
+        {
+          "id": "item_1774811522241_7se3k8",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        }
+      ],
+      "total": 32
+    },
+    {
+      "id": "ord_1774820494725",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 8,
+      "sessionId": 2,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-29T21:41:34.725Z",
+      "updatedAt": "2026-03-30T17:17:58.300Z",
+      "items": [
+        {
+          "id": "item_1774820494724_lozqrw",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        },
+        {
+          "id": "item_1774820494724_wxmhu6",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        },
+        {
+          "id": "item_1774820494725_tsx4ug",
+          "menuItemId": "m_soft_iced_tea",
+          "category": "non_alcoholic_drinks",
+          "name": "Peach Iced Tea",
+          "volumeOptionId": "volume_soft_iced_tea_330",
+          "volumeLabel": "330ml",
+          "price": 14,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        },
+        {
+          "id": "item_1774820494725_r7fi97",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        }
+      ],
+      "total": 129
+    },
+    {
+      "id": "ord_1774820665040",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 6,
+      "status": "served",
+      "serveMode": "as_ready",
+      "createdAt": "2026-03-29T21:44:25.040Z",
+      "updatedAt": "2026-03-29T22:17:10.487Z",
+      "items": [
+        {
+          "id": "item_1774820665040_51uw8k",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        },
+        {
+          "id": "item_1774820665040_ilkk9h",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 1,
+          "served": true,
+          "note": "__menu_order_cooked__"
+        }
+      ],
+      "total": 83
+    }
+  ],
+  "closedTableSummaries": [
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 1,
+      "closedAt": "2026-03-25T20:26:53.186Z",
+      "total": 736,
+      "orderCount": 7,
+      "orderIds": [
+        "ord_1774118511623",
+        "ord_1774101766987",
+        "ord_dash_20260321_2335",
+        "ord_dash_active_20260321_1210",
+        "ord_1774079537668",
+        "bill_1773740240220",
+        "call_1773740091907"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774118511623",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T18:41:51.623Z",
+          "updatedAt": "2026-03-25T20:24:32.244Z",
+          "items": [
+            {
+              "id": "item_1774118511622_4spy2h",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 2,
+              "served": true
+            },
+            {
+              "id": "item_1774118511623_xu970f",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "pina colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_74so63",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_xd5jiy",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774470272244_adnopc",
+              "menuItemId": "m4",
+              "category": "mains",
+              "name": "Salmon fillet",
+              "price": 78,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 359
+        },
+        {
+          "id": "ord_1774101766987",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T14:02:46.987Z",
+          "updatedAt": "2026-03-21T14:02:46.987Z",
+          "items": [
+            {
+              "id": "item_1774101766987_h76rbz",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        },
+        {
+          "id": "ord_dash_20260321_2335",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T23:35:00.000Z",
+          "updatedAt": "2026-03-21T23:40:00.000Z",
+          "items": [
+            {
+              "id": "item_dash_20260321_2335_1",
+              "menuItemId": "m_1773255842139",
+              "category": "starters",
+              "name": "Omelette 5",
+              "price": 100,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 100
+        },
+        {
+          "id": "ord_dash_active_20260321_1210",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T12:10:00.000Z",
+          "updatedAt": "2026-03-21T18:41:22.753Z",
+          "items": [
+            {
+              "id": "item_dash_active_20260321_1210_1",
+              "menuItemId": "m4",
+              "category": "mains",
+              "name": "Salmon fillet",
+              "price": 78,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774118482753_oehb2c",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774118482753_6k00vo",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "pina colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 148
+        },
+        {
+          "id": "ord_1774079537668",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T07:52:17.668Z",
+          "updatedAt": "2026-03-21T07:52:17.668Z",
+          "items": [
+            {
+              "id": "item_1774079537668_c051k1",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 100
+        },
+        {
+          "id": "bill_1773740240220",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "kind": "bill_request",
+          "status": "served",
+          "createdAt": "2026-03-17T09:37:20.220Z",
+          "updatedAt": "2026-03-17T09:37:20.220Z",
+          "items": [],
+          "total": 0
+        },
+        {
+          "id": "call_1773740091907",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 1,
+          "kind": "waiter_call",
+          "status": "served",
+          "createdAt": "2026-03-17T09:34:51.907Z",
+          "updatedAt": "2026-03-17T09:34:51.907Z",
+          "items": [],
+          "total": 0
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "closedAt": "2026-03-25T20:26:53.489Z",
+      "total": 0,
+      "orderCount": 0,
+      "orderIds": [],
+      "orders": []
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 8,
+      "sessionId": 1,
+      "closedAt": "2026-03-28T11:00:00.000Z",
+      "total": 24,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_1"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_1",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 8,
+          "sessionId": 1,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T10:40:00.000Z",
+          "updatedAt": "2026-03-28T10:58:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_1_item_1",
+              "menuItemId": "m1",
+              "category": "starters",
+              "name": "Hummus with pita",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 24
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 7,
+      "sessionId": 2,
+      "closedAt": "2026-03-28T11:45:00.000Z",
+      "total": 18,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_2"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_2",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 7,
+          "sessionId": 2,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T11:20:00.000Z",
+          "updatedAt": "2026-03-28T11:44:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_2_item_1",
+              "menuItemId": "m5",
+              "category": "drinks",
+              "name": "Mint lemonade",
+              "price": 18,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 18
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T12:50:00.000Z",
+      "total": 29,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_3"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_3",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T12:25:00.000Z",
+          "updatedAt": "2026-03-28T12:49:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_3_item_1",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 29
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T14:00:00.000Z",
+      "total": 32,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_4"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_4",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T13:40:00.000Z",
+          "updatedAt": "2026-03-28T13:58:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_4_item_1",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 32
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 2,
+      "closedAt": "2026-03-28T15:20:00.000Z",
+      "total": 36,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_demo_today_closed_5"
+      ],
+      "orders": [
+        {
+          "id": "ord_demo_today_closed_5",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 5,
+          "sessionId": 2,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T14:55:00.000Z",
+          "updatedAt": "2026-03-28T15:18:00.000Z",
+          "items": [
+            {
+              "id": "ord_demo_today_closed_5_item_1",
+              "menuItemId": "m5",
+              "category": "drinks",
+              "name": "Mint lemonade",
+              "price": 18,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 36
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T18:37:16.073Z",
+      "total": 180,
+      "orderCount": 4,
+      "orderIds": [
+        "ord_dash_20260321_2342",
+        "call_dash_20260321_1224",
+        "ord_dash_active_20260321_1218",
+        "ord_1774639200000"
+      ],
+      "orders": [
+        {
+          "id": "ord_dash_20260321_2342",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T23:42:00.000Z",
+          "updatedAt": "2026-03-21T23:47:00.000Z",
+          "items": [
+            {
+              "id": "item_dash_20260321_2342_1",
+              "menuItemId": "m1",
+              "category": "starters",
+              "name": "Hummus with pita",
+              "price": 24,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_dash_20260321_2342_2",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 78
+        },
+        {
+          "id": "call_dash_20260321_1224",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "kind": "waiter_call",
+          "status": "cancelled",
+          "createdAt": "2026-03-21T12:24:00.000Z",
+          "updatedAt": "2026-03-21T12:55:36.374Z",
+          "items": [],
+          "total": 0
+        },
+        {
+          "id": "ord_dash_active_20260321_1218",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-21T12:18:00.000Z",
+          "updatedAt": "2026-03-28T15:54:38.567Z",
+          "items": [
+            {
+              "id": "item_dash_active_20260321_1218_1",
+              "menuItemId": "m_1773741164354",
+              "category": "non_alcoholic_drinks",
+              "name": "orange juice2",
+              "volumeOptionId": "volume_0_1L",
+              "volumeLabel": "1L",
+              "price": 10,
+              "quantity": 2,
+              "served": true
+            }
+          ],
+          "total": 20
+        },
+        {
+          "id": "ord_1774639200000",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-28T10:20:00.000Z",
+          "updatedAt": "2026-03-28T11:02:00.000Z",
+          "items": [
+            {
+              "id": "item_1774639200000_b1",
+              "menuItemId": "m_1773862719283",
+              "name": "captain morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true,
+              "category": "rum"
+            },
+            {
+              "id": "item_1774639200000_b2",
+              "menuItemId": "m6",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true,
+              "category": "desserts"
+            }
+          ],
+          "total": 82
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 4,
+      "closedAt": "2026-03-28T18:37:18.671Z",
+      "total": 39,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_1774635000000"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774635000000",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 4,
+          "status": "served",
+          "serveMode": "all_at_once",
+          "createdAt": "2026-03-28T09:10:00.000Z",
+          "updatedAt": "2026-03-28T09:48:00.000Z",
+          "items": [
+            {
+              "id": "item_1774635000000_a1",
+              "menuItemId": "m2",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true,
+              "category": "starters"
+            },
+            {
+              "id": "item_1774635000000_a2",
+              "menuItemId": "m5",
+              "name": "Mint lemonade",
+              "volumeOptionId": "volume_0_empty_10",
+              "volumeLabel": "",
+              "price": 10,
+              "quantity": 1,
+              "served": true,
+              "category": "non_alcoholic_drinks"
+            }
+          ],
+          "total": 39
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 5,
+      "closedAt": "2026-03-28T22:21:44.391Z",
+      "total": 424,
+      "orderCount": 4,
+      "orderIds": [
+        "ord_1774736300794",
+        "ord_1774734899992",
+        "ord_1774734314850",
+        "ord_1774732312652"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774736300794",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 5,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-28T22:18:20.794Z",
+          "updatedAt": "2026-03-28T22:18:20.794Z",
+          "items": [
+            {
+              "id": "item_1774736300794_wkppxh",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "Captain Morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774736300794_43oa0s",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 104
+        },
+        {
+          "id": "ord_1774734899992",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 5,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-28T21:54:59.992Z",
+          "updatedAt": "2026-03-28T22:07:09.044Z",
+          "items": [
+            {
+              "id": "item_1774734899991_lbivx3",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 3,
+              "served": true
+            }
+          ],
+          "total": 96
+        },
+        {
+          "id": "ord_1774734314850",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 5,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-28T21:45:14.850Z",
+          "updatedAt": "2026-03-28T21:51:02.968Z",
+          "items": [
+            {
+              "id": "item_1774734314850_5kkcki",
+              "menuItemId": "m_soft_iced_tea",
+              "category": "non_alcoholic_drinks",
+              "name": "Peach Iced Tea",
+              "volumeOptionId": "volume_soft_iced_tea_330",
+              "volumeLabel": "330ml",
+              "price": 14,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774734429408_6e53uo",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 4,
+              "served": true
+            }
+          ],
+          "total": 142
+        },
+        {
+          "id": "ord_1774732312652",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 5,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-28T21:11:52.652Z",
+          "updatedAt": "2026-03-28T21:42:43.435Z",
+          "items": [
+            {
+              "id": "item_1774732312652_p54cfs",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774734163435_rwcpnm",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "Captain Morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 82
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 2,
+      "sessionId": 6,
+      "closedAt": "2026-03-29T22:17:21.494Z",
+      "total": 83,
+      "orderCount": 1,
+      "orderIds": [
+        "ord_1774820665040"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774820665040",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 2,
+          "sessionId": 6,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-29T21:44:25.040Z",
+          "updatedAt": "2026-03-29T22:17:10.487Z",
+          "items": [
+            {
+              "id": "item_1774820665040_51uw8k",
+              "menuItemId": "m2",
+              "category": "starters",
+              "name": "Tabbouleh salad",
+              "price": 29,
+              "quantity": 1,
+              "served": true,
+              "note": "__menu_order_cooked__"
+            },
+            {
+              "id": "item_1774820665040_ilkk9h",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true,
+              "note": "__menu_order_cooked__"
+            }
+          ],
+          "total": 83
+        }
+      ]
+    },
+    {
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 4,
+      "sessionId": 7,
+      "closedAt": "2026-03-29T22:17:52.363Z",
+      "total": 422,
+      "orderCount": 3,
+      "orderIds": [
+        "ord_1774811522241",
+        "ord_1774808855248",
+        "ord_1774794712457"
+      ],
+      "orders": [
+        {
+          "id": "ord_1774811522241",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 7,
+          "guestContactName": "Blabla",
+          "guestContactPhone": "+972552554358",
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-29T19:12:02.241Z",
+          "updatedAt": "2026-03-29T22:17:11.697Z",
+          "items": [
+            {
+              "id": "item_1774811522241_7se3k8",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true,
+              "note": "__menu_order_cooked__"
+            }
+          ],
+          "total": 32
+        },
+        {
+          "id": "ord_1774808855248",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 7,
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-29T18:27:35.248Z",
+          "updatedAt": "2026-03-29T22:17:13.527Z",
+          "items": [
+            {
+              "id": "item_1774808855247_rirols",
+              "menuItemId": "m5",
+              "category": "non_alcoholic_drinks",
+              "name": "Mint lemonade",
+              "volumeOptionId": "volume_0_empty_10",
+              "volumeLabel": "",
+              "price": 10,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774811485671_l6o0fw",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "Captain Morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774811485672_kxxn2z",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "Pina Colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774811485672_kiqojy",
+              "menuItemId": "m3",
+              "category": "mains",
+              "name": "Shawarma plate",
+              "price": 54,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774811485672_7ibb5w",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 166,
+          "guestContactName": "Blabla",
+          "guestContactPhone": "+972552554358"
+        },
+        {
+          "id": "ord_1774794712457",
+          "restaurantSlug": "olive-bistro",
+          "restaurantName": "Olive Bistro",
+          "tableNumber": 4,
+          "sessionId": 7,
+          "guestContactName": "hk",
+          "guestContactPhone": "+972552554358",
+          "status": "served",
+          "serveMode": "as_ready",
+          "createdAt": "2026-03-29T14:31:52.457Z",
+          "updatedAt": "2026-03-29T22:17:15.219Z",
+          "items": [
+            {
+              "id": "item_1774794712457_ypzuj5",
+              "menuItemId": "m6",
+              "category": "desserts",
+              "name": "Kanafeh",
+              "price": 32,
+              "quantity": 2,
+              "served": true
+            },
+            {
+              "id": "item_1774794712457_l63hdh",
+              "menuItemId": "m5",
+              "category": "non_alcoholic_drinks",
+              "name": "Mint lemonade",
+              "volumeOptionId": "volume_0_empty_10",
+              "volumeLabel": "",
+              "price": 10,
+              "quantity": 2,
+              "served": true
+            },
+            {
+              "id": "item_1774808831497_ku8khp",
+              "menuItemId": "m_1773862719283",
+              "category": "rum",
+              "name": "Captain Morgan",
+              "volumeOptionId": "volume_0_empty_50",
+              "volumeLabel": "",
+              "price": 50,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774808831497_a09pyl",
+              "menuItemId": "m_1773757074844",
+              "category": "two_component_mixture",
+              "name": "Pina Colada",
+              "volumeOptionId": "volume_0_empty_20",
+              "volumeLabel": "",
+              "price": 20,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774808831497_36agm6",
+              "menuItemId": "m_1773741164354",
+              "category": "non_alcoholic_drinks",
+              "name": "Fresh Orange Juice",
+              "volumeOptionId": "volume_2_3L_30",
+              "volumeLabel": "1L",
+              "price": 42,
+              "quantity": 1,
+              "served": true
+            },
+            {
+              "id": "item_1774808831497_9duk23",
+              "menuItemId": "m_1773741164354",
+              "category": "non_alcoholic_drinks",
+              "name": "Fresh Orange Juice",
+              "volumeOptionId": "volume_1_2L_20",
+              "volumeLabel": "500ml",
+              "price": 28,
+              "quantity": 1,
+              "served": true
+            }
+          ],
+          "total": 224
+        }
+      ]
+    }
+  ]
+}
