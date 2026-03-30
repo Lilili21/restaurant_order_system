@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 import {
+  ClosedTableOrderSnapshot,
   ClosedTableSummary,
   MenuCategory,
   Order,
@@ -294,7 +295,7 @@ function getCurrentShiftStartTimestampByRules(
 }
 
 function getHappyHourDiscountAmountFromOrder(
-  order: Order,
+  order: Pick<ClosedTableOrderSnapshot, "createdAt" | "items">,
   settings: {
     enabled: boolean;
     discountPercent: number;
@@ -679,15 +680,14 @@ export function TablesOverview() {
             closedDate: closedAtDate.toLocaleDateString("en-GB"),
             closedTime: closedAtDate.toLocaleTimeString("en-GB"),
             type: getItemType(item.category),
-          restaurantName: session.restaurantName,
-          tableNumber: session.tableNumber,
-          sessionId: session.sessionId,
-          orderId: order.id,
-          status: order.status,
+            restaurantName: session.restaurantName,
+            tableNumber: session.tableNumber,
+            sessionId: session.sessionId,
+            orderId: order.id,
             itemName: item.name,
-          quantity: item.quantity,
-          itemTotal: item.price * item.quantity,
-          sessionTotal: session.total
+            quantity: item.quantity,
+            itemTotal: item.price * item.quantity,
+            sessionTotal: session.total
           };
         })
       )
@@ -713,7 +713,6 @@ export function TablesOverview() {
         <th>Table</th>
         <th>Session ID</th>
         <th>Order ID</th>
-        <th>Status</th>
         <th>Type</th>
         <th>Item</th>
         <th>Qty</th>
@@ -729,7 +728,6 @@ export function TablesOverview() {
             <td>${escapeCell(row.tableNumber)}</td>
             <td>${escapeCell(row.sessionId)}</td>
             <td>${escapeCell(row.orderId)}</td>
-            <td>${escapeCell(row.status)}</td>
             <td>${escapeCell(row.type)}</td>
             <td>${escapeCell(row.itemName)}</td>
             <td>${escapeCell(row.quantity)}</td>
@@ -790,7 +788,6 @@ export function TablesOverview() {
             tableNumber: session.tableNumber,
             sessionId: session.sessionId,
             orderId: order.id,
-            status: order.status,
             itemName: item.name,
             quantity: item.quantity,
             itemTotal: item.price * item.quantity,
@@ -820,7 +817,6 @@ export function TablesOverview() {
         <th>Table</th>
         <th>Session ID</th>
         <th>Order ID</th>
-        <th>Status</th>
         <th>Type</th>
         <th>Item</th>
         <th>Qty</th>
@@ -836,7 +832,6 @@ export function TablesOverview() {
             <td>${escapeCell(row.tableNumber)}</td>
             <td>${escapeCell(row.sessionId)}</td>
             <td>${escapeCell(row.orderId)}</td>
-            <td>${escapeCell(row.status)}</td>
             <td>${escapeCell(row.type)}</td>
             <td>${escapeCell(row.itemName)}</td>
             <td>${escapeCell(row.quantity)}</td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
@@ -9,6 +9,10 @@ const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
 const NEW_HIGHLIGHT_MS = 2 * 60 * 1000;
 const COOKED_HIGHLIGHT_MS = 5 * 60 * 1000;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
+const ACTIVE_POLL_MS = 4_000;
+const HIDDEN_POLL_MS = 12_000;
+const INITIAL_RENDERED_ORDERS = 24;
+const RENDER_ORDERS_CHUNK = 16;
 
 const statusLabels = {
   new: "New",
@@ -189,6 +193,8 @@ function getOrderAgeTone(ageMs: number) {
 
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
+  const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
   const [loading, setLoading] = useState(true);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">("hall");
@@ -260,28 +266,76 @@ export function OrdersList() {
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: number | null = null;
+    let loadingInFlight = false;
 
-    async function load() {
-      if (document.visibilityState === "hidden") {
+    function scheduleNextLoad() {
+      if (cancelled) {
         return;
       }
 
-      const response = await fetch("/api/orders");
-      const payload = response.ok ? await response.json() : [];
-      const data = mergeOrdersWithStoredWaiterCalls(payload);
+      const delay =
+        document.visibilityState === "hidden" ? HIDDEN_POLL_MS : ACTIVE_POLL_MS;
+      timeoutId = window.setTimeout(() => {
+        void load();
+      }, delay);
+    }
 
-      if (!cancelled) {
-        setOrders(data);
-        setLoading(false);
+    async function load() {
+      if (cancelled || loadingInFlight) {
+        return;
+      }
+
+      if (document.visibilityState === "hidden") {
+        scheduleNextLoad();
+        return;
+      }
+
+      loadingInFlight = true;
+
+      try {
+        const response = await fetch("/api/orders");
+        const payload = response.ok ? await response.json() : [];
+        const data = mergeOrdersWithStoredWaiterCalls(payload);
+
+        if (!cancelled) {
+          setOrders(data);
+          setCurrentTimestamp(Date.now());
+          setLoading(false);
+        }
+      } finally {
+        loadingInFlight = false;
+
+        if (!cancelled) {
+          scheduleNextLoad();
+        }
       }
     }
 
-    load();
-    const intervalId = window.setInterval(load, 4000);
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      void load();
+    }
+
+    void load();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -299,6 +353,7 @@ export function OrdersList() {
     }
 
     const updatedOrder = (await response.json()) as Order;
+    setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (
         (updatedOrder.kind === "waiter_call" ||
@@ -336,6 +391,7 @@ export function OrdersList() {
     }
 
     const updatedOrder = (await response.json()) as Order;
+    setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (updatedOrder.status === "served" || updatedOrder.status === "cancelled") {
         return current.filter((order) => order.id !== orderId);
@@ -359,6 +415,7 @@ export function OrdersList() {
     }
 
     const updatedOrder = (await response.json()) as Order;
+    setCurrentTimestamp(Date.now());
     setOrders((current) =>
       current.map((order) => (order.id === orderId ? updatedOrder : order))
     );
@@ -382,6 +439,7 @@ export function OrdersList() {
     }
 
     const updatedOrder = (await response.json()) as Order;
+    setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (updatedOrder.status === "served" || updatedOrder.status === "cancelled") {
         return current.filter((order) => order.id !== orderId);
@@ -474,62 +532,214 @@ export function OrdersList() {
     return <p className="muted">Loading incoming orders...</p>;
   }
 
-  const tableOptions = [...new Set(orders.map((order) => order.tableNumber))].sort(
-    (left, right) => left - right
+  const selectedTablesSet = useMemo(() => new Set(selectedTables), [selectedTables]);
+
+  const tableOptions = useMemo(
+    () =>
+      [...new Set(orders.map((order) => order.tableNumber))].sort(
+        (left, right) => left - right
+      ),
+    [orders]
   );
 
-  const currentTimestamp = Date.now();
-  const kitchenBaseOrders = orders.filter(
-    (order) =>
-      (selectedTables.length === 0
-        ? true
-        : selectedTables.includes(order.tableNumber)) &&
-      order.kind !== "waiter_call" &&
-      order.kind !== "bill_request" &&
-      !isCookedOrder(order) &&
-      order.items.some((item) =>
-        item.category ? !barCategories.has(item.category) : true
-      )
-  );
-  const kitchenStatusCounts = {
-    new: kitchenBaseOrders.filter(
-      (order) =>
-        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "new"
-    ).length,
-    on_time: kitchenBaseOrders.filter(
-      (order) =>
-        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "on_time"
-    ).length,
-    late: kitchenBaseOrders.filter(
-      (order) =>
-        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "late"
-    ).length
-  };
-  const filteredOrders = orders.filter((order) =>
-    (selectedTables.length === 0
-      ? true
-      : selectedTables.includes(order.tableNumber)) &&
-    (selectedZone === "hall"
-      ? true
-      : selectedZone === "bar"
-        ? order.kind !== "waiter_call" &&
-          order.kind !== "bill_request" &&
-          order.items.some((item) =>
-            item.category ? barCategories.has(item.category) : false
-          )
-        : order.kind !== "waiter_call" &&
+  const kitchenBaseOrders = useMemo(
+    () =>
+      orders.filter(
+        (order) =>
+          (selectedTablesSet.size === 0
+            ? true
+            : selectedTablesSet.has(order.tableNumber)) &&
+          order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
           !isCookedOrder(order) &&
-          selectedKitchenStatuses.includes(
-            getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp))
-          ) &&
           order.items.some((item) =>
             item.category ? !barCategories.has(item.category) : true
-          ))
-  ).sort(
-    (left, right) =>
-      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+          )
+      ),
+    [orders, selectedTablesSet]
   );
+
+  const kitchenStatusCounts = useMemo(
+    () => ({
+      new: kitchenBaseOrders.filter(
+        (order) =>
+          getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "new"
+      ).length,
+      on_time: kitchenBaseOrders.filter(
+        (order) =>
+          getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "on_time"
+      ).length,
+      late: kitchenBaseOrders.filter(
+        (order) =>
+          getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "late"
+      ).length
+    }),
+    [currentTimestamp, kitchenBaseOrders]
+  );
+
+  const filteredOrders = useMemo(
+    () =>
+      orders
+        .filter((order) =>
+          (selectedTablesSet.size === 0
+            ? true
+            : selectedTablesSet.has(order.tableNumber)) &&
+          (selectedZone === "hall"
+            ? true
+            : selectedZone === "bar"
+              ? order.kind !== "waiter_call" &&
+                order.kind !== "bill_request" &&
+                order.items.some((item) =>
+                  item.category ? barCategories.has(item.category) : false
+                )
+              : order.kind !== "waiter_call" &&
+                order.kind !== "bill_request" &&
+                !isCookedOrder(order) &&
+                selectedKitchenStatuses.includes(
+                  getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp))
+                ) &&
+                order.items.some((item) =>
+                  item.category ? !barCategories.has(item.category) : true
+                ))
+        )
+        .sort(
+          (left, right) =>
+            new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+        ),
+    [
+      currentTimestamp,
+      orders,
+      selectedKitchenStatuses,
+      selectedTablesSet,
+      selectedZone
+    ]
+  );
+
+  const preparedOrders = useMemo(
+    () =>
+      filteredOrders.map((order) => {
+        const isHallView = selectedZone === "hall";
+        const isKitchenView = selectedZone === "kitchen";
+        const isStationView = !isHallView;
+        const isBarView = selectedZone === "bar";
+        const highlightTimestamp = order.updatedAt || order.createdAt;
+        const serveModeLabel = order.serveMode
+          ? serveModeLabels[order.serveMode]
+          : null;
+        const isFreshNewOrder =
+          order.kind !== "waiter_call" &&
+          order.kind !== "bill_request" &&
+          order.status === "new" &&
+          currentTimestamp - new Date(highlightTimestamp).getTime() < NEW_HIGHLIGHT_MS;
+        const visibleItems = isHallView
+          ? order.items
+          : isBarView
+            ? order.items.filter((item) =>
+                item.category ? barCategories.has(item.category) : false
+              )
+            : order.items.filter((item) =>
+                item.category ? !barCategories.has(item.category) : true
+              );
+        const visibleTotal = visibleItems.reduce(
+          (sum, item) => sum + item.price * item.quantity,
+          0
+        );
+        const groupedBarItems = isBarView
+          ? getGroupedBarItems(
+              visibleItems.map((item) => ({
+                id: item.id,
+                name: item.name,
+                volumeLabel: item.volumeLabel,
+                quantity: item.quantity
+              }))
+            )
+          : [];
+        const totalDrinksCount = visibleItems.reduce(
+          (sum, item) => sum + item.quantity,
+          0
+        );
+        const whatsAppLink = getWhatsAppLink(order);
+        const orderAgeMs = getOrderAgeMs(order.createdAt, currentTimestamp);
+        const orderAgeTone = getOrderAgeTone(orderAgeMs);
+        const isTimedOrder =
+          order.kind !== "waiter_call" && order.kind !== "bill_request";
+        const isCooked = isCookedOrder(order);
+        const hallKitchenIndicator = isHallView
+          ? getHallKitchenIndicator(order, currentTimestamp)
+          : null;
+        const kitchenTimerStatus = isKitchenView
+          ? getKitchenTimerStatus(orderAgeMs)
+          : null;
+        const isCookedFreshHighlight =
+          isHallView &&
+          isCooked &&
+          !order.items.some((item) => item.served) &&
+          currentTimestamp - new Date(order.updatedAt || order.createdAt).getTime() <
+            COOKED_HIGHLIGHT_MS;
+
+        return {
+          order,
+          groupedBarItems,
+          hallKitchenIndicator,
+          isBarView,
+          isCooked,
+          isCookedFreshHighlight,
+          isFreshNewOrder,
+          isHallView,
+          isKitchenView,
+          isStationView,
+          isTimedOrder,
+          kitchenTimerStatus,
+          orderAgeMs,
+          orderAgeTone,
+          serveModeLabel,
+          totalDrinksCount,
+          visibleItems,
+          visibleTotal,
+          whatsAppLink
+        };
+      }),
+    [currentTimestamp, filteredOrders, selectedZone]
+  );
+
+  useEffect(() => {
+    setVisibleOrderCount(INITIAL_RENDERED_ORDERS);
+  }, [selectedKitchenStatuses, selectedTables, selectedZone]);
+
+  useEffect(() => {
+    if (preparedOrders.length <= visibleOrderCount) {
+      return;
+    }
+
+    function loadMoreOnScroll() {
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const threshold = document.documentElement.scrollHeight - 800;
+
+      if (scrollBottom < threshold) {
+        return;
+      }
+
+      setVisibleOrderCount((current) =>
+        Math.min(current + RENDER_ORDERS_CHUNK, preparedOrders.length)
+      );
+    }
+
+    window.addEventListener("scroll", loadMoreOnScroll, { passive: true });
+    window.addEventListener("resize", loadMoreOnScroll);
+    loadMoreOnScroll();
+
+    return () => {
+      window.removeEventListener("scroll", loadMoreOnScroll);
+      window.removeEventListener("resize", loadMoreOnScroll);
+    };
+  }, [preparedOrders.length, visibleOrderCount]);
+
+  const visiblePreparedOrders = useMemo(
+    () => preparedOrders.slice(0, visibleOrderCount),
+    [preparedOrders, visibleOrderCount]
+  );
+
+  const hiddenOrdersCount = Math.max(0, preparedOrders.length - visiblePreparedOrders.length);
 
   function toggleTable(tableNumber: number) {
     setSelectedTables((current) =>
@@ -834,67 +1044,28 @@ export function OrdersList() {
               : "orders-grid"
           }
         >
-          {filteredOrders.map((order) => {
-            const isHallView = selectedZone === "hall";
-            const isKitchenView = selectedZone === "kitchen";
-            const isStationView = !isHallView;
-            const isBarView = selectedZone === "bar";
-            const highlightTimestamp = order.updatedAt || order.createdAt;
-            const serveModeLabel = order.serveMode
-              ? serveModeLabels[order.serveMode]
-              : null;
-            const isFreshNewOrder =
-              order.kind !== "waiter_call" &&
-              order.kind !== "bill_request" &&
-              order.status === "new" &&
-              Date.now() - new Date(highlightTimestamp).getTime() < NEW_HIGHLIGHT_MS;
-            const visibleItems =
-              isHallView
-                ? order.items
-                : isBarView
-                ? order.items.filter((item) =>
-                    item.category ? barCategories.has(item.category) : false
-                  )
-                : order.items.filter((item) =>
-                    item.category ? !barCategories.has(item.category) : true
-                  );
-            const visibleTotal = visibleItems.reduce(
-              (sum, item) => sum + item.price * item.quantity,
-              0
-            );
-            const groupedBarItems = isBarView
-              ? getGroupedBarItems(
-                  visibleItems.map((item) => ({
-                    id: item.id,
-                    name: item.name,
-                    volumeLabel: item.volumeLabel,
-                    quantity: item.quantity
-                  }))
-                )
-              : [];
-            const totalDrinksCount = visibleItems.reduce(
-              (sum, item) => sum + item.quantity,
-              0
-            );
-            const whatsAppLink = getWhatsAppLink(order);
-            const orderAgeMs = getOrderAgeMs(order.createdAt, currentTimestamp);
-            const orderAgeTone = getOrderAgeTone(orderAgeMs);
-            const isTimedOrder =
-              order.kind !== "waiter_call" && order.kind !== "bill_request";
-            const isCooked = isCookedOrder(order);
-            const hallKitchenIndicator = isHallView
-              ? getHallKitchenIndicator(order, currentTimestamp)
-              : null;
-            const kitchenTimerStatus = isKitchenView
-              ? getKitchenTimerStatus(orderAgeMs)
-              : null;
-            const isCookedFreshHighlight =
-              isHallView &&
-              isCooked &&
-              !order.items.some((item) => item.served) &&
-              Date.now() - new Date(order.updatedAt || order.createdAt).getTime() <
-                COOKED_HIGHLIGHT_MS;
-
+          {visiblePreparedOrders.map(
+            ({
+              order,
+              groupedBarItems,
+              hallKitchenIndicator,
+              isBarView,
+              isCooked,
+              isCookedFreshHighlight,
+              isFreshNewOrder,
+              isHallView,
+              isKitchenView,
+              isStationView,
+              isTimedOrder,
+              kitchenTimerStatus,
+              orderAgeMs,
+              orderAgeTone,
+              serveModeLabel,
+              totalDrinksCount,
+              visibleItems,
+              visibleTotal,
+              whatsAppLink
+            }) => {
             return (
               <article
                 key={order.id}
@@ -1125,9 +1296,25 @@ export function OrdersList() {
                 </div>
               </article>
             );
-          })}
+            }
+          )}
         </div>
       )}
+      {hiddenOrdersCount > 0 ? (
+        <div className="orders-list-more">
+          <button
+            className="button-neutral"
+            type="button"
+            onClick={() =>
+              setVisibleOrderCount((current) =>
+                Math.min(current + RENDER_ORDERS_CHUNK, preparedOrders.length)
+              )
+            }
+          >
+            Load {Math.min(RENDER_ORDERS_CHUNK, hiddenOrdersCount)} more orders
+          </button>
+        </div>
+      ) : null}
       </div>
     </>
   );

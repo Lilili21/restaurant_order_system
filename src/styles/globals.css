@@ -2706,6 +2706,7 @@ textarea.modal-input {
 }
 
 .order-card--compact .order-card__header {
+  align-items: start;
   gap: 10px;
 }
 
@@ -2755,6 +2756,7 @@ textarea.modal-input {
   gap: 6px;
   text-align: right;
   min-width: 140px;
+  align-content: start;
 }
 
 .order-time {
@@ -2936,10 +2938,12 @@ textarea.modal-input {
 .order-bar-group {
   display: grid;
   gap: 8px;
+  align-content: start;
 }
 
 .order-bar-group__title {
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .order-bar-group__single-line {
@@ -2960,6 +2964,7 @@ textarea.modal-input {
   gap: 8px;
   color: var(--control-copy-muted);
   justify-content: flex-start;
+  line-height: 1.15;
 }
 
 .order-bar-group__dash {
@@ -3961,15 +3966,35 @@ textarea.modal-input {
 .closed-actions {
   display: flex;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .tables-action-button {
+  display: inline-flex;
+  align-items: center;
   min-height: 52px;
-  min-width: 240px;
   width: auto;
   align-self: flex-start;
   justify-content: center;
   font-weight: 700;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+  padding: 0 18px;
+}
+
+.table-card .order-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.table-card .tables-action-button {
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
 }
 
 .closed-details {

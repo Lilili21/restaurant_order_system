@@ -137,6 +137,12 @@ export type TableOverview = {
   orders: Order[];
 };
 
+export type ClosedTableOrderSnapshot = {
+  id: string;
+  createdAt: string;
+  items: OrderItem[];
+};
+
 export type ClosedTableSummary = {
   restaurantSlug: string;
   restaurantName: string;
@@ -146,5 +152,5 @@ export type ClosedTableSummary = {
   total: number;
   orderCount: number;
   orderIds: string[];
-  orders: Order[];
+  orders: ClosedTableOrderSnapshot[];
 };

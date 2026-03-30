@@ -1,6 +1,7 @@
 import { initialOrders } from "@/lib/mock-data";
 import { getMenuSettings, PromotionSettings } from "@/lib/menu-settings";
 import {
+  ClosedTableOrderSnapshot,
   CartItem,
   ClosedTableSummary,
   MenuItem,
@@ -71,6 +72,7 @@ const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
 const ORDERS_STATE_CACHE_TTL_MS = 2_000;
+const MENU_LOOKUP_CACHE_TTL_MS = 60 * 1000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
 const MERGE_ORDER_WINDOW_MS = 3 * 60 * 1000;
@@ -102,9 +104,18 @@ type OrdersStateCacheEntry = {
   expiresAt: number;
 };
 
+type MenuLookupCacheEntry = {
+  lookup: Map<string, MenuItem>;
+  expiresAt: number;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var __ordersStateCache: OrdersStateCacheEntry | undefined;
+  // eslint-disable-next-line no-var
+  var __ordersPersistedPayload: string | undefined;
+  // eslint-disable-next-line no-var
+  var __menuLookupCache: Map<string, MenuLookupCacheEntry> | undefined;
   // eslint-disable-next-line no-var
   var __orderRequestCache:
     | Map<
@@ -260,6 +271,14 @@ function getWeekLabel(weekKey: string) {
   }
 
   return `${dateRange.start} - ${dateRange.end}`;
+}
+
+function buildOrdersPersistencePayload(state: RuntimeState): OrdersPersistence {
+  return {
+    orders: state.ordersStore,
+    currentTableSessions: [...state.currentTableSessions.entries()],
+    closedTableSummaries: state.closedTableSummaries
+  };
 }
 
 function getWeeklyArchivePath(weekKey: string) {
@@ -602,7 +621,8 @@ function cloneOrdersPersistence(state: OrdersPersistence): OrdersPersistence {
       ...summary,
       orderIds: [...summary.orderIds],
       orders: summary.orders.map((order) => ({
-        ...order,
+        id: order.id,
+        createdAt: order.createdAt,
         items: order.items.map((item) => ({ ...item }))
       }))
     }))
@@ -890,8 +910,22 @@ function isMissingTableError(error: unknown) {
 }
 
 async function getMenuLookupForRestaurant(restaurantSlug: string) {
+  globalThis.__menuLookupCache ??= new Map();
+  const cachedLookup = globalThis.__menuLookupCache.get(restaurantSlug);
+
+  if (cachedLookup && cachedLookup.expiresAt > Date.now()) {
+    return cachedLookup.lookup;
+  }
+
   const menuItems = await getAllMenuItems(restaurantSlug);
-  return new Map(menuItems.map((menuItem) => [menuItem.id, menuItem] as const));
+  const lookup = new Map(menuItems.map((menuItem) => [menuItem.id, menuItem] as const));
+
+  globalThis.__menuLookupCache.set(restaurantSlug, {
+    lookup,
+    expiresAt: Date.now() + MENU_LOOKUP_CACHE_TTL_MS
+  });
+
+  return lookup;
 }
 
 type MenuLookupByRestaurant = Map<string, Map<string, MenuItem>>;
@@ -933,6 +967,83 @@ async function normalizePersistedOrder(
     items,
     total: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
   };
+}
+
+async function normalizeClosedTableOrderSnapshot(
+  order: ClosedTableOrderSnapshot,
+  menuLookup?: Map<string, MenuItem>
+): Promise<ClosedTableOrderSnapshot> {
+  return {
+    id: order.id,
+    createdAt: order.createdAt,
+    items: await Promise.all(
+      (order.items ?? []).map((item) => normalizeOrderItemForAdmin(item, menuLookup))
+    )
+  };
+}
+
+function toClosedTableOrderSnapshot(
+  order: Pick<Order, "id" | "createdAt" | "items">
+): ClosedTableOrderSnapshot {
+  return {
+    id: order.id,
+    createdAt: order.createdAt,
+    items: order.items.map((item) => ({ ...item }))
+  };
+}
+
+function removeClosedSessionOrdersFromActiveState(state: RuntimeState) {
+  const closedOrderIds = new Set(
+    state.closedTableSummaries.flatMap((summary) => summary.orderIds ?? [])
+  );
+
+  if (closedOrderIds.size === 0) {
+    return false;
+  }
+
+  const nextOrders = state.ordersStore.filter((order) => !closedOrderIds.has(order.id));
+
+  if (nextOrders.length === state.ordersStore.length) {
+    return false;
+  }
+
+  state.ordersStore = nextOrders;
+  return true;
+}
+
+function compactClosedTableSummaries(state: RuntimeState) {
+  let changed = false;
+
+  state.closedTableSummaries = state.closedTableSummaries.map((summary) => {
+    const nextOrders = (summary.orders ?? []).map((order) => {
+      const compactOrder = toClosedTableOrderSnapshot(order);
+
+      if (
+        "restaurantSlug" in order ||
+        "restaurantName" in order ||
+        "tableNumber" in order ||
+        "sessionId" in order ||
+        "status" in order ||
+        "total" in order ||
+        "kind" in order ||
+        "updatedAt" in order ||
+        "guestContactName" in order ||
+        "guestContactPhone" in order ||
+        "serveMode" in order
+      ) {
+        changed = true;
+      }
+
+      return compactOrder;
+    });
+
+    return {
+      ...summary,
+      orders: nextOrders
+    };
+  });
+
+  return changed;
 }
 
 function createDefaultTableSessions() {
@@ -1228,17 +1339,8 @@ async function loadStateFromLegacySupabase(
 
   if (Array.isArray(parsed.closedTableSummaries)) {
     for (const summary of parsed.closedTableSummaries) {
-      if (Array.isArray(summary?.orders)) {
-        for (const order of summary.orders) {
-          if (
-            order &&
-            typeof order.restaurantSlug === "string" &&
-            order.kind !== "waiter_call" &&
-            order.kind !== "bill_request"
-          ) {
-            restaurantSlugs.add(order.restaurantSlug);
-          }
-        }
+      if (summary && typeof summary.restaurantSlug === "string") {
+        restaurantSlugs.add(summary.restaurantSlug);
       }
     }
   }
@@ -1268,9 +1370,9 @@ async function loadStateFromLegacySupabase(
           orders: Array.isArray(summary.orders)
             ? await Promise.all(
                 summary.orders.map((order) =>
-                  normalizePersistedOrder(
-                    order as Order,
-                    menuLookupByRestaurant
+                  normalizeClosedTableOrderSnapshot(
+                    order as ClosedTableOrderSnapshot,
+                    menuLookupByRestaurant.get(summary.restaurantSlug)
                   )
                 )
               )
@@ -1506,13 +1608,17 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
   const staleClosedSummariesPruned = await pruneClosedTableSummariesByWorkingDay(
     state
   );
+  const activeOrdersTrimmed = removeClosedSessionOrdersFromActiveState(state);
+  const closedSummariesCompacted = compactClosedTableSummaries(state);
 
   if (
     expiredShiftOrdersClosed ||
     staleServiceRequestsClosed ||
     shiftedSessionsRotated ||
     completedShiftOrdersArchived ||
-    staleClosedSummariesPruned
+    staleClosedSummariesPruned ||
+    activeOrdersTrimmed ||
+    closedSummariesCompacted
   ) {
     await persistStateAsync(state);
   }
@@ -1533,13 +1639,17 @@ function persistState(state: RuntimeState) {
     mkdirSync(DATA_DIR, { recursive: true });
   }
 
-  const payload = {
-    orders: state.ordersStore,
-    currentTableSessions: [...state.currentTableSessions.entries()],
-    closedTableSummaries: state.closedTableSummaries
-  } satisfies OrdersPersistence;
+  const payload = buildOrdersPersistencePayload(state);
+  const serializedPayload = JSON.stringify(payload, null, 2);
+  const previousPayload =
+    globalThis.__ordersPersistedPayload ??
+    (existsSync(ORDERS_STORE_PATH) ? readFileSync(ORDERS_STORE_PATH, "utf8") : undefined);
 
-  writeFileSync(ORDERS_STORE_PATH, JSON.stringify(payload, null, 2), "utf8");
+  if (previousPayload !== serializedPayload) {
+    writeFileSync(ORDERS_STORE_PATH, serializedPayload, "utf8");
+    globalThis.__ordersPersistedPayload = serializedPayload;
+  }
+
   setOrdersStateCache(payload);
 }
 
@@ -1551,11 +1661,7 @@ async function persistStateAsync(state: RuntimeState) {
     return;
   }
 
-  const payload = {
-    orders: state.ordersStore,
-    currentTableSessions: [...state.currentTableSessions.entries()],
-    closedTableSummaries: state.closedTableSummaries
-  } satisfies OrdersPersistence;
+  const payload = buildOrdersPersistencePayload(state);
 
   try {
     await persistStateToRowSupabase(supabase, state);
@@ -1729,7 +1835,11 @@ function applyHappyHourDiscount(
   return Number(Math.max(0, price * discountMultiplier).toFixed(2));
 }
 
-async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
+async function mergeOrderItems(
+  order: Order,
+  nextItems: OrderItem[],
+  menuLookup?: Map<string, MenuItem>
+) {
   const mergedItems = [...order.items];
   const now = new Date().toISOString();
 
@@ -1752,13 +1862,17 @@ async function mergeOrderItems(order: Order, nextItems: OrderItem[]) {
 
   order.items = mergedItems;
   order.updatedAt = now;
-  return normalizeOrderState(order);
+  return normalizeOrderState(order, menuLookup);
 }
 
-async function normalizeOrderState(order: Order) {
-  const menuLookup = await getMenuLookupForRestaurant(order.restaurantSlug);
+async function normalizeOrderState(
+  order: Order,
+  menuLookup?: Map<string, MenuItem>
+) {
+  const resolvedMenuLookup =
+    menuLookup ?? (await getMenuLookupForRestaurant(order.restaurantSlug));
   order.items = await Promise.all(
-    order.items.map((item) => normalizeOrderItemForAdmin(item, menuLookup))
+    order.items.map((item) => normalizeOrderItemForAdmin(item, resolvedMenuLookup))
   );
 
   if (order.kind === "waiter_call" || order.kind === "bill_request") {
@@ -2072,7 +2186,7 @@ export async function createOrder(input: {
       );
     }
 
-    return normalizeOrderState(repeatedPayloadOrder);
+    return normalizeOrderState(repeatedPayloadOrder, menuLookup);
   }
 
   const existingNewOrder = state.ordersStore.find(
@@ -2093,7 +2207,7 @@ export async function createOrder(input: {
       guestContactPhone: input.guestContactPhone
     })
   ) {
-    const mergedOrder = await mergeOrderItems(existingNewOrder, items);
+    const mergedOrder = await mergeOrderItems(existingNewOrder, items, menuLookup);
 
     if (!normalizeGuestContactValue(mergedOrder.guestContactName)) {
       mergedOrder.guestContactName = normalizeGuestContactValue(input.guestContactName);
@@ -2493,13 +2607,11 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     total: orders.reduce((sum, order) => sum + order.total, 0),
     orderCount: orders.length,
     orderIds: orders.map((order) => order.id),
-    orders: orders.map((order) => ({
-      ...order,
-      items: order.items.map((item) => ({ ...item }))
-    }))
+    orders: orders.map((order) => toClosedTableOrderSnapshot(order))
   };
 
   state.closedTableSummaries.unshift(summary);
+  state.ordersStore = state.ordersStore.filter((order) => !summary.orderIds.includes(order.id));
   state.currentTableSessions.set(
     createTableKey(restaurantSlug, tableNumber),
     sessionId + 1
