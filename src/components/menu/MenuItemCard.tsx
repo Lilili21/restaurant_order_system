@@ -14,6 +14,9 @@ const badgeMeta: Record<
   spicy: { icon: "🌶️", label: { he: "חריף", en: "Spicy" } },
   kids_favorite: { icon: "🧸", label: { he: "אהוב על ילדים", en: "Kids favorite" } },
   new: { icon: "🆕", label: { he: "חדש", en: "New" } },
+  kosher: { icon: "Ⓚ", label: { he: "כשר", en: "Kosher" } },
+  meat: { icon: "🥩", label: { he: "בשרי", en: "Meat" } },
+  dairy: { icon: "🧀", label: { he: "חלבי", en: "Dairy" } },
   gluten_free: { icon: "🌾", label: { he: "ללא גלוטן", en: "Gluten free" } },
   dairy_free: { icon: "🥛", label: { he: "ללא חלב", en: "Dairy free" } },
   nut_free: { icon: "🥜", label: { he: "ללא אגוזים", en: "Nut free" } }

@@ -1688,6 +1688,10 @@ button:disabled {
   gap: 12px;
 }
 
+.order-items--compact {
+  gap: 10px;
+}
+
 .menu-card {
   overflow: hidden;
   border-radius: 24px;
@@ -2927,6 +2931,48 @@ textarea.modal-input {
 
 .order-card--compact .order-item-qty {
   font-size: 0.92rem;
+}
+
+.order-bar-group {
+  display: grid;
+  gap: 8px;
+}
+
+.order-bar-group__title {
+  font-weight: 800;
+}
+
+.order-bar-group__single-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.order-bar-group__variants {
+  display: grid;
+  gap: 6px;
+}
+
+.order-bar-group__variant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--control-copy-muted);
+  justify-content: flex-start;
+}
+
+.order-bar-group__dash {
+  color: var(--text);
+}
+
+.order-bar-group__variant-label {
+  min-width: 0;
+}
+
+.order-bar-group__variant-qty {
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .orders-filter {

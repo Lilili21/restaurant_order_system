@@ -41,11 +41,11 @@ const analyticsBlocks = [
     icon: "🟢",
     title: "Live status",
     stats: [
-      { label: "Revenue", value: "—" },
-      { label: "Avg Check", value: "—" },
-      { label: "Orders", value: "—" },
-      { label: "Active Orders", value: "—" },
-      { label: "Waiter Calls", value: "—" }
+      { label: "Revenue", value: "0" },
+      { label: "Avg Check", value: "0" },
+      { label: "Orders", value: "0" },
+      { label: "Active Orders", value: "0" },
+      { label: "Waiter Calls", value: "0" }
     ]
   },
   { icon: "🟡", title: "Daily status" }
@@ -729,16 +729,16 @@ function ControlCenterDashboardComponent({
                       }
                     >
                       {stat.label === "Revenue"
-                        ? insightStats.revenue || "—"
+                        ? insightStats.revenue || "0"
                         : stat.label === "Avg Check"
-                          ? insightStats.avgCheck || "—"
+                          ? insightStats.avgCheck || "0"
                           : stat.label === "Orders"
-                            ? insightStats.orders || "—"
+                            ? insightStats.orders || "0"
                             : stat.label === "Active Orders"
-                              ? insightStats.activeOrders || "—"
+                              ? insightStats.activeOrders || "0"
                               : stat.label === "Waiter Calls"
                                 ? insightStats.waiterCalls
-                                : "—"}
+                                : "0"}
                     </strong>
                     <span className="control-center-analytics__stat-comparison">
                       {stat.label === "Revenue"

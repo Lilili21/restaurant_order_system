@@ -75,6 +75,9 @@ const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
   { value: "spicy", label: "🌶️ Spicy" },
   { value: "kids_favorite", label: "🧸 Kids favorite" },
   { value: "new", label: "🆕 New" },
+  { value: "kosher", label: "Ⓚ Kosher" },
+  { value: "meat", label: "🥩 Meat" },
+  { value: "dairy", label: "🧀 Dairy" },
   { value: "gluten_free", label: "🌾 Gluten free" },
   { value: "dairy_free", label: "🥛 Dairy free" },
   { value: "nut_free", label: "🥜 Nut free" }
@@ -548,14 +551,14 @@ export function MenuEditor() {
   const [barOpenSaving, setBarOpenSaving] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [insightStats, setInsightStats] = useState<InsightStats>({
-    revenue: "—",
-    avgCheck: "—",
-    orders: "—",
-    activeOrders: "—",
+    revenue: "0",
+    avgCheck: "0",
+    orders: "0",
+    activeOrders: "0",
     topDish: "—",
     lowDish: "—",
     peakHour: "—",
-    waiterCalls: "—",
+    waiterCalls: "0",
     globalInsight: "",
     globalInsightStatus: "same",
     vsYesterday: {
@@ -1312,26 +1315,26 @@ export function MenuEditor() {
             revenue:
               typeof analytics.insights?.revenue === "number"
                 ? formatCurrency(analytics.insights.revenue)
-                : "—",
+                : "0",
             avgCheck:
               typeof analytics.insights?.avgCheck === "number"
                 ? formatCurrency(analytics.insights.avgCheck)
-                : "—",
+                : "0",
             orders:
               analytics.insights?.orders !== undefined
                 ? String(analytics.insights.orders)
-                : "—",
+                : "0",
             activeOrders:
               analytics.insights?.activeOrders !== undefined
                 ? String(analytics.insights.activeOrders)
-                : "—",
+                : "0",
             topDish: analytics.insights?.topDish || "—",
             lowDish: analytics.insights?.lowDish || "—",
             peakHour: analytics.insights?.peakHour || "—",
             waiterCalls:
               analytics.insights?.waiterCalls !== undefined
                 ? String(analytics.insights.waiterCalls)
-                : "—",
+                : "0",
             globalInsight:
               typeof analytics.insights?.globalInsight === "string"
                 ? analytics.insights.globalInsight

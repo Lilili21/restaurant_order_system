@@ -45,6 +45,9 @@ export type MenuBadge =
   | "spicy"
   | "kids_favorite"
   | "new"
+  | "kosher"
+  | "meat"
+  | "dairy"
   | "gluten_free"
   | "dairy_free"
   | "nut_free";

@@ -2221,7 +2221,7 @@ export function Cart({
                       <div className="order-card__header">
                         <div>
                           <strong>
-                            {formatOrderLabel(order.updatedAt || order.createdAt)}
+                            {formatOrderLabel(order.createdAt)}
                           </strong>
                         </div>
                         {getOrderStatusLabel(order.status) ? (

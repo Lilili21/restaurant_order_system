@@ -130,6 +130,30 @@ function getKitchenStage(ageMs: number) {
   return "late" as const;
 }
 
+function getGroupedBarItems(
+  items: Array<{ id: string; name: string; volumeLabel?: string; quantity: number }>
+) {
+  const groups = new Map<
+    string,
+    Array<{ id: string; volumeLabel?: string; quantity: number }>
+  >();
+
+  for (const item of items) {
+    const current = groups.get(item.name) ?? [];
+    current.push({
+      id: item.id,
+      volumeLabel: item.volumeLabel,
+      quantity: item.quantity
+    });
+    groups.set(item.name, current);
+  }
+
+  return [...groups.entries()].map(([name, variants]) => ({
+    name,
+    variants
+  }));
+}
+
 function getOrderAgeMs(createdAt: string, now: number) {
   return Math.max(0, now - new Date(createdAt).getTime());
 }
@@ -838,6 +862,20 @@ export function OrdersList() {
               (sum, item) => sum + item.price * item.quantity,
               0
             );
+            const groupedBarItems = isBarView
+              ? getGroupedBarItems(
+                  visibleItems.map((item) => ({
+                    id: item.id,
+                    name: item.name,
+                    volumeLabel: item.volumeLabel,
+                    quantity: item.quantity
+                  }))
+                )
+              : [];
+            const totalDrinksCount = visibleItems.reduce(
+              (sum, item) => sum + item.quantity,
+              0
+            );
             const whatsAppLink = getWhatsAppLink(order);
             const orderAgeMs = getOrderAgeMs(order.createdAt, currentTimestamp);
             const orderAgeTone = getOrderAgeTone(orderAgeMs);
@@ -886,6 +924,9 @@ export function OrdersList() {
                           ? " · Bill request"
                         : ""}
                     </h3>
+                    {isBarView ? (
+                      <p className="muted">Drinks {totalDrinksCount}</p>
+                    ) : null}
                     {order.kind !== "waiter_call" &&
                     order.kind !== "bill_request" &&
                     isHallView &&
@@ -948,7 +989,7 @@ export function OrdersList() {
                         </span>
                       </div>
                     ) : null}
-                    {isKitchenView ? null : (
+                    {isKitchenView || isBarView ? null : (
                       <div className="order-time">
                         <span className="order-time__label">Order time</span>
                         <span className="order-time__value">
@@ -963,6 +1004,44 @@ export function OrdersList() {
                   <p className="order-callout">A guest is asking for staff at the table.</p>
                 ) : order.kind === "bill_request" ? (
                   <p className="order-callout">A guest is asking for the bill.</p>
+                ) : isBarView ? (
+                  <div className="order-items order-items--compact">
+                    {groupedBarItems.map((group) => (
+                      <div key={group.name} className="order-bar-group">
+                        {group.variants.every((variant) => !variant.volumeLabel?.trim()) ? (
+                          <div className="order-bar-group__single-line">
+                            <span className="order-bar-group__title">{group.name}</span>
+                            <span className="order-bar-group__variant-qty">
+                              x
+                              {group.variants.reduce(
+                                (sum, variant) => sum + variant.quantity,
+                                0
+                              )}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="order-bar-group__title">{group.name}:</div>
+                            <div className="order-bar-group__variants">
+                              {group.variants.map((variant) => (
+                                <div key={variant.id} className="order-bar-group__variant">
+                                  <span className="order-bar-group__dash" aria-hidden="true">
+                                    -
+                                  </span>
+                                  <span className="order-bar-group__variant-label">
+                                    {variant.volumeLabel}
+                                  </span>
+                                  <span className="order-bar-group__variant-qty">
+                                    x{variant.quantity}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="order-items">
                     {visibleItems.map((item) => (
@@ -1012,7 +1091,7 @@ export function OrdersList() {
                     >
                       OK
                     </button>
-                  ) : isKitchenView ? (
+                  ) : isKitchenView || isBarView ? (
                     <button
                       className="button-success order-action-ready"
                       type="button"

@@ -615,12 +615,12 @@ export async function GET(request: NextRequest) {
       insights: {
         revenue: closedSessionsInCurrentShift.length
           ? Number(closedSessionsInCurrentShiftRevenue.toFixed(2))
-          : "—",
+          : 0,
         avgCheck: closedSessionsInCurrentShift.length
           ? Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2))
-          : "—",
-        orders: totalTablesOrdersCount || "—",
-        activeOrders: activeTablesCount || "—",
+          : 0,
+        orders: totalTablesOrdersCount,
+        activeOrders: activeTablesCount,
         topDish: currentShiftWindow
           ? getUniqueDishNames(recentDishItems, "desc")
           : "—",
@@ -663,10 +663,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         insights: {
-          revenue: "—",
-          avgCheck: "—",
-          orders: "—",
-          activeOrders: "—",
+          revenue: 0,
+          avgCheck: 0,
+          orders: 0,
+          activeOrders: 0,
           topDish: "—",
           lowDish: "—",
           peakHour: "—",
