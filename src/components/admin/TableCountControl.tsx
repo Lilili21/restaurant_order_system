@@ -13,7 +13,7 @@ type SecondaryCredentials = {
 };
 
 type TableCountControlProps = {
-  credentials: SecondaryCredentials;
+  credentials: SecondaryCredentials | null;
   restaurantSlug: string;
   onOpen?: () => void;
 };
@@ -74,8 +74,12 @@ export function TableCountControl({
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-secondary-login": credentials.login,
-        "x-admin-secondary-password": credentials.password
+        ...(credentials
+          ? {
+              "x-admin-secondary-login": credentials.login,
+              "x-admin-secondary-password": credentials.password
+            }
+          : {})
       },
       body: JSON.stringify({
         tableCount: draftCount

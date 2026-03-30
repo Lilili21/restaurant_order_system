@@ -9,6 +9,7 @@ import {
   createWaiterCall,
   getOrders,
   updateOrderGuestContact,
+  updateOrderCooked,
   updateOrderItemServed,
   updateOrderStatus
 } from "@/lib/orders";
@@ -203,6 +204,7 @@ export async function PATCH(request: NextRequest) {
     status?: OrderStatus;
     orderItemId?: string;
     served?: boolean;
+    cooked?: boolean;
     quantityDelta?: number;
     guestContactName?: string;
     guestContactPhone?: string;
@@ -266,6 +268,8 @@ export async function PATCH(request: NextRequest) {
           )
         : typeof body.orderItemId === "string" && typeof body.served === "boolean"
         ? await updateOrderItemServed(body.orderId, body.orderItemId, body.served)
+        : typeof body.cooked === "boolean"
+          ? await updateOrderCooked(body.orderId, body.cooked)
         : body.status
           ? await updateOrderStatus(body.orderId, body.status)
           : (() => {

@@ -7,6 +7,8 @@ import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
 const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
 const NEW_HIGHLIGHT_MS = 2 * 60 * 1000;
+const COOKED_HIGHLIGHT_MS = 5 * 60 * 1000;
+const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
 
 const statusLabels = {
   new: "New",
@@ -57,11 +59,118 @@ function getWhatsAppLink(order: Order) {
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
 }
 
+function isCookedOrder(order: Order) {
+  return (
+    order.kind !== "waiter_call" &&
+    order.kind !== "bill_request" &&
+    order.items.length > 0 &&
+    order.items.some((item) =>
+      typeof item.note === "string" ? item.note.includes("__menu_order_cooked__") : false
+    )
+  );
+}
+
+function getHallKitchenIndicator(order: Order, now: number) {
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
+    return null;
+  }
+
+  if (isCookedOrder(order)) {
+    return {
+      label: "Cooked",
+      className: "status-pill status-pill--kitchen-cooked"
+    };
+  }
+
+  if (getOrderAgeMs(order.createdAt, now) >= AUTO_COOKING_AFTER_MS) {
+    return {
+      label: "Is cooking",
+      className: "status-pill status-pill--kitchen-cooking"
+    };
+  }
+
+  return {
+    label: "New",
+    className: "status-pill status-pill--kitchen-new"
+  };
+}
+
+function getKitchenTimerStatus(ageMs: number) {
+  const stage = getKitchenStage(ageMs);
+
+  if (stage === "new") {
+    return {
+      label: "New",
+      className: "order-kitchen-timer__status order-kitchen-timer__status--neutral"
+    };
+  }
+
+  if (stage === "on_time") {
+    return {
+      label: "On time",
+      className: "order-kitchen-timer__status order-kitchen-timer__status--orange"
+    };
+  }
+
+  return {
+    label: "Late",
+    className: "order-kitchen-timer__status order-kitchen-timer__status--danger"
+  };
+}
+
+function getKitchenStage(ageMs: number) {
+  if (ageMs < AUTO_COOKING_AFTER_MS) {
+    return "new" as const;
+  }
+
+  if (ageMs < 10 * 60 * 1000) {
+    return "on_time" as const;
+  }
+
+  return "late" as const;
+}
+
+function getOrderAgeMs(createdAt: string, now: number) {
+  return Math.max(0, now - new Date(createdAt).getTime());
+}
+
+function formatOrderAge(ageMs: number) {
+  const totalMinutes = Math.floor(ageMs / 60000);
+  const totalSeconds = Math.floor(ageMs / 1000);
+
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+
+  if (totalMinutes > 0) {
+    return `${totalMinutes} min`;
+  }
+
+  return `${Math.max(1, totalSeconds)} sec`;
+}
+
+function getOrderAgeTone(ageMs: number) {
+  if (ageMs < AUTO_COOKING_AFTER_MS) {
+    return "neutral";
+  }
+
+  if (ageMs < 10 * 60 * 1000) {
+    return "orange";
+  }
+
+  return "danger";
+}
+
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">("hall");
+  const [selectedKitchenStatuses, setSelectedKitchenStatuses] = useState<
+    Array<"new" | "on_time" | "late">
+  >(["new", "on_time", "late"]);
   const [authOrder, setAuthOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editedQuantities, setEditedQuantities] = useState<Record<string, number>>({});
@@ -212,6 +321,25 @@ export function OrdersList() {
     });
   }
 
+  async function toggleOrderCooked(orderId: string, cooked: boolean) {
+    const response = await fetch("/api/orders", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ orderId, cooked })
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const updatedOrder = (await response.json()) as Order;
+    setOrders((current) =>
+      current.map((order) => (order.id === orderId ? updatedOrder : order))
+    );
+  }
+
   async function changeOrderItemQuantity(
     orderId: string,
     orderItemId: string,
@@ -326,6 +454,33 @@ export function OrdersList() {
     (left, right) => left - right
   );
 
+  const currentTimestamp = Date.now();
+  const kitchenBaseOrders = orders.filter(
+    (order) =>
+      (selectedTables.length === 0
+        ? true
+        : selectedTables.includes(order.tableNumber)) &&
+      order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
+      !isCookedOrder(order) &&
+      order.items.some((item) =>
+        item.category ? !barCategories.has(item.category) : true
+      )
+  );
+  const kitchenStatusCounts = {
+    new: kitchenBaseOrders.filter(
+      (order) =>
+        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "new"
+    ).length,
+    on_time: kitchenBaseOrders.filter(
+      (order) =>
+        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "on_time"
+    ).length,
+    late: kitchenBaseOrders.filter(
+      (order) =>
+        getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp)) === "late"
+    ).length
+  };
   const filteredOrders = orders.filter((order) =>
     (selectedTables.length === 0
       ? true
@@ -340,9 +495,16 @@ export function OrdersList() {
           )
         : order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
+          !isCookedOrder(order) &&
+          selectedKitchenStatuses.includes(
+            getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp))
+          ) &&
           order.items.some((item) =>
             item.category ? !barCategories.has(item.category) : true
           ))
+  ).sort(
+    (left, right) =>
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
   );
 
   function toggleTable(tableNumber: number) {
@@ -350,6 +512,14 @@ export function OrdersList() {
       current.includes(tableNumber)
         ? current.filter((value) => value !== tableNumber)
         : [...current, tableNumber].sort((left, right) => left - right)
+    );
+  }
+
+  function toggleKitchenStatus(status: "new" | "on_time" | "late") {
+    setSelectedKitchenStatuses((current) =>
+      current.includes(status)
+        ? current.filter((value) => value !== status)
+        : [...current, status]
     );
   }
 
@@ -589,12 +759,57 @@ export function OrdersList() {
           ))}
         </div>
         </div>
+        {selectedZone === "kitchen" ? (
+          <div className="orders-filter__row">
+            <div className="orders-filter__chips orders-filter__chips--nested">
+              <button
+                type="button"
+                className={
+                  selectedKitchenStatuses.includes("new")
+                    ? "orders-filter__chip orders-filter__chip--kitchen-light orders-filter__chip--active"
+                    : "orders-filter__chip orders-filter__chip--kitchen-light"
+                }
+                onClick={() => toggleKitchenStatus("new")}
+              >
+                New • {kitchenStatusCounts.new}
+              </button>
+              <button
+                type="button"
+                className={
+                  selectedKitchenStatuses.includes("on_time")
+                    ? "orders-filter__chip orders-filter__chip--kitchen-neutral orders-filter__chip--active"
+                    : "orders-filter__chip orders-filter__chip--kitchen-neutral"
+                }
+                onClick={() => toggleKitchenStatus("on_time")}
+              >
+                On time • {kitchenStatusCounts.on_time}
+              </button>
+              <button
+                type="button"
+                className={
+                  selectedKitchenStatuses.includes("late")
+                    ? "orders-filter__chip orders-filter__chip--kitchen-late orders-filter__chip--active"
+                    : "orders-filter__chip orders-filter__chip--kitchen-late"
+                }
+                onClick={() => toggleKitchenStatus("late")}
+              >
+                Late • {kitchenStatusCounts.late}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {!filteredOrders.length ? (
         <p className="muted">No active orders for the selected table.</p>
       ) : (
-        <div className="orders-grid">
+        <div
+          className={
+            selectedZone === "kitchen"
+              ? "orders-grid orders-grid--compact"
+              : "orders-grid"
+          }
+        >
           {filteredOrders.map((order) => {
             const isHallView = selectedZone === "hall";
             const isKitchenView = selectedZone === "kitchen";
@@ -624,19 +839,42 @@ export function OrdersList() {
               0
             );
             const whatsAppLink = getWhatsAppLink(order);
+            const orderAgeMs = getOrderAgeMs(order.createdAt, currentTimestamp);
+            const orderAgeTone = getOrderAgeTone(orderAgeMs);
+            const isTimedOrder =
+              order.kind !== "waiter_call" && order.kind !== "bill_request";
+            const isCooked = isCookedOrder(order);
+            const hallKitchenIndicator = isHallView
+              ? getHallKitchenIndicator(order, currentTimestamp)
+              : null;
+            const kitchenTimerStatus = isKitchenView
+              ? getKitchenTimerStatus(orderAgeMs)
+              : null;
+            const isCookedFreshHighlight =
+              isHallView &&
+              isCooked &&
+              !order.items.some((item) => item.served) &&
+              Date.now() - new Date(order.updatedAt || order.createdAt).getTime() <
+                COOKED_HIGHLIGHT_MS;
 
             return (
               <article
                 key={order.id}
-                className={
+                className={[
+                  "order-card",
                   order.kind === "waiter_call"
-                    ? "order-card order-card--alert"
+                    ? "order-card--alert"
                     : order.kind === "bill_request"
-                      ? "order-card order-card--notice"
+                      ? "order-card--notice"
+                    : isCookedFreshHighlight
+                      ? "order-card--cooked-highlight"
                     : isFreshNewOrder
-                      ? "order-card order-card--fresh-new"
-                    : "order-card"
-                }
+                      ? "order-card--fresh-new"
+                    : "",
+                  isKitchenView ? "order-card--compact" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <div className="order-card__header">
                   <div>
@@ -680,12 +918,44 @@ export function OrdersList() {
                     ) : null}
                   </div>
                   <div className="order-header-meta">
-                    <div className="order-time">
-                      <span className="order-time__label">Order time</span>
-                      <span className="order-time__value">
-                        {new Date(order.createdAt).toLocaleTimeString("en-GB")}
+                    {hallKitchenIndicator ? (
+                      <span className={hallKitchenIndicator.className}>
+                        {hallKitchenIndicator.label}
                       </span>
-                    </div>
+                    ) : null}
+                    {isTimedOrder && isKitchenView ? (
+                      <div className={`order-kitchen-timer order-kitchen-timer--${orderAgeTone}`}>
+                        <span className={kitchenTimerStatus?.className}>
+                          {orderAgeTone === "danger" ? (
+                            <span
+                              className="order-kitchen-timer__bell"
+                              aria-hidden="true"
+                            >
+                              🔔
+                            </span>
+                          ) : null}
+                          {kitchenTimerStatus?.label}
+                        </span>
+                        <span className="order-kitchen-timer__value">
+                          {formatOrderAge(orderAgeMs)}
+                        </span>
+                      </div>
+                    ) : isTimedOrder ? (
+                      <div className={`order-age-badge order-age-badge--${orderAgeTone}`}>
+                        <span className="order-age-badge__dot" aria-hidden="true" />
+                        <span className="order-age-badge__value">
+                          {formatOrderAge(orderAgeMs)}
+                        </span>
+                      </div>
+                    ) : null}
+                    {isKitchenView ? null : (
+                      <div className="order-time">
+                        <span className="order-time__label">Order time</span>
+                        <span className="order-time__value">
+                          {new Date(order.createdAt).toLocaleTimeString("en-GB")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -744,16 +1014,16 @@ export function OrdersList() {
                     </button>
                   ) : isKitchenView ? (
                     <button
-                      className={
-                        order.status === "preparing"
-                          ? "button-neutral order-action-preparing order-action-preparing--active"
-                          : "button-neutral order-action-preparing"
-                      }
+                      className="button-success order-action-ready"
                       type="button"
-                      disabled={order.status === "preparing"}
-                      onClick={() => changeStatus(order.id, "preparing")}
+                      aria-disabled={isCooked}
+                      onClick={() => {
+                        if (!isCooked) {
+                          void toggleOrderCooked(order.id, true);
+                        }
+                      }}
                     >
-                      {order.status === "preparing" ? "Preparing" : "New"}
+                      Ready
                     </button>
                   ) : isStationView ? null : (
                     <>

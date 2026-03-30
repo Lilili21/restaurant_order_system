@@ -467,6 +467,17 @@ button:disabled {
   padding: 24px;
 }
 
+.order-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.order-card--compact {
+  padding: 18px;
+  border-radius: 24px;
+}
+
 .hero-card {
   display: flex;
   flex-direction: column;
@@ -1673,6 +1684,10 @@ button:disabled {
   gap: 16px;
 }
 
+.orders-grid--compact {
+  gap: 12px;
+}
+
 .menu-card {
   overflow: hidden;
   border-radius: 24px;
@@ -2621,6 +2636,30 @@ textarea.modal-input {
   color: #2f6a3a;
 }
 
+.status-pill--cooked {
+  background: rgba(124, 181, 78, 0.26);
+  color: #4c7b29;
+  border: 1px solid rgba(93, 141, 49, 0.2);
+}
+
+.status-pill--kitchen-new {
+  background: rgba(214, 100, 92, 0.18);
+  color: #b03b3b;
+  border: 1px solid rgba(169, 52, 43, 0.16);
+}
+
+.status-pill--kitchen-cooking {
+  background: rgba(224, 180, 74, 0.2);
+  color: #a66f15;
+  border: 1px solid rgba(193, 145, 23, 0.16);
+}
+
+.status-pill--kitchen-cooked {
+  background: rgba(124, 181, 78, 0.26);
+  color: #4c7b29;
+  border: 1px solid rgba(93, 141, 49, 0.2);
+}
+
 .status-pill--cancelled {
   background: rgba(214, 111, 111, 0.18);
   color: #b03b3b;
@@ -2641,6 +2680,14 @@ textarea.modal-input {
   border-color: rgba(214, 126, 163, 0.38);
 }
 
+.order-card--cooked-highlight {
+  background: rgba(187, 224, 160, 0.34);
+  border-color: rgba(98, 154, 58, 0.34);
+  box-shadow:
+    0 18px 40px rgba(104, 134, 58, 0.14),
+    inset 0 0 0 1px rgba(150, 197, 110, 0.2);
+}
+
 .order-callout {
   margin: 0;
   font-weight: 700;
@@ -2654,6 +2701,14 @@ textarea.modal-input {
   margin-top: 16px;
 }
 
+.order-card--compact .order-card__header {
+  gap: 10px;
+}
+
+.order-card--compact .order-actions {
+  margin-top: 12px;
+}
+
 .order-action-preparing--active {
   background: var(--control-button-neutral-bg);
   color: var(--control-button-neutral-text);
@@ -2661,6 +2716,33 @@ textarea.modal-input {
   box-shadow: none;
   transform: none;
   cursor: not-allowed;
+}
+
+.order-action-ready {
+  min-width: 132px;
+}
+
+.order-card--compact .order-action-ready {
+  min-width: 116px;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+.order-action-ready--active {
+  background: var(--control-button-success-bg);
+  color: var(--control-button-accent-text);
+  border-color: var(--control-button-success-border);
+  box-shadow: var(--control-ui-shadow);
+  cursor: default;
+}
+
+.order-action-ready[aria-disabled="true"] {
+  transform: none;
+}
+
+.order-action-ready[aria-disabled="true"]:hover {
+  background: var(--control-button-success-bg);
+  box-shadow: none;
 }
 
 .order-header-meta {
@@ -2688,6 +2770,96 @@ textarea.modal-input {
 .order-time__value {
   font-weight: 700;
   color: var(--text);
+}
+
+.order-age-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(117, 91, 69, 0.12);
+  background: rgba(255, 252, 246, 0.72);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.order-age-badge__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+.order-age-badge__value {
+  line-height: 1;
+}
+
+.order-age-badge--neutral {
+  color: #d7d0c6;
+}
+
+.order-age-badge--orange {
+  color: #d57a24;
+}
+
+.order-age-badge--danger {
+  color: #c84f43;
+}
+
+.order-kitchen-timer {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  min-width: 120px;
+  line-height: 1;
+}
+
+.order-kitchen-timer__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.order-kitchen-timer__bell {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.order-kitchen-timer__status--neutral {
+  color: #b8b0a6;
+}
+
+.order-kitchen-timer__status--orange {
+  color: #d57a24;
+}
+
+.order-kitchen-timer__status--danger {
+  color: #c84f43;
+}
+
+.order-kitchen-timer__value {
+  font-size: clamp(1.7rem, 3.4vw, 2.35rem);
+  font-weight: 800;
+}
+
+.order-kitchen-timer--neutral .order-kitchen-timer__value {
+  color: #d7d0c6;
+}
+
+.order-kitchen-timer--orange .order-kitchen-timer__value {
+  color: #d57a24;
+}
+
+.order-kitchen-timer--danger .order-kitchen-timer__value {
+  color: #c84f43;
 }
 
 .order-guest-contact {
@@ -2730,14 +2902,31 @@ textarea.modal-input {
   width: 100%;
 }
 
+.order-card--compact .order-row {
+  gap: 8px;
+}
+
+.order-card--compact .order-item-line,
+.order-card--compact .order-item-check {
+  gap: 8px;
+}
+
 .order-item-name {
   min-width: 0;
+}
+
+.order-card--compact .order-item-name {
+  font-size: 0.96rem;
 }
 
 .order-item-qty {
   color: var(--muted);
   font-weight: 700;
   white-space: nowrap;
+}
+
+.order-card--compact .order-item-qty {
+  font-size: 0.92rem;
 }
 
 .orders-filter {
@@ -2814,6 +3003,27 @@ textarea.modal-input {
   color: #fffaf4;
   border-color: rgba(135, 68, 12, 0.26);
   box-shadow: 0 14px 28px rgba(135, 74, 24, 0.18);
+}
+
+.orders-filter__chip--kitchen-light {
+  background: rgba(249, 245, 238, 0.96);
+  color: #8f8477;
+  border-color: rgba(191, 179, 166, 0.3);
+  box-shadow: 0 10px 22px rgba(96, 58, 23, 0.05);
+}
+
+.orders-filter__chip--kitchen-neutral {
+  background: rgba(243, 237, 228, 0.96);
+  color: #6f6254;
+  border-color: rgba(161, 143, 123, 0.24);
+  box-shadow: 0 10px 22px rgba(96, 58, 23, 0.06);
+}
+
+.orders-filter__chip--kitchen-late {
+  background: rgba(232, 88, 76, 0.12);
+  color: #b03b3b;
+  border-color: rgba(176, 59, 59, 0.2);
+  box-shadow: 0 12px 24px rgba(176, 59, 59, 0.08);
 }
 
 .orders-filter__chip--group {

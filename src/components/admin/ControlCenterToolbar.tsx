@@ -181,15 +181,11 @@ function ControlCenterToolbarComponent({
           </button>
           {settingsButtonsOpen ? (
             <div className="menu-editor__toolbar-subrow">
-              {secondaryCredentials ? (
-                <TableCountControl
-                  credentials={secondaryCredentials}
-                  restaurantSlug={restaurantSlug}
-                />
-              ) : null}
-              {secondaryCredentials ? (
-                <WorkingHoursControl credentials={secondaryCredentials} />
-              ) : null}
+              <TableCountControl
+                credentials={secondaryCredentials}
+                restaurantSlug={restaurantSlug}
+              />
+              <WorkingHoursControl credentials={secondaryCredentials} />
               <button
                 className={
                   notificationsOpen

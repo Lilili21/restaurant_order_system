@@ -19,7 +19,7 @@ type SecondaryCredentials = {
 };
 
 type WorkingHoursControlProps = {
-  credentials: SecondaryCredentials;
+  credentials: SecondaryCredentials | null;
 };
 
 type WorkingHoursRuleDraft = {
@@ -145,8 +145,12 @@ export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "x-admin-secondary-login": credentials.login,
-        "x-admin-secondary-password": credentials.password
+        ...(credentials
+          ? {
+              "x-admin-secondary-login": credentials.login,
+              "x-admin-secondary-password": credentials.password
+            }
+          : {})
       },
       body: JSON.stringify({
         workingHoursRules: normalizedRules,

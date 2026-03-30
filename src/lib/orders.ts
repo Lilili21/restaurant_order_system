@@ -57,7 +57,7 @@ type OrderItemRow = {
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
-const AUTO_PREPARING_DELAY_MS = 5 * 60 * 1000;
+const AUTO_PREPARING_DELAY_MS = 3 * 60 * 1000;
 const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
 const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
 const ORDERS_STATE_KEY = "orders-state";
@@ -66,6 +66,7 @@ const ORDERS_STATE_CACHE_TTL_MS = 2_000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
 const SHIFT_CLOSE_GRACE_MS = 60 * 60 * 1000;
+const COOKED_MARKER = "__menu_order_cooked__";
 
 type MenuSettingsSnapshot = Awaited<ReturnType<typeof getMenuSettings>>;
 type ShiftWindow = {
@@ -111,6 +112,36 @@ declare global {
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
+}
+
+function normalizeOrderItemNoteValue(note: string | undefined) {
+  return typeof note === "string" && note.trim() ? note.trim() : "";
+}
+
+function noteHasCookedMarker(note: string | undefined) {
+  return normalizeOrderItemNoteValue(note).includes(COOKED_MARKER);
+}
+
+function setCookedMarkerOnNote(note: string | undefined, cooked: boolean) {
+  const base = normalizeOrderItemNoteValue(note)
+    .replaceAll(COOKED_MARKER, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!cooked) {
+    return base || undefined;
+  }
+
+  return base ? `${base} ${COOKED_MARKER}` : COOKED_MARKER;
+}
+
+function isOrderCooked(order: Order) {
+  return (
+    order.kind !== "waiter_call" &&
+    order.kind !== "bill_request" &&
+    order.items.length > 0 &&
+    order.items.some((item) => noteHasCookedMarker(item.note))
+  );
 }
 
 function parseClockValue(value: string | null | undefined) {
@@ -570,6 +601,7 @@ async function normalizeOrderItemForAdmin(
     category: item.category ?? menuItem?.category,
     name: menuItem?.nameEn || item.name,
     volumeLabel: item.volumeLabel ?? matchedVolumeOption?.label,
+    note: setCookedMarkerOnNote(item.note, noteHasCookedMarker(item.note)),
     price: item.price
   };
 }
@@ -1830,6 +1862,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   }
 
   order.status = status;
+  order.updatedAt = new Date().toISOString();
 
   if (status === "served") {
     order.items = order.items.map((item) => ({
@@ -1910,6 +1943,40 @@ export async function updateOrderItemServed(
   }
 
   orderItem.served = served;
+  order.updatedAt = new Date().toISOString();
+  const normalizedOrder = await normalizeOrderState(order);
+  await persistStateAsync(state);
+
+  return normalizedOrder;
+}
+
+export async function updateOrderCooked(orderId: string, cooked: boolean) {
+  const state = await readRuntimeStateAsync();
+  const order = state.ordersStore.find((item) => item.id === orderId);
+
+  if (!order) {
+    throw new Error("Order not found");
+  }
+
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
+    throw new Error("Service request cannot be marked as cooked");
+  }
+
+  if (order.status === "served" || order.status === "cancelled") {
+    throw new Error("Closed order cannot be updated");
+  }
+
+  order.items = order.items.map((item) => ({
+    ...item,
+    note: setCookedMarkerOnNote(item.note, cooked)
+  }));
+
+  if (cooked && order.status === "new") {
+    order.status = "preparing";
+  }
+
+  order.updatedAt = new Date().toISOString();
+
   const normalizedOrder = await normalizeOrderState(order);
   await persistStateAsync(state);
 

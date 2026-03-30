@@ -242,6 +242,34 @@ function getPeakHourLabel(orders: Order[], start: Date, end: Date) {
   return peak?.[0] ?? "—";
 }
 
+type ClosedSessionSeriesEntry = {
+  closedAt: string;
+  total: number;
+};
+
+function getPeakHourLabelFromClosedSessions(
+  sessions: ClosedSessionSeriesEntry[],
+  start: Date,
+  end: Date
+) {
+  const counts = new Map<string, number>();
+
+  for (const session of sessions) {
+    const closedAt = new Date(session.closedAt).getTime();
+
+    if (closedAt < start.getTime() || closedAt > end.getTime()) {
+      continue;
+    }
+
+    const sessionDate = new Date(session.closedAt);
+    const label = `${String(sessionDate.getHours()).padStart(2, "0")}:00`;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+
+  const peak = [...counts.entries()].sort((left, right) => right[1] - left[1])[0];
+  return peak?.[0] ?? "—";
+}
+
 function formatHourLabel(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:00`;
 }
@@ -266,7 +294,7 @@ function buildHourlyLabels(start: Date, end: Date) {
 }
 
 function buildHourlySeries(
-  orders: Order[],
+  sessions: ClosedSessionSeriesEntry[],
   start: Date,
   end: Date
 ) {
@@ -279,21 +307,21 @@ function buildHourlySeries(
     revenueCounts.set(label, 0);
   }
 
-  for (const order of orders) {
-    const createdAt = new Date(order.createdAt).getTime();
+  for (const session of sessions) {
+    const closedAt = new Date(session.closedAt).getTime();
 
-    if (createdAt < start.getTime() || createdAt > end.getTime()) {
+    if (closedAt < start.getTime() || closedAt > end.getTime()) {
       continue;
     }
 
-    const bucketLabel = formatHourLabel(new Date(order.createdAt));
+    const bucketLabel = formatHourLabel(new Date(session.closedAt));
 
     if (!orderCounts.has(bucketLabel)) {
       continue;
     }
 
     orderCounts.set(bucketLabel, (orderCounts.get(bucketLabel) ?? 0) + 1);
-    revenueCounts.set(bucketLabel, (revenueCounts.get(bucketLabel) ?? 0) + order.total);
+    revenueCounts.set(bucketLabel, (revenueCounts.get(bucketLabel) ?? 0) + session.total);
   }
 
   return {
@@ -476,6 +504,10 @@ export async function GET(request: NextRequest) {
           );
         })
       : [];
+    const analyticsClosedSessions = closedSessionsInCurrentShift.map((session) => ({
+      closedAt: session.closedAt,
+      total: session.total
+    }));
     const closedSessionsInCurrentShiftRevenue = closedSessionsInCurrentShift.reduce(
       (sum, session) => sum + session.total,
       0
@@ -559,7 +591,7 @@ export async function GET(request: NextRequest) {
       : [];
     const hourlySeries = analyticsDayBounds
       ? buildHourlySeries(
-          analyticsOrders,
+          analyticsClosedSessions,
           analyticsDayBounds.start,
           new Date(Math.min(analyticsDayBounds.end.getTime(), Date.now()))
         )
@@ -571,7 +603,11 @@ export async function GET(request: NextRequest) {
       currentOrders: totalTablesOrdersCount,
       previousOrders: previousOrdersCount,
       peakHour: currentShiftWindow
-        ? getPeakHourLabel(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
+        ? getPeakHourLabelFromClosedSessions(
+            analyticsClosedSessions,
+            currentShiftWindow.start,
+            currentShiftWindow.end
+          )
         : "the next busy hour"
     });
 
@@ -592,7 +628,11 @@ export async function GET(request: NextRequest) {
           ? getUniqueDishNames(recentDishItems, "asc")
           : "—",
         peakHour: currentShiftWindow
-          ? getPeakHourLabel(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
+          ? getPeakHourLabelFromClosedSessions(
+              analyticsClosedSessions,
+              currentShiftWindow.start,
+              currentShiftWindow.end
+            )
           : "—",
         waiterCalls: String(waiterCallsCount),
         globalInsight: globalInsight.text,
