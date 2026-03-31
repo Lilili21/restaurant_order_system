@@ -63,9 +63,40 @@ type OrderItemRow = {
   served: boolean;
 };
 
-const DATA_DIR = path.join(process.cwd(), "data");
+function canWriteToDirectory(directoryPath: string) {
+  try {
+    mkdirSync(directoryPath, { recursive: true });
+    const probePath = path.join(directoryPath, ".write-test");
+    writeFileSync(probePath, "ok", "utf8");
+    unlinkSync(probePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveWritableDataDir() {
+  const projectDataDir = path.join(process.cwd(), "data");
+
+  if (canWriteToDirectory(projectDataDir)) {
+    return projectDataDir;
+  }
+
+  const tempDataDir = path.join(process.env.TMPDIR ?? "/tmp", "menu-data");
+
+  if (canWriteToDirectory(tempDataDir)) {
+    return tempDataDir;
+  }
+
+  return projectDataDir;
+}
+
+const BUNDLED_DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = resolveWritableDataDir();
 const ORDERS_STORE_PATH = path.join(DATA_DIR, "orders-store.json");
+const BUNDLED_ORDERS_STORE_PATH = path.join(BUNDLED_DATA_DIR, "orders-store.json");
 const ORDERS_ARCHIVE_DIR = path.join(DATA_DIR, "orders-archive");
+const BUNDLED_ORDERS_ARCHIVE_DIR = path.join(BUNDLED_DATA_DIR, "orders-archive");
 const AUTO_PREPARING_DELAY_MS = 3 * 60 * 1000;
 const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
 const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
@@ -294,11 +325,32 @@ function getLegacyWeeklyArchivePath(weekKey: string) {
   return path.join(ORDERS_ARCHIVE_DIR, `orders-${weekKey}.json`);
 }
 
+function getBundledWeeklyArchivePath(weekKey: string) {
+  const dateRange = getWeekDateRangeForKey(weekKey);
+  const fileName = dateRange
+    ? `orders-${weekKey}-${dateRange.start}_to_${dateRange.end}.json`
+    : `orders-${weekKey}.json`;
+
+  return path.join(BUNDLED_ORDERS_ARCHIVE_DIR, fileName);
+}
+
+function getBundledLegacyWeeklyArchivePath(weekKey: string) {
+  return path.join(BUNDLED_ORDERS_ARCHIVE_DIR, `orders-${weekKey}.json`);
+}
+
 function readWeeklyArchive(weekKey: string): WeeklyOrdersArchive {
   const archivePath = getWeeklyArchivePath(weekKey);
   const legacyArchivePath = getLegacyWeeklyArchivePath(weekKey);
+  const bundledArchivePath = getBundledWeeklyArchivePath(weekKey);
+  const bundledLegacyArchivePath = getBundledLegacyWeeklyArchivePath(weekKey);
+  const readableArchivePath = [
+    archivePath,
+    legacyArchivePath,
+    bundledArchivePath,
+    bundledLegacyArchivePath
+  ].find((candidatePath) => existsSync(candidatePath));
 
-  if (!existsSync(archivePath) && !existsSync(legacyArchivePath)) {
+  if (!readableArchivePath) {
     return {
       weekKey,
       orders: [],
@@ -307,10 +359,7 @@ function readWeeklyArchive(weekKey: string): WeeklyOrdersArchive {
   }
 
   try {
-    const raw = readFileSync(
-      existsSync(archivePath) ? archivePath : legacyArchivePath,
-      "utf8"
-    );
+    const raw = readFileSync(readableArchivePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<WeeklyOrdersArchive>;
 
     return {
@@ -330,11 +379,18 @@ function readWeeklyArchive(weekKey: string): WeeklyOrdersArchive {
 }
 
 export function listWeeklyOrdersArchiveMeta(): WeeklyOrdersArchiveMeta[] {
-  if (!existsSync(ORDERS_ARCHIVE_DIR)) {
+  const archiveDirectories = [ORDERS_ARCHIVE_DIR, BUNDLED_ORDERS_ARCHIVE_DIR].filter(
+    (directoryPath, index, current) =>
+      existsSync(directoryPath) && current.indexOf(directoryPath) === index
+  );
+
+  if (archiveDirectories.length === 0) {
     return [];
   }
 
-  return readdirSync(ORDERS_ARCHIVE_DIR)
+  return archiveDirectories
+    .flatMap((directoryPath) => readdirSync(directoryPath))
+    .filter((fileName, index, current) => current.indexOf(fileName) === index)
     .map((fileName) => {
       const match = /^orders-(\d{4}-W\d{2})(?:-(\d{4}-\d{2}-\d{2})_to_(\d{4}-\d{2}-\d{2}))?\.json$/.exec(
         fileName
@@ -1262,12 +1318,18 @@ function getDefaultState(): OrdersPersistence {
 }
 
 function loadState(): OrdersPersistence {
-  if (!existsSync(ORDERS_STORE_PATH)) {
+  const readableStorePath = existsSync(ORDERS_STORE_PATH)
+    ? ORDERS_STORE_PATH
+    : existsSync(BUNDLED_ORDERS_STORE_PATH)
+      ? BUNDLED_ORDERS_STORE_PATH
+      : null;
+
+  if (!readableStorePath) {
     return getDefaultState();
   }
 
   try {
-    const raw = readFileSync(ORDERS_STORE_PATH, "utf8");
+    const raw = readFileSync(readableStorePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<OrdersPersistence>;
 
     return {
