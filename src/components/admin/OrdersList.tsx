@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  readLocalCache,
+  readSessionCache,
+  writeLocalCache,
+  writeSessionCache
+} from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
@@ -13,6 +19,10 @@ const ACTIVE_POLL_MS = 4_000;
 const HIDDEN_POLL_MS = 12_000;
 const INITIAL_RENDERED_ORDERS = 24;
 const RENDER_ORDERS_CHUNK = 16;
+const ORDERS_CACHE_TTL_MS = 30 * 1000;
+const ORDERS_FILTERS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ORDERS_CACHE_KEY = "admin-orders-cache-v1";
+const ORDERS_FILTERS_CACHE_KEY = "admin-orders-filters-v1";
 
 const statusLabels = {
   new: "New",
@@ -191,16 +201,34 @@ function getOrderAgeTone(ageMs: number) {
   return "danger";
 }
 
+type OrdersFiltersCache = {
+  selectedTables: number[];
+  selectedZone: "hall" | "kitchen" | "bar";
+  selectedKitchenStatuses: Array<"new" | "on_time" | "late">;
+};
+
 export function OrdersList() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const cachedOrders = readSessionCache<Order[]>(
+    ORDERS_CACHE_KEY,
+    ORDERS_CACHE_TTL_MS
+  );
+  const cachedFilters = readLocalCache<OrdersFiltersCache>(
+    ORDERS_FILTERS_CACHE_KEY,
+    ORDERS_FILTERS_CACHE_TTL_MS
+  );
+  const [orders, setOrders] = useState<Order[]>(() => cachedOrders ?? []);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
-  const [loading, setLoading] = useState(true);
-  const [selectedTables, setSelectedTables] = useState<number[]>([]);
-  const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">("hall");
+  const [loading, setLoading] = useState(() => cachedOrders === null);
+  const [selectedTables, setSelectedTables] = useState<number[]>(
+    () => cachedFilters?.selectedTables ?? []
+  );
+  const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">(
+    () => cachedFilters?.selectedZone ?? "hall"
+  );
   const [selectedKitchenStatuses, setSelectedKitchenStatuses] = useState<
     Array<"new" | "on_time" | "late">
-  >(["new", "on_time", "late"]);
+  >(() => cachedFilters?.selectedKitchenStatuses ?? ["new", "on_time", "late"]);
   const [authOrder, setAuthOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editedQuantities, setEditedQuantities] = useState<Record<string, number>>({});
@@ -263,6 +291,18 @@ export function OrdersList() {
       right.createdAt.localeCompare(left.createdAt)
     );
   }
+
+  useEffect(() => {
+    writeSessionCache(ORDERS_CACHE_KEY, orders);
+  }, [orders]);
+
+  useEffect(() => {
+    writeLocalCache(ORDERS_FILTERS_CACHE_KEY, {
+      selectedTables,
+      selectedZone,
+      selectedKitchenStatuses
+    });
+  }, [selectedKitchenStatuses, selectedTables, selectedZone]);
 
   useEffect(() => {
     let cancelled = false;

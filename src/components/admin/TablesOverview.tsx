@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { readSessionCache, writeSessionCache } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
 import {
   ClosedTableOrderSnapshot,
@@ -55,6 +56,18 @@ type PosSyncState = {
   posOrderNumber?: string;
 };
 
+type TablesViewCache = {
+  data: TablesResponse;
+  serviceRequests: Order[];
+  happyHourEnabled: boolean;
+  happyHourDiscountPercent: number;
+  happyHourCategories: MenuCategory[];
+  happyHourStartsFrom: string | null;
+  happyHourUntil: string | null;
+  workingHoursFrom: string | null;
+  workingHoursRules: MenuSettingsResponse["workingHoursRules"];
+};
+
 const DRINK_CATEGORIES = new Set<string>([
   "drinks",
   "non_alcoholic_drinks",
@@ -74,6 +87,10 @@ const DRINK_CATEGORIES = new Set<string>([
   "two_component_mixture",
   "dot4"
 ]);
+const TABLES_VIEW_CACHE_TTL_MS = 30 * 1000;
+const TABLES_ARCHIVES_CACHE_TTL_MS = 15 * 60 * 1000;
+const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
+const TABLES_ARCHIVES_CACHE_KEY = "admin-tables-archives-cache-v1";
 
 function getSessionItemKey(item: { menuItemId: string; volumeOptionId?: string; volumeLabel?: string }) {
   return `${item.menuItemId}:${item.volumeOptionId ?? item.volumeLabel ?? "base"}`;
@@ -325,11 +342,22 @@ function getHappyHourDiscountAmountFromOrder(
 }
 
 export function TablesOverview() {
-  const [data, setData] = useState<TablesResponse>({
-    tables: [],
-    closedSessions: []
-  });
-  const [loading, setLoading] = useState(true);
+  const cachedView = readSessionCache<TablesViewCache>(
+    TABLES_VIEW_CACHE_KEY,
+    TABLES_VIEW_CACHE_TTL_MS
+  );
+  const cachedArchives = readSessionCache<WeeklyOrdersArchiveMeta[]>(
+    TABLES_ARCHIVES_CACHE_KEY,
+    TABLES_ARCHIVES_CACHE_TTL_MS
+  );
+  const [data, setData] = useState<TablesResponse>(
+    () =>
+      cachedView?.data ?? {
+        tables: [],
+        closedSessions: []
+      }
+  );
+  const [loading, setLoading] = useState(() => cachedView === null);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [moveAuthTable, setMoveAuthTable] = useState<TableOverview | null>(null);
   const [targetTableNumber, setTargetTableNumber] = useState("");
@@ -337,16 +365,34 @@ export function TablesOverview() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [weeklyArchives, setWeeklyArchives] = useState<WeeklyOrdersArchiveMeta[]>([]);
-  const [serviceRequests, setServiceRequests] = useState<Order[]>([]);
-  const [happyHourEnabled, setHappyHourEnabled] = useState(false);
-  const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(0);
-  const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>([]);
-  const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(null);
-  const [happyHourUntil, setHappyHourUntil] = useState<string | null>(null);
-  const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
+  const [weeklyArchives, setWeeklyArchives] = useState<WeeklyOrdersArchiveMeta[]>(
+    () => cachedArchives ?? []
+  );
+  const [serviceRequests, setServiceRequests] = useState<Order[]>(
+    () => cachedView?.serviceRequests ?? []
+  );
+  const [happyHourEnabled, setHappyHourEnabled] = useState(
+    () => cachedView?.happyHourEnabled ?? false
+  );
+  const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(
+    () => cachedView?.happyHourDiscountPercent ?? 0
+  );
+  const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>(
+    () => cachedView?.happyHourCategories ?? []
+  );
+  const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(
+    () => cachedView?.happyHourStartsFrom ?? null
+  );
+  const [happyHourUntil, setHappyHourUntil] = useState<string | null>(
+    () => cachedView?.happyHourUntil ?? null
+  );
+  const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(
+    () => cachedView?.workingHoursFrom ?? null
+  );
   const [workingHoursRules, setWorkingHoursRules] =
-    useState<MenuSettingsResponse["workingHoursRules"]>([]);
+    useState<MenuSettingsResponse["workingHoursRules"]>(
+      () => cachedView?.workingHoursRules ?? []
+    );
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
 
   function getPosSyncKey(table: TableOverview) {
@@ -366,6 +412,34 @@ export function TablesOverview() {
         : []
     };
   }
+
+  useEffect(() => {
+    writeSessionCache(TABLES_VIEW_CACHE_KEY, {
+      data,
+      serviceRequests,
+      happyHourEnabled,
+      happyHourDiscountPercent,
+      happyHourCategories,
+      happyHourStartsFrom,
+      happyHourUntil,
+      workingHoursFrom,
+      workingHoursRules
+    });
+  }, [
+    data,
+    happyHourCategories,
+    happyHourDiscountPercent,
+    happyHourEnabled,
+    happyHourStartsFrom,
+    happyHourUntil,
+    serviceRequests,
+    workingHoursFrom,
+    workingHoursRules
+  ]);
+
+  useEffect(() => {
+    writeSessionCache(TABLES_ARCHIVES_CACHE_KEY, weeklyArchives);
+  }, [weeklyArchives]);
 
   useEffect(() => {
     let cancelled = false;
