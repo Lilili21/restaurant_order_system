@@ -471,6 +471,66 @@ function normalizeSettings(
   };
 }
 
+function hasWorkingHoursConfigured(settings: MenuSettings) {
+  return Boolean(
+    (settings.workingHoursFrom && settings.workingHoursUntil) ||
+      settings.workingHoursRules.some((rule) => rule.from && rule.until)
+  );
+}
+
+function mergeRestaurantSettingsWithFallback(
+  restaurantSettings: MenuSettings,
+  fallbackSettings: MenuSettings
+) {
+  return normalizeSettings({
+    ...fallbackSettings,
+    ...restaurantSettings,
+    workingHoursRules:
+      restaurantSettings.workingHoursRules.length > 0
+        ? restaurantSettings.workingHoursRules
+        : fallbackSettings.workingHoursRules,
+    workingHoursFrom:
+      restaurantSettings.workingHoursFrom ?? fallbackSettings.workingHoursFrom,
+    workingHoursUntil:
+      restaurantSettings.workingHoursUntil ?? fallbackSettings.workingHoursUntil,
+    promotions:
+      restaurantSettings.promotions.length > 0
+        ? restaurantSettings.promotions
+        : fallbackSettings.promotions,
+    businessLunches:
+      restaurantSettings.businessLunches.length > 0
+        ? restaurantSettings.businessLunches
+        : fallbackSettings.businessLunches,
+    recommendations:
+      restaurantSettings.recommendations.length > 0
+        ? restaurantSettings.recommendations
+        : fallbackSettings.recommendations,
+    happyHourText:
+      restaurantSettings.happyHourText || fallbackSettings.happyHourText,
+    happyHourCategories:
+      restaurantSettings.happyHourCategories.length > 0
+        ? restaurantSettings.happyHourCategories
+        : fallbackSettings.happyHourCategories,
+    happyHourDays:
+      restaurantSettings.happyHourDays.length > 0
+        ? restaurantSettings.happyHourDays
+        : fallbackSettings.happyHourDays,
+    happyHourDiscountPercent:
+      restaurantSettings.happyHourDiscountPercent > 0
+        ? restaurantSettings.happyHourDiscountPercent
+        : fallbackSettings.happyHourDiscountPercent,
+    happyHourStartsFrom:
+      restaurantSettings.happyHourStartsFrom ?? fallbackSettings.happyHourStartsFrom,
+    happyHourUntil:
+      restaurantSettings.happyHourUntil ?? fallbackSettings.happyHourUntil,
+    kitchenOpenUntil:
+      restaurantSettings.kitchenOpenUntil ?? fallbackSettings.kitchenOpenUntil,
+    barOpenUntil: restaurantSettings.barOpenUntil ?? fallbackSettings.barOpenUntil,
+    tableCount: restaurantSettings.tableCount,
+    tableTokens: restaurantSettings.tableTokens
+  });
+}
+
 function persistMenuSettings(settings: MenuSettings) {
   if (!existsSync(DATA_DIR)) {
     mkdirSync(DATA_DIR, { recursive: true });
@@ -586,6 +646,22 @@ async function getRestaurantSettingsFromSupabase(
   return normalized;
 }
 
+async function getLegacyMenuSettingsFromSupabase(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
+) {
+  const { data, error } = await supabase
+    .from("app_state")
+    .select("value")
+    .eq("key", MENU_SETTINGS_KEY)
+    .maybeSingle();
+
+  if (error || !data?.value) {
+    return null;
+  }
+
+  return normalizeSettings(data.value as Partial<MenuSettings>);
+}
+
 async function persistRestaurantSettingsAsync(
   restaurantSlug: string,
   settings: MenuSettings
@@ -651,10 +727,17 @@ export async function getMenuSettings(restaurantSlug?: string) {
       );
 
       if (restaurantSettings) {
-        setSettingsCache(restaurantSettings, restaurantSlug);
+        const nextRestaurantSettings = hasWorkingHoursConfigured(restaurantSettings)
+          ? restaurantSettings
+          : mergeRestaurantSettingsWithFallback(
+              restaurantSettings,
+              (await getLegacyMenuSettingsFromSupabase(supabase)) ?? getMenuSettingsSync()
+            );
+
+        setSettingsCache(nextRestaurantSettings, restaurantSlug);
         return {
-          ...restaurantSettings,
-          tableTokens: { ...restaurantSettings.tableTokens }
+          ...nextRestaurantSettings,
+          tableTokens: { ...nextRestaurantSettings.tableTokens }
         };
       }
     }
