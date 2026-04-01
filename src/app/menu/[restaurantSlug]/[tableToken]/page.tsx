@@ -62,6 +62,10 @@ function isShiftActiveNow(menuSettings: Awaited<ReturnType<typeof getMenuSetting
     })
     .filter((window): window is { start: Date; end: Date } => window !== null);
 
+  if (windows.length === 0) {
+    return true;
+  }
+
   return windows.some(
     (window) =>
       now.getTime() >= window.start.getTime() && now.getTime() < window.end.getTime()
