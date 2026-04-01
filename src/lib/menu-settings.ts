@@ -622,7 +622,7 @@ async function getRestaurantSettingsFromSupabase(
         .maybeSingle(),
       supabase
         .from("restaurant_tables")
-        .select("table_number, access_token, is_active")
+        .select("id, table_number, access_token, is_active")
         .eq("restaurant_id", restaurant.id)
         .eq("is_active", true)
         .order("table_number", { ascending: true })
@@ -632,7 +632,40 @@ async function getRestaurantSettingsFromSupabase(
     return null;
   }
 
-  const tableRowsSafe = Array.isArray(tableRows) ? tableRows : [];
+  const tableRowsSafe = Array.isArray(tableRows)
+    ? tableRows.map((table) => {
+        const token =
+          typeof table.access_token === "string" && table.access_token.trim().length >= 12
+            ? table.access_token
+            : generateTableToken();
+
+        return {
+          ...table,
+          access_token: token
+        };
+      })
+    : [];
+
+  const rowsNeedingTokenRefresh = tableRowsSafe.filter(
+    (table) => table.access_token !== (tableRows as Array<{ access_token: string }>)[
+      tableRowsSafe.indexOf(table)
+    ]?.access_token
+  );
+
+  if (rowsNeedingTokenRefresh.length > 0) {
+    const { error: refreshTokensError } = await supabase.from("restaurant_tables").upsert(
+      rowsNeedingTokenRefresh.map((table) => ({
+        id: table.id,
+        access_token: table.access_token
+      })),
+      { onConflict: "id" }
+    );
+
+    if (refreshTokensError) {
+      return null;
+    }
+  }
+
   const tableTokens = Object.fromEntries(
     tableRowsSafe.map((table) => [String(table.table_number), table.access_token])
   );
@@ -665,13 +698,13 @@ async function getLegacyMenuSettingsFromSupabase(
 async function persistRestaurantSettingsAsync(
   restaurantSlug: string,
   settings: MenuSettings
-) {
+): Promise<MenuSettings> {
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
     persistMenuSettings(settings);
     setSettingsCache(settings, restaurantSlug);
-    return;
+    return settings;
   }
 
   const restaurant = await getRestaurantIdBySlug(supabase, restaurantSlug);
@@ -695,7 +728,75 @@ async function persistRestaurantSettingsAsync(
     throw new Error(`Supabase persist failed: ${error.message}`);
   }
 
-  setSettingsCache(settings, restaurantSlug);
+  const { data: existingTableRows, error: existingTablesError } = await supabase
+    .from("restaurant_tables")
+    .select("id, table_number, access_token, seats, zone, is_active")
+    .eq("restaurant_id", restaurant.id)
+    .order("table_number", { ascending: true });
+
+  if (existingTablesError) {
+    throw new Error(`Supabase persist failed: ${existingTablesError.message}`);
+  }
+
+  const existingByNumber = new Map(
+    (existingTableRows ?? []).map((table) => [Number(table.table_number), table] as const)
+  );
+  const activeRows = Array.from({ length: settings.tableCount }, (_, index) => {
+    const tableNumber = index + 1;
+    const existingRow = existingByNumber.get(tableNumber);
+
+    return {
+      id: existingRow?.id,
+      restaurant_id: restaurant.id,
+      table_number: tableNumber,
+      access_token:
+        typeof existingRow?.access_token === "string" && existingRow.access_token.trim()
+          ? existingRow.access_token
+          : generateTableToken(),
+      seats: existingRow?.seats ?? 4,
+      zone:
+        typeof existingRow?.zone === "string" && existingRow.zone.trim()
+          ? existingRow.zone
+          : "Hall",
+      is_active: true,
+      updated_at: new Date().toISOString()
+    };
+  });
+
+  const inactiveRows = (existingTableRows ?? [])
+    .filter((table) => Number(table.table_number) > settings.tableCount)
+    .map((table) => ({
+      id: table.id,
+      restaurant_id: restaurant.id,
+      table_number: Number(table.table_number),
+      access_token:
+        typeof table.access_token === "string" && table.access_token.trim()
+          ? table.access_token
+          : generateTableToken(),
+      seats: table.seats ?? 4,
+      zone:
+        typeof table.zone === "string" && table.zone.trim() ? table.zone : "Hall",
+      is_active: false,
+      updated_at: new Date().toISOString()
+    }));
+
+  const tableRowsToUpsert = [...activeRows, ...inactiveRows];
+
+  if (tableRowsToUpsert.length > 0) {
+    const { error: tableRowsError } = await supabase
+      .from("restaurant_tables")
+      .upsert(tableRowsToUpsert, { onConflict: "id" });
+
+    if (tableRowsError) {
+      throw new Error(`Supabase persist failed: ${tableRowsError.message}`);
+    }
+  }
+
+  const syncedSettings =
+    (await getRestaurantSettingsFromSupabase(supabase, restaurantSlug)) ?? settings;
+
+  setSettingsCache(syncedSettings, restaurantSlug);
+  return syncedSettings;
 }
 
 export async function getMenuSettings(restaurantSlug?: string) {
@@ -801,9 +902,9 @@ export async function updateMenuSettings(
   });
 
   if (restaurantSlug) {
-    await persistRestaurantSettingsAsync(restaurantSlug, next);
+    return persistRestaurantSettingsAsync(restaurantSlug, next);
   } else {
     await persistMenuSettingsAsync(next);
+    return next;
   }
-  return next;
 }
