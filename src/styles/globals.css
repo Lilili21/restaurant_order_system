@@ -1951,6 +1951,12 @@ button:disabled {
   font-weight: 600;
 }
 
+.cart-empty-state__active-hint {
+  margin: 0;
+  color: #2f7a38;
+  font-weight: 800;
+}
+
 .cart-recommendation {
   display: flex;
   align-items: center;
@@ -3921,8 +3927,25 @@ textarea.modal-input {
 }
 
 .submitted-orders__summary-copy h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: clamp(1.1rem, 2vw, 1.4rem);
   line-height: 1.05;
+}
+
+.submitted-orders__summary-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(66, 156, 78, 0.16);
+  color: #2f7a38;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .submitted-orders__summary-total {

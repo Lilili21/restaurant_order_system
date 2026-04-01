@@ -142,6 +142,7 @@ const uiText = {
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
+    currentOrdersActiveHint: "ההזמנה הפעילה שלכם כאן למטה 👇",
     orderNew: "חדש",
     orderPreparing: "בהכנה",
     orderServed: "הוגש",
@@ -236,6 +237,7 @@ const uiText = {
     submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
+    currentOrdersActiveHint: "Your active order below 👇",
     orderNew: "New",
     orderPreparing: "Preparing",
     orderServed: "Served",
@@ -2019,6 +2021,11 @@ export function Cart({
                   🍽
                 </span>
                 <p className="cart-empty-state__text">{text.emptyCart}</p>
+                {submittedOrders.length ? (
+                  <p className="cart-empty-state__active-hint">
+                    {text.currentOrdersActiveHint}
+                  </p>
+                ) : null}
               </div>
             ) : (
               <div className="cart-list">
@@ -2196,6 +2203,12 @@ export function Cart({
                 <summary className="submitted-orders__summary">
                   <div className="submitted-orders__summary-copy">
                     <h2>
+                      <span
+                        className="submitted-orders__summary-check"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
                       <span>{text.currentOrders}</span>{" "}
                       <span className="submitted-orders__summary-total">
                         ({formatCurrency(submittedOrdersTotal)})
