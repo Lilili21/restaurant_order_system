@@ -58,6 +58,10 @@ declare global {
   var __restaurantsCache: RestaurantsCacheEntry | undefined;
 }
 
+export function invalidateRestaurantsCache() {
+  globalThis.__restaurantsCache = undefined;
+}
+
 function cloneRestaurants(items: Restaurant[]) {
   return items.map((restaurant) => ({
     ...restaurant,

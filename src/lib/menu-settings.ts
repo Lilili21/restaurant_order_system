@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { invalidateRestaurantsCache } from "@/lib/restaurants";
 import type { MenuCategory } from "@/lib/types";
 
 const MENU_CATEGORIES: MenuCategory[] = [
@@ -763,6 +764,10 @@ async function persistRestaurantSettingsAsync(
     };
   });
 
+  const rowsToUpdate = activeRows.filter((row) => row.id);
+  const rowsToInsert = activeRows
+    .filter((row) => !row.id)
+    .map(({ id: _id, ...row }) => row);
   const inactiveRows = (existingTableRows ?? [])
     .filter((table) => Number(table.table_number) > settings.tableCount)
     .map((table) => ({
@@ -780,21 +785,40 @@ async function persistRestaurantSettingsAsync(
       updated_at: new Date().toISOString()
     }));
 
-  const tableRowsToUpsert = [...activeRows, ...inactiveRows];
-
-  if (tableRowsToUpsert.length > 0) {
-    const { error: tableRowsError } = await supabase
+  if (rowsToUpdate.length > 0) {
+    const { error: updateRowsError } = await supabase
       .from("restaurant_tables")
-      .upsert(tableRowsToUpsert, { onConflict: "id" });
+      .upsert(rowsToUpdate, { onConflict: "id" });
 
-    if (tableRowsError) {
-      throw new Error(`Supabase persist failed: ${tableRowsError.message}`);
+    if (updateRowsError) {
+      throw new Error(`Supabase persist failed: ${updateRowsError.message}`);
+    }
+  }
+
+  if (rowsToInsert.length > 0) {
+    const { error: insertRowsError } = await supabase
+      .from("restaurant_tables")
+      .insert(rowsToInsert);
+
+    if (insertRowsError) {
+      throw new Error(`Supabase persist failed: ${insertRowsError.message}`);
+    }
+  }
+
+  if (inactiveRows.length > 0) {
+    const { error: deactivateRowsError } = await supabase
+      .from("restaurant_tables")
+      .upsert(inactiveRows, { onConflict: "id" });
+
+    if (deactivateRowsError) {
+      throw new Error(`Supabase persist failed: ${deactivateRowsError.message}`);
     }
   }
 
   const syncedSettings =
     (await getRestaurantSettingsFromSupabase(supabase, restaurantSlug)) ?? settings;
 
+  invalidateRestaurantsCache();
   setSettingsCache(syncedSettings, restaurantSlug);
   return syncedSettings;
 }
