@@ -185,7 +185,10 @@ function ControlCenterToolbarComponent({
                 credentials={secondaryCredentials}
                 restaurantSlug={restaurantSlug}
               />
-              <WorkingHoursControl credentials={secondaryCredentials} />
+              <WorkingHoursControl
+                credentials={secondaryCredentials}
+                restaurantSlug={restaurantSlug}
+              />
               <button
                 className={
                   notificationsOpen

@@ -15,6 +15,21 @@ export const restaurants: Restaurant[] = [
       accessToken: `olive-demo-token-${index + 1}`,
       qrCodeValue: `/olive-bistro/menu/olive-demo-token-${index + 1}`
     }))
+  },
+  {
+    id: "rest_beerabar",
+    slug: "beerabar",
+    name: "BeeraBar",
+    description: "New restaurant space with QR ordering, ready for setup.",
+    currency: "ILS",
+    tables: Array.from({ length: 10 }, (_, index) => ({
+      id: `beerabar_table_${index + 1}`,
+      number: index + 1,
+      seats: index < 6 ? 2 : 4,
+      zone: index < 5 ? "Main hall" : "Bar area",
+      accessToken: `beerabar-demo-token-${index + 1}`,
+      qrCodeValue: `/beerabar/menu/beerabar-demo-token-${index + 1}`
+    }))
   }
 ];
 

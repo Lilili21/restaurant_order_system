@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { ControlCenterDashboard } from "@/components/admin/ControlCenterDashboard";
 import { MenuAlertsPanel } from "@/components/admin/MenuAlertsPanel";
-import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
+impлаort { MenuEditPanel } from "@/components/admin/MenuEditPanel";
 import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
 import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
@@ -1192,11 +1192,11 @@ export function MenuEditor() {
     async function load() {
       try {
         const [menuResponse, settingsResponse, analyticsResponse] = await Promise.all([
-          fetch("/api/menu?restaurantSlug=olive-bistro", {
+          fetch(`/api/menu?restaurantSlug=${restaurantSlug}`, {
             cache: "no-store",
             headers: authHeaders
           }),
-          fetch("/api/menu-settings", {
+          fetch(`/api/menu-settings?restaurantSlug=${restaurantSlug}`, {
             cache: "no-store"
           }),
           fetch(`/api/admin-analytics?restaurantSlug=${restaurantSlug}`, {
@@ -1618,6 +1618,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         kitchenLoadWarningEnabled: nextValue
       })
     });
@@ -1699,6 +1700,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         businessLunches: normalizedBusinessLunches.map((businessLunch) => ({
           id: businessLunch.id,
           enabled: businessLunch.enabled,
@@ -1777,6 +1779,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         promotions: normalizedPromotions.map((promotion) => ({
           id: promotion.id,
           enabled: promotion.enabled,
@@ -1868,6 +1871,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         recommendations: normalizedRecommendationRules.map((recommendation) => ({
           id: recommendation.id,
           enabled: recommendation.enabled,
@@ -2317,6 +2321,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         kitchenOpenEnabled: nextEnabled,
         kitchenOpenUntil: nextEnabled ? isoValue : null
       })
@@ -2369,6 +2374,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
+        restaurantSlug,
         barOpenEnabled: nextEnabled,
         barOpenUntil: nextEnabled ? isoValue : null
       })
@@ -2543,7 +2549,7 @@ export function MenuEditor() {
         "x-admin-secondary-password": secondaryCredentials?.password ?? ""
       },
       body: JSON.stringify({
-        restaurantSlug: "olive-bistro",
+        restaurantSlug,
         name: preferredName,
         description: newItem.descriptionHe,
         nameHe: newItem.nameHe || preferredName,

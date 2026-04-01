@@ -1,6 +1,40 @@
 {
   "orders": [
     {
+      "id": "ord_1775065949222",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 8,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-04-01T17:52:29.222Z",
+      "updatedAt": "2026-04-01T17:52:57.608Z",
+      "items": [
+        {
+          "id": "item_1775065949221_0n5xar",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 2,
+          "served": false
+        },
+        {
+          "id": "item_1775065949221_fy3jpy",
+          "menuItemId": "m3",
+          "category": "mains",
+          "name": "Shawarma plate",
+          "price": 54,
+          "quantity": 2,
+          "served": false
+        }
+      ],
+      "total": 166,
+      "guestContactName": "Надя",
+      "guestContactPhone": "345"
+    },
+    {
       "id": "ord_1775065185281",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

@@ -63,6 +63,40 @@ type OrderItemRow = {
   served: boolean;
 };
 
+type ClosedSessionRow = {
+  id: string;
+  restaurant_id: string;
+  table_number: number;
+  session_id: number;
+  closed_at: string;
+  total: number;
+  order_ids: unknown;
+  orders_snapshot: unknown;
+};
+
+type RestaurantRow = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
+type RestaurantTableSessionRow = {
+  restaurant_id: string;
+  table_number: number;
+  current_session_id: number;
+};
+
+type ServiceRequestRow = {
+  id: string;
+  restaurant_id: string;
+  table_number: number;
+  session_id: number;
+  kind: "waiter_call" | "bill_request";
+  status: OrderStatus;
+  created_at: string;
+  updated_at: string | null;
+};
+
 function canWriteToDirectory(directoryPath: string) {
   try {
     mkdirSync(directoryPath, { recursive: true });
@@ -951,6 +985,101 @@ function mapRowsToOrders(
   }));
 }
 
+function mapServiceRequestToRow(
+  order: Order,
+  restaurantId: string
+): ServiceRequestRow {
+  return {
+    id: order.id,
+    restaurant_id: restaurantId,
+    table_number: order.tableNumber,
+    session_id: order.sessionId,
+    kind: order.kind === "bill_request" ? "bill_request" : "waiter_call",
+    status: order.status,
+    created_at: order.createdAt,
+    updated_at: order.updatedAt ?? null
+  };
+}
+
+function mapServiceRequestRowsToOrders(
+  rows: ServiceRequestRow[],
+  restaurantLookup: Map<string, RestaurantRow>
+): Order[] {
+  return rows
+    .map((row) => {
+      const restaurant = restaurantLookup.get(row.restaurant_id);
+
+      if (!restaurant) {
+        return null;
+      }
+
+      return {
+        id: row.id,
+        restaurantSlug: restaurant.slug,
+        restaurantName: restaurant.name,
+        tableNumber: Number(row.table_number),
+        sessionId: Number(row.session_id),
+        kind: row.kind,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at ?? undefined,
+        items: [],
+        total: 0
+      } satisfies Order;
+    })
+    .filter(Boolean) as Order[];
+}
+
+function mapClosedSummaryToRow(
+  summary: ClosedTableSummary,
+  restaurantId: string
+): ClosedSessionRow {
+  return {
+    id: `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
+    restaurant_id: restaurantId,
+    table_number: summary.tableNumber,
+    session_id: summary.sessionId,
+    closed_at: summary.closedAt,
+    total: summary.total,
+    order_ids: summary.orderIds,
+    orders_snapshot: summary.orders
+  };
+}
+
+function mapClosedSessionRowsToSummaries(
+  rows: ClosedSessionRow[],
+  restaurantLookup: Map<string, RestaurantRow>
+): ClosedTableSummary[] {
+  return rows
+    .map((row) => {
+      const restaurant = restaurantLookup.get(row.restaurant_id);
+
+      if (!restaurant) {
+        return null;
+      }
+
+      const orderIds = Array.isArray(row.order_ids)
+        ? row.order_ids.map((value) => String(value))
+        : [];
+      const orders = Array.isArray(row.orders_snapshot)
+        ? (row.orders_snapshot as ClosedTableOrderSnapshot[])
+        : [];
+
+      return {
+        restaurantSlug: restaurant.slug,
+        restaurantName: restaurant.name,
+        tableNumber: Number(row.table_number),
+        sessionId: Number(row.session_id),
+        closedAt: row.closed_at,
+        total: Number(row.total) || 0,
+        orderCount: orderIds.length || orders.length,
+        orderIds,
+        orders
+      } satisfies ClosedTableSummary;
+    })
+    .filter(Boolean) as ClosedTableSummary[];
+}
+
 function isMissingTableError(error: unknown) {
   const message =
     error instanceof Error
@@ -961,7 +1090,13 @@ function isMissingTableError(error: unknown) {
 
   return (
     message.includes("relation") &&
-    (message.includes("orders_store") || message.includes("order_items_store"))
+    (
+      message.includes("orders_store") ||
+      message.includes("order_items_store") ||
+      message.includes("closed_sessions") ||
+      message.includes("restaurant_table_sessions") ||
+      message.includes("service_requests")
+    )
   );
 }
 
@@ -1455,10 +1590,22 @@ async function loadStateFromLegacySupabase(
 async function loadStateFromRowSupabase(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
 ): Promise<OrdersPersistence> {
-  const [ordersResult, orderItemsResult, metaResult] = await Promise.all([
+  const [
+    ordersResult,
+    orderItemsResult,
+    metaResult,
+    closedSessionsResult,
+    tableSessionsResult,
+    serviceRequestsResult,
+    restaurantsResult
+  ] = await Promise.all([
     supabase.from("orders_store").select("*").order("created_at", { ascending: false }),
     supabase.from("order_items_store").select("*"),
-    supabase.from("app_state").select("value").eq("key", ORDERS_META_KEY).maybeSingle()
+    supabase.from("app_state").select("value").eq("key", ORDERS_META_KEY).maybeSingle(),
+    supabase.from("closed_sessions").select("*").order("closed_at", { ascending: false }),
+    supabase.from("restaurant_table_sessions").select("*"),
+    supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
+    supabase.from("restaurants").select("id, slug, name")
   ]);
 
   if (ordersResult.error) {
@@ -1472,23 +1619,72 @@ async function loadStateFromRowSupabase(
   if (metaResult.error) {
     throw new Error(metaResult.error.message);
   }
+  if (closedSessionsResult.error) {
+    throw new Error(closedSessionsResult.error.message);
+  }
+  if (tableSessionsResult.error && !isMissingTableError(tableSessionsResult.error.message)) {
+    throw new Error(tableSessionsResult.error.message);
+  }
+  if (
+    serviceRequestsResult.error &&
+    !isMissingTableError(serviceRequestsResult.error.message)
+  ) {
+    throw new Error(serviceRequestsResult.error.message);
+  }
+  if (restaurantsResult.error) {
+    throw new Error(restaurantsResult.error.message);
+  }
 
   const rows = (ordersResult.data ?? []) as OrderRow[];
   const itemRows = (orderItemsResult.data ?? []) as OrderItemRow[];
+  const closedSessionRows = (closedSessionsResult.data ?? []) as ClosedSessionRow[];
+  const tableSessionRows = Array.isArray(tableSessionsResult.data)
+    ? (tableSessionsResult.data as RestaurantTableSessionRow[])
+    : [];
+  const serviceRequestRows = Array.isArray(serviceRequestsResult.data)
+    ? (serviceRequestsResult.data as ServiceRequestRow[])
+    : [];
+  const restaurantRows = (restaurantsResult.data ?? []) as RestaurantRow[];
+  const restaurantLookup = new Map(
+    restaurantRows.map((restaurant) => [restaurant.id, restaurant] as const)
+  );
   const orders = mapRowsToOrders(rows, itemRows);
   const defaultSessionsFromRows = [...createSessionsFromOrders(orders).entries()];
   const parsedMeta = (metaResult.data?.value ?? null) as
     | Partial<OrdersMetaPersistence>
     | null;
+  const currentTableSessions =
+    tableSessionRows.length > 0
+      ? tableSessionRows
+          .map((row) => {
+            const restaurant = restaurantLookup.get(row.restaurant_id);
+
+            if (!restaurant) {
+              return null;
+            }
+
+            return [
+              createTableKey(restaurant.slug, Number(row.table_number)),
+              Number(row.current_session_id) || 1
+            ] as [string, number];
+          })
+          .filter(Boolean) as Array<[string, number]>
+      : Array.isArray(parsedMeta?.currentTableSessions)
+        ? parsedMeta.currentTableSessions
+        : defaultSessionsFromRows;
 
   const normalized: OrdersPersistence = {
-    orders,
-    currentTableSessions: Array.isArray(parsedMeta?.currentTableSessions)
-      ? parsedMeta.currentTableSessions
-      : defaultSessionsFromRows,
-    closedTableSummaries: Array.isArray(parsedMeta?.closedTableSummaries)
-      ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
-      : []
+    orders:
+      serviceRequestRows.length > 0
+        ? [...mapServiceRequestRowsToOrders(serviceRequestRows, restaurantLookup), ...orders]
+        : orders,
+    currentTableSessions,
+    closedTableSummaries:
+      closedSessionRows.length > 0
+        ? mapClosedSessionRowsToSummaries(closedSessionRows, restaurantLookup)
+        : Array.isArray(parsedMeta?.closedTableSummaries)
+          ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
+          : []
   };
 
   // Backward compatibility: if new tables are empty, try legacy payload once.
@@ -1507,11 +1703,27 @@ async function persistStateToRowSupabase(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
   state: RuntimeState
 ) {
-  const orderRows = state.ordersStore.map(mapOrderToRow);
-  const orderItemRows = state.ordersStore.flatMap((order) =>
+  const standardOrders = state.ordersStore.filter(
+    (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
+  );
+  const serviceRequestOrders = state.ordersStore.filter(
+    (order) => order.kind === "waiter_call" || order.kind === "bill_request"
+  );
+  const orderRows = standardOrders.map(mapOrderToRow);
+  const orderItemRows = standardOrders.flatMap((order) =>
     order.items.map((item) => mapOrderItemToRow(order.id, item))
   );
-  const orderIds = state.ordersStore.map((order) => order.id);
+  const orderIds = standardOrders.map((order) => order.id);
+  const restaurantRowsResult = await supabase.from("restaurants").select("id, slug, name");
+
+  if (restaurantRowsResult.error) {
+    throw new Error(restaurantRowsResult.error.message);
+  }
+
+  const restaurantRows = (restaurantRowsResult.data ?? []) as RestaurantRow[];
+  const restaurantIdBySlug = new Map(
+    restaurantRows.map((restaurant) => [restaurant.slug, restaurant.id] as const)
+  );
 
   if (orderIds.length === 0) {
     const { error: deleteAllItemsError } = await supabase
@@ -1539,6 +1751,73 @@ async function persistStateToRowSupabase(
 
     if (deleteItemsError) {
       throw new Error(deleteItemsError.message);
+    }
+  }
+
+  const serviceRequestRows = serviceRequestOrders
+    .map((order) => {
+      const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+      return restaurantId ? mapServiceRequestToRow(order, restaurantId) : null;
+    })
+    .filter(Boolean);
+
+  try {
+    if (serviceRequestRows.length === 0) {
+      const { error: deleteServiceRequestsError } = await supabase
+        .from("service_requests")
+        .delete()
+        .neq("id", "");
+
+      if (
+        deleteServiceRequestsError &&
+        !isMissingTableError(deleteServiceRequestsError.message)
+      ) {
+        throw new Error(deleteServiceRequestsError.message);
+      }
+    } else {
+      const { error: upsertServiceRequestsError } = await supabase
+        .from("service_requests")
+        .upsert(serviceRequestRows, { onConflict: "id" });
+
+      if (
+        upsertServiceRequestsError &&
+        !isMissingTableError(upsertServiceRequestsError.message)
+      ) {
+        throw new Error(upsertServiceRequestsError.message);
+      }
+
+      const { data: existingServiceRequestRows, error: existingServiceRequestsError } =
+        await supabase.from("service_requests").select("id");
+
+      if (
+        existingServiceRequestsError &&
+        !isMissingTableError(existingServiceRequestsError.message)
+      ) {
+        throw new Error(existingServiceRequestsError.message);
+      }
+
+      const currentServiceRequestIds = serviceRequestRows.map((row) => row!.id);
+      const staleServiceRequestIds = (existingServiceRequestRows ?? [])
+        .map((row) => String((row as { id: string }).id))
+        .filter((id) => !currentServiceRequestIds.includes(id));
+
+      if (staleServiceRequestIds.length > 0) {
+        const { error: deleteStaleServiceRequestsError } = await supabase
+          .from("service_requests")
+          .delete()
+          .in("id", staleServiceRequestIds);
+
+        if (
+          deleteStaleServiceRequestsError &&
+          !isMissingTableError(deleteStaleServiceRequestsError.message)
+        ) {
+          throw new Error(deleteStaleServiceRequestsError.message);
+        }
+      }
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      throw error;
     }
   }
 
@@ -1585,17 +1864,123 @@ async function persistStateToRowSupabase(
     }
   }
 
-  const { error: metaError } = await supabase.from("app_state").upsert(
-    {
-      key: ORDERS_META_KEY,
-      value: toOrdersMetaPersistence(state),
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "key" }
-  );
+  const closedSessionRows = state.closedTableSummaries
+    .map((summary) => {
+      const restaurantId = restaurantIdBySlug.get(summary.restaurantSlug);
+      return restaurantId ? mapClosedSummaryToRow(summary, restaurantId) : null;
+    })
+    .filter(Boolean);
 
-  if (metaError) {
-    throw new Error(metaError.message);
+  if (closedSessionRows.length === 0) {
+    const { error: deleteClosedSessionsError } = await supabase
+      .from("closed_sessions")
+      .delete()
+      .neq("id", "");
+
+    if (deleteClosedSessionsError) {
+      throw new Error(deleteClosedSessionsError.message);
+    }
+  } else {
+    const { error: upsertClosedSessionsError } = await supabase
+      .from("closed_sessions")
+      .upsert(closedSessionRows, { onConflict: "id" });
+
+    if (upsertClosedSessionsError) {
+      throw new Error(upsertClosedSessionsError.message);
+    }
+
+    const { data: existingClosedSessionRows, error: existingClosedSessionsError } =
+      await supabase.from("closed_sessions").select("id");
+
+    if (existingClosedSessionsError) {
+      throw new Error(existingClosedSessionsError.message);
+    }
+
+    const currentClosedSessionIds = closedSessionRows.map((row) => row!.id);
+    const staleClosedSessionIds = (existingClosedSessionRows ?? [])
+      .map((row) => String((row as { id: string }).id))
+      .filter((id) => !currentClosedSessionIds.includes(id));
+
+    if (staleClosedSessionIds.length > 0) {
+      const { error: deleteStaleClosedSessionsError } = await supabase
+        .from("closed_sessions")
+        .delete()
+        .in("id", staleClosedSessionIds);
+
+      if (deleteStaleClosedSessionsError) {
+        throw new Error(deleteStaleClosedSessionsError.message);
+      }
+    }
+  }
+
+  const tableSessionRows = [...state.currentTableSessions.entries()]
+    .map(([key, currentSessionId]) => {
+      const [restaurantSlug, tableNumberRaw] = key.split(":");
+      const restaurantId = restaurantIdBySlug.get(restaurantSlug);
+      const tableNumber = Number.parseInt(tableNumberRaw ?? "", 10);
+
+      if (!restaurantId || !Number.isFinite(tableNumber)) {
+        return null;
+      }
+
+      return {
+        restaurant_id: restaurantId,
+        table_number: tableNumber,
+        current_session_id: currentSessionId
+      };
+    })
+    .filter(Boolean);
+  let tableSessionsStoredInDedicatedTable = false;
+
+  try {
+    if (tableSessionRows.length === 0) {
+      const { error: deleteTableSessionsError } = await supabase
+        .from("restaurant_table_sessions")
+        .delete()
+        .neq("table_number", -1);
+
+      if (deleteTableSessionsError && !isMissingTableError(deleteTableSessionsError.message)) {
+        throw new Error(deleteTableSessionsError.message);
+      }
+
+      if (!deleteTableSessionsError) {
+        tableSessionsStoredInDedicatedTable = true;
+      }
+    } else {
+      const { error: upsertTableSessionsError } = await supabase
+        .from("restaurant_table_sessions")
+        .upsert(tableSessionRows, { onConflict: "restaurant_id,table_number" });
+
+      if (upsertTableSessionsError && !isMissingTableError(upsertTableSessionsError.message)) {
+        throw new Error(upsertTableSessionsError.message);
+      }
+
+      if (!upsertTableSessionsError) {
+        tableSessionsStoredInDedicatedTable = true;
+      }
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      throw error;
+    }
+  }
+
+  if (!tableSessionsStoredInDedicatedTable) {
+    const { error: metaError } = await supabase.from("app_state").upsert(
+      {
+        key: ORDERS_META_KEY,
+        value: {
+          currentTableSessions: toOrdersMetaPersistence(state).currentTableSessions,
+          closedTableSummaries: []
+        },
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "key" }
+    );
+
+    if (metaError) {
+      throw new Error(metaError.message);
+    }
   }
 }
 

@@ -34,9 +34,12 @@ export function TableCountControl({
     let cancelled = false;
 
     async function loadSettings() {
-      const response = await fetch("/api/menu-settings", {
-        cache: "no-store"
-      });
+      const response = await fetch(
+        `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+        {
+          cache: "no-store"
+        }
+      );
 
       if (!response.ok) {
         return;
@@ -82,6 +85,7 @@ export function TableCountControl({
           : {})
       },
       body: JSON.stringify({
+        restaurantSlug,
         tableCount: draftCount
       })
     });

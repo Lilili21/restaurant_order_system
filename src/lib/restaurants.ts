@@ -1,5 +1,5 @@
 import { restaurants } from "@/lib/mock-data";
-import { getMenuSettings } from "@/lib/menu-settings";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { MenuItem, Restaurant, TableSession } from "@/lib/types";
 import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
 
@@ -8,7 +8,25 @@ const RESTAURANTS_CACHE_TTL_MS = 60_000;
 type RestaurantsCacheEntry = {
   restaurants: Restaurant[];
   expiresAt: number;
-  signature: string;
+};
+
+type RestaurantRow = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  currency: string | null;
+  is_active: boolean | null;
+};
+
+type RestaurantTableRow = {
+  id: string;
+  restaurant_id: string;
+  table_number: number;
+  access_token: string;
+  seats: number | null;
+  zone: string | null;
+  is_active: boolean | null;
 };
 
 declare global {
@@ -16,63 +34,96 @@ declare global {
   var __restaurantsCache: RestaurantsCacheEntry | undefined;
 }
 
-function buildRestaurantsSignature(
-  tableCount: number,
-  tableTokens: Record<string, string>
-) {
-  return `${tableCount}:${Object.entries(tableTokens)
-    .sort(([left], [right]) => Number(left) - Number(right))
-    .map(([key, value]) => `${key}:${value}`)
-    .join("|")}`;
+function cloneRestaurants(items: Restaurant[]) {
+  return items.map((restaurant) => ({
+    ...restaurant,
+    tables: restaurant.tables.map((table) => ({ ...table }))
+  }));
+}
+
+function getMockRestaurants() {
+  return restaurants.map((restaurant) => ({
+    ...restaurant,
+    tables: restaurant.tables.map((table) => ({ ...table }))
+  }));
+}
+
+async function getRestaurantsFromSupabase() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const [{ data: restaurantRows, error: restaurantsError }, { data: tableRows, error: tablesError }] =
+    await Promise.all([
+      supabase
+        .from("restaurants")
+        .select("id, slug, name, description, currency, is_active")
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
+      supabase
+        .from("restaurant_tables")
+        .select("id, restaurant_id, table_number, access_token, seats, zone, is_active")
+        .eq("is_active", true)
+        .order("table_number", { ascending: true })
+    ]);
+
+  if (restaurantsError || tablesError) {
+    return null;
+  }
+
+  if (!restaurantRows?.length) {
+    return null;
+  }
+
+  const tablesByRestaurant = new Map<string, RestaurantTableRow[]>();
+
+  for (const table of (tableRows ?? []) as RestaurantTableRow[]) {
+    const current = tablesByRestaurant.get(table.restaurant_id) ?? [];
+    current.push(table);
+    tablesByRestaurant.set(table.restaurant_id, current);
+  }
+
+  const normalizedRestaurants = (restaurantRows as RestaurantRow[]).map((restaurant) => {
+    const restaurantTables = tablesByRestaurant.get(restaurant.id) ?? [];
+
+    return {
+      id: restaurant.id,
+      slug: restaurant.slug,
+      name: restaurant.name,
+      description: restaurant.description ?? "",
+      currency: (restaurant.currency as Restaurant["currency"]) ?? "ILS",
+      tables: restaurantTables.map((table) => ({
+        id: table.id,
+        number: Number(table.table_number),
+        seats: table.seats ?? 4,
+        zone: table.zone ?? "Hall",
+        accessToken: table.access_token,
+        qrCodeValue: `/${restaurant.slug}/menu/${table.access_token}`
+      }))
+    } satisfies Restaurant;
+  });
+
+  return normalizedRestaurants;
 }
 
 export async function getRestaurants() {
-  const settings = await getMenuSettings();
-  const signature = buildRestaurantsSignature(
-    settings.tableCount,
-    settings.tableTokens
-  );
   const cached = globalThis.__restaurantsCache;
 
-  if (
-    cached &&
-    cached.expiresAt > Date.now() &&
-    cached.signature === signature
-  ) {
-    return cached.restaurants.map((restaurant) => ({
-      ...restaurant,
-      tables: restaurant.tables.map((table) => ({ ...table }))
-    }));
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneRestaurants(cached.restaurants);
   }
 
-  const computedRestaurants = restaurants.map((restaurant) => ({
-    ...restaurant,
-    tables: Array.from({ length: settings.tableCount }, (_, index) => {
-      const tableNumber = index + 1;
-      const baseTable = restaurant.tables[index];
-      const accessToken = settings.tableTokens[String(tableNumber)];
-
-      return {
-        id: baseTable?.id ?? `${restaurant.slug}_table_${tableNumber}`,
-        number: tableNumber,
-        seats: baseTable?.seats ?? (tableNumber <= 4 ? 2 : 4),
-        zone: baseTable?.zone ?? (tableNumber <= 4 ? "Hall A" : "Terrace"),
-        accessToken,
-        qrCodeValue: `/${restaurant.slug}/menu/${accessToken}`
-      };
-    })
-  }));
+  const computedRestaurants =
+    (await getRestaurantsFromSupabase()) ?? getMockRestaurants();
 
   globalThis.__restaurantsCache = {
-    restaurants: computedRestaurants.map((restaurant) => ({
-      ...restaurant,
-      tables: restaurant.tables.map((table) => ({ ...table }))
-    })),
-    expiresAt: Date.now() + RESTAURANTS_CACHE_TTL_MS,
-    signature
+    restaurants: cloneRestaurants(computedRestaurants),
+    expiresAt: Date.now() + RESTAURANTS_CACHE_TTL_MS
   };
 
-  return computedRestaurants;
+  return cloneRestaurants(computedRestaurants);
 }
 
 export async function getRestaurantBySlug(slug: string) {

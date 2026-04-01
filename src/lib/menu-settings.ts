@@ -118,17 +118,27 @@ type MenuSettingsCacheEntry = {
   expiresAt: number;
 };
 
+type RestaurantRow = {
+  id: string;
+  slug: string;
+};
+
 declare global {
   // eslint-disable-next-line no-var
-  var __menuSettingsCache: MenuSettingsCacheEntry | undefined;
+  var __menuSettingsCache: Record<string, MenuSettingsCacheEntry> | undefined;
 }
 
-function getSettingsCache() {
-  return globalThis.__menuSettingsCache;
+function getSettingsCacheKey(restaurantSlug?: string) {
+  return restaurantSlug?.trim() || "__global__";
 }
 
-function setSettingsCache(settings: MenuSettings) {
-  globalThis.__menuSettingsCache = {
+function getSettingsCache(restaurantSlug?: string) {
+  return globalThis.__menuSettingsCache?.[getSettingsCacheKey(restaurantSlug)];
+}
+
+function setSettingsCache(settings: MenuSettings, restaurantSlug?: string) {
+  globalThis.__menuSettingsCache ??= {};
+  globalThis.__menuSettingsCache[getSettingsCacheKey(restaurantSlug)] = {
     settings: {
       ...settings,
       tableTokens: { ...settings.tableTokens }
@@ -516,8 +526,104 @@ function getMenuSettingsSync() {
   }
 }
 
-export async function getMenuSettings() {
-  const cached = getSettingsCache();
+async function getRestaurantIdBySlug(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantSlug: string
+) {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("id, slug")
+    .eq("slug", restaurantSlug)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as RestaurantRow;
+}
+
+async function getRestaurantSettingsFromSupabase(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantSlug: string
+) {
+  const restaurant = await getRestaurantIdBySlug(supabase, restaurantSlug);
+
+  if (!restaurant) {
+    return null;
+  }
+
+  const [{ data: settingsRow, error: settingsError }, { data: tableRows, error: tablesError }] =
+    await Promise.all([
+      supabase
+        .from("restaurant_settings")
+        .select("*")
+        .eq("restaurant_id", restaurant.id)
+        .maybeSingle(),
+      supabase
+        .from("restaurant_tables")
+        .select("table_number, access_token, is_active")
+        .eq("restaurant_id", restaurant.id)
+        .eq("is_active", true)
+        .order("table_number", { ascending: true })
+    ]);
+
+  if (settingsError || tablesError) {
+    return null;
+  }
+
+  const tableRowsSafe = Array.isArray(tableRows) ? tableRows : [];
+  const tableTokens = Object.fromEntries(
+    tableRowsSafe.map((table) => [String(table.table_number), table.access_token])
+  );
+
+  const normalized = normalizeSettings({
+    ...(settingsRow ?? {}),
+    tableCount: tableRowsSafe.length || 1,
+    tableTokens
+  });
+
+  return normalized;
+}
+
+async function persistRestaurantSettingsAsync(
+  restaurantSlug: string,
+  settings: MenuSettings
+) {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    persistMenuSettings(settings);
+    setSettingsCache(settings, restaurantSlug);
+    return;
+  }
+
+  const restaurant = await getRestaurantIdBySlug(supabase, restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error(`Restaurant not found: ${restaurantSlug}`);
+  }
+
+  const { tableCount: _tableCount, tableTokens: _tableTokens, ...settingsPayload } = settings;
+
+  const { error } = await supabase.from("restaurant_settings").upsert(
+    {
+      restaurant_id: restaurant.id,
+      ...settingsPayload,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "restaurant_id" }
+  );
+
+  if (error) {
+    throw new Error(`Supabase persist failed: ${error.message}`);
+  }
+
+  setSettingsCache(settings, restaurantSlug);
+}
+
+export async function getMenuSettings(restaurantSlug?: string) {
+  const cached = getSettingsCache(restaurantSlug);
 
   if (cached && cached.expiresAt > Date.now()) {
     return {
@@ -530,7 +636,7 @@ export async function getMenuSettings() {
 
   if (!supabase) {
     const localSettings = getMenuSettingsSync();
-    setSettingsCache(localSettings);
+    setSettingsCache(localSettings, restaurantSlug);
     return {
       ...localSettings,
       tableTokens: { ...localSettings.tableTokens }
@@ -538,6 +644,21 @@ export async function getMenuSettings() {
   }
 
   try {
+    if (restaurantSlug) {
+      const restaurantSettings = await getRestaurantSettingsFromSupabase(
+        supabase,
+        restaurantSlug
+      );
+
+      if (restaurantSettings) {
+        setSettingsCache(restaurantSettings, restaurantSlug);
+        return {
+          ...restaurantSettings,
+          tableTokens: { ...restaurantSettings.tableTokens }
+        };
+      }
+    }
+
     const { data, error } = await supabase
       .from("app_state")
       .select("value")
@@ -550,7 +671,11 @@ export async function getMenuSettings() {
 
     if (!data?.value) {
       const normalized = normalizeSettings(DEFAULT_SETTINGS);
-      await persistMenuSettingsAsync(normalized);
+      if (restaurantSlug) {
+        await persistRestaurantSettingsAsync(restaurantSlug, normalized);
+      } else {
+        await persistMenuSettingsAsync(normalized);
+      }
       return {
         ...normalized,
         tableTokens: { ...normalized.tableTokens }
@@ -558,14 +683,14 @@ export async function getMenuSettings() {
     }
 
     const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
-    setSettingsCache(normalized);
+    setSettingsCache(normalized, restaurantSlug);
     return {
       ...normalized,
       tableTokens: { ...normalized.tableTokens }
     };
   } catch {
     const localSettings = getMenuSettingsSync();
-    setSettingsCache(localSettings);
+    setSettingsCache(localSettings, restaurantSlug);
     return {
       ...localSettings,
       tableTokens: { ...localSettings.tableTokens }
@@ -574,9 +699,16 @@ export async function getMenuSettings() {
 }
 
 export async function updateMenuSettings(
-  updates: Partial<MenuSettings>
+  restaurantSlugOrUpdates: string | undefined | Partial<MenuSettings>,
+  maybeUpdates?: Partial<MenuSettings>
 ): Promise<MenuSettings> {
-  const current = await getMenuSettings();
+  const restaurantSlug =
+    typeof restaurantSlugOrUpdates === "string" ? restaurantSlugOrUpdates : undefined;
+  const updates =
+    typeof restaurantSlugOrUpdates === "string"
+      ? maybeUpdates ?? {}
+      : restaurantSlugOrUpdates ?? {};
+  const current = await getMenuSettings(restaurantSlug);
   const definedUpdates = Object.fromEntries(
     Object.entries(updates).filter(([, value]) => value !== undefined)
   ) as Partial<MenuSettings>;
@@ -585,6 +717,10 @@ export async function updateMenuSettings(
     ...definedUpdates
   });
 
-  await persistMenuSettingsAsync(next);
+  if (restaurantSlug) {
+    await persistRestaurantSettingsAsync(restaurantSlug, next);
+  } else {
+    await persistMenuSettingsAsync(next);
+  }
   return next;
 }

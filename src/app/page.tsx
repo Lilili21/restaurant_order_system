@@ -1,13 +1,15 @@
 import Link from "next/link";
 
-import { getRestaurantBySlug } from "@/lib/restaurants";
+import { getRestaurants } from "@/lib/restaurants";
 
 export default async function HomePage() {
-  const restaurant = await getRestaurantBySlug("olive-bistro");
+  const restaurants = await getRestaurants();
 
-  if (!restaurant) {
+  if (restaurants.length === 0) {
     return null;
   }
+
+  const primaryRestaurant = restaurants[0];
 
   return (
     <main className="page-shell">
@@ -16,18 +18,21 @@ export default async function HomePage() {
           <p className="eyebrow">QR ordering</p>
           <h1>QR ordering</h1>
           <div className="hero-actions">
-            <Link
-              href={`/${restaurant.slug}`}
-              className="button-link button-link--hero"
-            >
-              {restaurant.name}
-            </Link>
+            {restaurants.map((restaurant) => (
+              <Link
+                key={restaurant.slug}
+                href={`/${restaurant.slug}`}
+                className="button-link button-link--hero"
+              >
+                {restaurant.name}
+              </Link>
+            ))}
           </div>
         </div>
 
         <div className="hero-card">
-          <strong>{restaurant.name}</strong>
-          <p>{restaurant.description}</p>
+          <strong>{primaryRestaurant.name}</strong>
+          <p>{primaryRestaurant.description}</p>
         </div>
       </section>
     </main>

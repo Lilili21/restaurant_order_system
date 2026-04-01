@@ -36,8 +36,9 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "desserts"
 ];
 
-export async function GET() {
-  const settings = await getMenuSettings();
+export async function GET(request: NextRequest) {
+  const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug") ?? undefined;
+  const settings = await getMenuSettings(restaurantSlug);
 
   return NextResponse.json({
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
@@ -132,6 +133,7 @@ export async function PATCH(request: NextRequest) {
       barOpenEnabled?: boolean;
       barOpenUntil?: string | null;
       tableCount?: number;
+      restaurantSlug?: string;
     };
 
     if (
@@ -642,7 +644,12 @@ export async function PATCH(request: NextRequest) {
       updates.tableCount = body.tableCount;
     }
 
-    return NextResponse.json(await updateMenuSettings(updates));
+    const restaurantSlug =
+      typeof body.restaurantSlug === "string" && body.restaurantSlug.trim()
+        ? body.restaurantSlug.trim()
+        : undefined;
+
+    return NextResponse.json(await updateMenuSettings(restaurantSlug, updates));
   } catch (error) {
     return NextResponse.json(
       {

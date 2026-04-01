@@ -46,6 +46,30 @@ type TableSessionCacheEntry = {
   expiresAt: number;
 };
 
+type RestaurantRow = {
+  id: string;
+  slug: string;
+};
+
+type MenuItemRow = {
+  id: string;
+  restaurant_id: string;
+  category: string;
+  name_he: string | null;
+  name_en: string | null;
+  name_ru: string | null;
+  description_he: string | null;
+  description_en: string | null;
+  description_ru: string | null;
+  price: number | null;
+  image: string | null;
+  show_image: boolean | null;
+  available: boolean | null;
+  badges: unknown;
+  volume_options: unknown;
+  sort_order: number | null;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var __menuStoreCache: MenuStoreCacheEntry | undefined;
@@ -78,6 +102,115 @@ function setMenuStoreCache(items: MenuItem[]) {
     items: cloneMenuItems(items),
     expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
   };
+}
+
+async function getRestaurantSlugMap(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
+) {
+  const { data, error } = await supabase.from("restaurants").select("id, slug");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = Array.isArray(data) ? (data as RestaurantRow[]) : [];
+  return new Map(rows.map((row) => [row.id, row.slug] as const));
+}
+
+async function getRestaurantIdBySlug(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantSlug: string
+) {
+  const { data, error } = await supabase
+    .from("restaurants")
+    .select("id, slug")
+    .eq("slug", restaurantSlug)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as RestaurantRow;
+}
+
+function mapMenuItemRowToMenuItem(
+  row: MenuItemRow,
+  restaurantSlug: string
+): MenuItem {
+  return normalizeMenuItem({
+    id: row.id,
+    restaurantSlug,
+    category: row.category as MenuCategory,
+    name: row.name_he ?? row.name_en ?? row.name_ru ?? "",
+    description:
+      row.description_he ?? row.description_en ?? row.description_ru ?? "",
+    nameHe: row.name_he ?? "",
+    nameEn: row.name_en ?? row.name_he ?? "",
+    nameRu: row.name_ru ?? row.name_en ?? row.name_he ?? "",
+    descriptionHe: row.description_he ?? "",
+    descriptionEn: row.description_en ?? row.description_he ?? "",
+    descriptionRu:
+      row.description_ru ?? row.description_en ?? row.description_he ?? "",
+    price: Number(row.price ?? 0),
+    image: row.image ?? "",
+    showImage: row.show_image ?? true,
+    available: row.available ?? true,
+    badges: Array.isArray(row.badges) ? (row.badges as MenuBadge[]) : [],
+    volumeOptions: Array.isArray(row.volume_options)
+      ? (row.volume_options as MenuVolumeOption[])
+      : []
+  });
+}
+
+function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
+  return {
+    id: item.id,
+    restaurant_id: restaurantId,
+    category: item.category,
+    name_he: item.nameHe,
+    name_en: item.nameEn,
+    name_ru: item.nameRu ?? item.nameEn,
+    description_he: item.descriptionHe,
+    description_en: item.descriptionEn,
+    description_ru: item.descriptionRu ?? item.descriptionEn,
+    price: item.price,
+    image: item.image,
+    show_image: item.showImage,
+    available: item.available,
+    badges: item.badges ?? [],
+    volume_options: item.volumeOptions ?? []
+  };
+}
+
+async function loadMenuItemsFromSupabase() {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const restaurantSlugMap = await getRestaurantSlugMap(supabase);
+  const { data, error } = await supabase
+    .from("menu_items")
+    .select(
+      "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, image, show_image, available, badges, volume_options, sort_order"
+    )
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const rows = Array.isArray(data) ? (data as MenuItemRow[]) : [];
+
+  return rows
+    .map((row) => {
+      const restaurantSlug = restaurantSlugMap.get(row.restaurant_id);
+      return restaurantSlug ? mapMenuItemRowToMenuItem(row, restaurantSlug) : null;
+    })
+    .filter(Boolean) as MenuItem[];
 }
 
 function getAvailableMenuCache() {
@@ -250,6 +383,13 @@ async function loadMenuItemsAsync(): Promise<MenuItem[]> {
   }
 
   try {
+    const supabaseItems = await loadMenuItemsFromSupabase();
+
+    if (supabaseItems && supabaseItems.length > 0) {
+      setMenuStoreCache(supabaseItems);
+      return cloneMenuItems(supabaseItems);
+    }
+
     const { data, error } = await supabase
       .from("app_state")
       .select("value")
@@ -289,6 +429,33 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
     setMenuStoreCache(normalized);
     clearDerivedMenuCaches();
     return;
+  }
+
+  try {
+    const restaurantRows = await getRestaurantSlugMap(supabase);
+    const slugToId = new Map(
+      [...restaurantRows.entries()].map(([id, slug]) => [slug, id] as const)
+    );
+    const rows = normalized
+      .map((item) => {
+        const restaurantId = slugToId.get(item.restaurantSlug);
+        return restaurantId ? mapMenuItemToRow(item, restaurantId) : null;
+      })
+      .filter(Boolean);
+
+    if (rows.length > 0) {
+      const { error } = await supabase.from("menu_items").upsert(rows, { onConflict: "id" });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setMenuStoreCache(normalized);
+      clearDerivedMenuCaches();
+      return;
+    }
+  } catch {
+    // Fallback to legacy storage below while migration is in progress.
   }
 
   const { error } = await supabase.from("app_state").upsert(
@@ -355,11 +522,35 @@ export async function getMenuItemById(menuItemId: string) {
 export async function createMenuItem(
   item: Omit<MenuItem, "id"> & Partial<Pick<MenuItem, "id">>
 ) {
-  const items = await loadMenuItemsAsync();
   const nextItem = normalizeMenuItem({
     ...item,
     id: item.id?.trim() || buildMenuItemId()
   } as MenuItem);
+
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    try {
+      const restaurant = await getRestaurantIdBySlug(supabase, nextItem.restaurantSlug);
+
+      if (restaurant) {
+        const { error } = await supabase
+          .from("menu_items")
+          .insert(mapMenuItemToRow(nextItem, restaurant.id));
+
+        if (!error) {
+          const current = getMenuStoreCache()?.items ?? [];
+          setMenuStoreCache([nextItem, ...current.filter((item) => item.id !== nextItem.id)]);
+          clearDerivedMenuCaches(nextItem.restaurantSlug);
+          return nextItem;
+        }
+      }
+    } catch {
+      // Fall back to legacy storage while migration is in progress.
+    }
+  }
+
+  const items = await loadMenuItemsAsync();
 
   items.push(nextItem);
   await persistMenuItemsAsync(items);
@@ -404,6 +595,29 @@ export async function updateMenuItem(
     restaurantSlug: current.restaurantSlug
   });
 
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    try {
+      const restaurant = await getRestaurantIdBySlug(supabase, current.restaurantSlug);
+
+      if (restaurant) {
+        const { error } = await supabase
+          .from("menu_items")
+          .upsert(mapMenuItemToRow(next, restaurant.id), { onConflict: "id" });
+
+        if (!error) {
+          items[index] = next;
+          setMenuStoreCache(items);
+          clearDerivedMenuCaches(current.restaurantSlug);
+          return next;
+        }
+      }
+    } catch {
+      // Fall back to legacy storage while migration is in progress.
+    }
+  }
+
   items[index] = next;
   await persistMenuItemsAsync(items);
   return next;
@@ -418,6 +632,23 @@ export async function deleteMenuItem(menuItemId: string) {
   }
 
   const [deletedItem] = items.splice(index, 1);
+
+  const supabase = getSupabaseAdminClient();
+
+  if (supabase) {
+    try {
+      const { error } = await supabase.from("menu_items").delete().eq("id", menuItemId);
+
+      if (!error) {
+        setMenuStoreCache(items);
+        clearDerivedMenuCaches(deletedItem.restaurantSlug);
+        return deletedItem;
+      }
+    } catch {
+      // Fall back to legacy storage while migration is in progress.
+    }
+  }
+
   await persistMenuItemsAsync(items);
   return deletedItem;
 }

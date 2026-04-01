@@ -20,6 +20,7 @@ type SecondaryCredentials = {
 
 type WorkingHoursControlProps = {
   credentials: SecondaryCredentials | null;
+  restaurantSlug: string;
 };
 
 type WorkingHoursRuleDraft = {
@@ -43,7 +44,10 @@ function createRuleId() {
   return `hours-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
+export function WorkingHoursControl({
+  credentials,
+  restaurantSlug
+}: WorkingHoursControlProps) {
   const [workingHoursRules, setWorkingHoursRules] = useState<WorkingHoursRuleDraft[]>([]);
   const [workingHoursFrom, setWorkingHoursFrom] = useState("");
   const [workingHoursUntil, setWorkingHoursUntil] = useState("");
@@ -57,9 +61,12 @@ export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
     let cancelled = false;
 
     async function loadSettings() {
-      const response = await fetch("/api/menu-settings", {
-        cache: "no-store"
-      });
+      const response = await fetch(
+        `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+        {
+          cache: "no-store"
+        }
+      );
 
       if (!response.ok) {
         return;
@@ -127,7 +134,7 @@ export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [restaurantSlug]);
 
   async function saveWorkingHours() {
     setSaving(true);
@@ -153,6 +160,7 @@ export function WorkingHoursControl({ credentials }: WorkingHoursControlProps) {
           : {})
       },
       body: JSON.stringify({
+        restaurantSlug,
         workingHoursRules: normalizedRules,
         workingHoursFrom: (fallbackRule?.from ?? draftFrom) || null,
         workingHoursUntil: (fallbackRule?.until ?? draftUntil) || null
