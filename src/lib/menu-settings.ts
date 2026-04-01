@@ -815,8 +815,13 @@ async function persistRestaurantSettingsAsync(
     }
   }
 
-  const syncedSettings =
-    (await getRestaurantSettingsFromSupabase(supabase, restaurantSlug)) ?? settings;
+  const syncedSettings = normalizeSettings({
+    ...settings,
+    tableCount: settings.tableCount,
+    tableTokens: Object.fromEntries(
+      activeRows.map((row) => [String(row.table_number), row.access_token])
+    )
+  });
 
   invalidateRestaurantsCache();
   setSettingsCache(syncedSettings, restaurantSlug);

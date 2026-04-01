@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { menuItems as defaultMenuItems } from "@/lib/mock-data";
+import { getRestaurantBySlug, invalidateRestaurantsCache } from "@/lib/restaurants";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
   MenuBadge,
@@ -665,8 +666,7 @@ export async function getTableSession(
     return cloneTableSession(cached.session);
   }
 
-  const { getRestaurantBySlug } = await import("@/lib/restaurants");
-  const restaurant = await getRestaurantBySlug(restaurantSlug);
+  let restaurant = await getRestaurantBySlug(restaurantSlug);
 
   if (!restaurant) {
     cache.set(cacheKey, {
@@ -676,9 +676,26 @@ export async function getTableSession(
     return null;
   }
 
-  const table = restaurant.tables.find((item) => item.accessToken === tableToken);
+  let table = restaurant.tables.find((item) => item.accessToken === tableToken);
 
   if (!table) {
+    invalidateRestaurantsCache();
+    restaurant = await getRestaurantBySlug(restaurantSlug);
+
+    if (restaurant) {
+      table = restaurant.tables.find((item) => item.accessToken === tableToken);
+    }
+  }
+
+  if (!table) {
+    cache.set(cacheKey, {
+      session: null,
+      expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+    });
+    return null;
+  }
+
+  if (!restaurant) {
     cache.set(cacheKey, {
       session: null,
       expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
