@@ -2,7 +2,7 @@
 
 import { ChangeEvent, memo } from "react";
 
-import { MenuBadge, MenuCategory } from "@/lib/types";
+import { MenuBadge, MenuCategory, MenuLanguage } from "@/lib/types";
 import { MenuCreateCard } from "@/components/admin/MenuCreateCard";
 import { MenuItemEditCard } from "@/components/admin/MenuItemEditCard";
 import {
@@ -23,8 +23,8 @@ type Props = {
   onToggleCategory: (category: MenuCategory) => void;
   onClearSelectedCategories: () => void;
   filteredItems: EditableMenuItem[];
-  newItemLanguage: "he" | "en";
-  onSetNewItemLanguage: (language: "he" | "en") => void;
+  newItemLanguage: MenuLanguage;
+  onSetNewItemLanguage: (language: MenuLanguage) => void;
   newDescriptionExpanded: boolean;
   onToggleNewDescription: () => void;
   newItem: NewMenuItemDraft;
@@ -50,8 +50,8 @@ type Props = {
     nextValue: string
   ) => string;
   getItemKind: (category: MenuCategory) => "dishes" | "drinks";
-  getItemLanguage: (itemId: string) => "he" | "en";
-  setItemLanguage: (itemId: string, language: "he" | "en") => void;
+  getItemLanguage: (itemId: string) => MenuLanguage;
+  setItemLanguage: (itemId: string, language: MenuLanguage) => void;
   expandedDescriptions: Record<string, boolean>;
   toggleItemDescription: (itemId: string) => void;
   updateDraft: (

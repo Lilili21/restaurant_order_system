@@ -2,7 +2,7 @@
 
 import { ChangeEvent } from "react";
 
-import { MenuBadge, MenuCategory } from "@/lib/types";
+import { MenuBadge, MenuCategory, MenuLanguage } from "@/lib/types";
 import {
   BadgeOptionsByKind,
   CategoryOptionsByKind,
@@ -15,8 +15,8 @@ import {
 type Props = {
   selectedKind: "dishes" | "drinks";
   categoryLabels: Record<MenuCategory, string>;
-  newItemLanguage: "he" | "en";
-  onSetNewItemLanguage: (language: "he" | "en") => void;
+  newItemLanguage: MenuLanguage;
+  onSetNewItemLanguage: (language: MenuLanguage) => void;
   newDescriptionExpanded: boolean;
   onToggleNewDescription: () => void;
   newItem: NewMenuItemDraft;
@@ -90,15 +90,42 @@ export function MenuCreateCard({
               >
                 EN
               </button>
+              <button
+                type="button"
+                className={
+                  newItemLanguage === "ru"
+                    ? "menu-editor__language-chip menu-editor__language-chip--active"
+                    : "menu-editor__language-chip"
+                }
+                onClick={() => onSetNewItemLanguage("ru")}
+              >
+                RU
+              </button>
             </div>
             <input
               className="modal-input"
               type="text"
-              placeholder={newItemLanguage === "he" ? "שם המנה" : "Dish name"}
-              value={newItemLanguage === "he" ? newItem.nameHe : newItem.nameEn}
+              placeholder={
+                newItemLanguage === "he"
+                  ? "שם המנה"
+                  : newItemLanguage === "ru"
+                    ? "Название блюда"
+                    : "Dish name"
+              }
+              value={
+                newItemLanguage === "he"
+                  ? newItem.nameHe
+                  : newItemLanguage === "ru"
+                    ? newItem.nameRu
+                    : newItem.nameEn
+              }
               onChange={(event) =>
                 updateNewItem(
-                  newItemLanguage === "he" ? "nameHe" : "nameEn",
+                  newItemLanguage === "he"
+                    ? "nameHe"
+                    : newItemLanguage === "ru"
+                      ? "nameRu"
+                      : "nameEn",
                   event.target.value
                 )
               }
@@ -142,16 +169,28 @@ export function MenuCreateCard({
           {newDescriptionExpanded ? (
             <textarea
               className="modal-input menu-editor__textarea"
-              placeholder={newItemLanguage === "he" ? "תיאור" : "Description"}
+              placeholder={
+                newItemLanguage === "he"
+                  ? "תיאור"
+                  : newItemLanguage === "ru"
+                    ? "Описание"
+                    : "Description"
+              }
               value={
                 newItemLanguage === "he"
                   ? newItem.descriptionHe
-                  : newItem.descriptionEn
+                  : newItemLanguage === "ru"
+                    ? newItem.descriptionRu
+                    : newItem.descriptionEn
               }
               dir={newItemLanguage === "he" ? "rtl" : "ltr"}
               onChange={(event) =>
                 updateNewItem(
-                  newItemLanguage === "he" ? "descriptionHe" : "descriptionEn",
+                  newItemLanguage === "he"
+                    ? "descriptionHe"
+                    : newItemLanguage === "ru"
+                      ? "descriptionRu"
+                      : "descriptionEn",
                   event.target.value
                 )
               }

@@ -179,7 +179,9 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
   const descriptionHe =
     item.descriptionHe?.trim() || item.description?.trim() || "";
   const nameEn = item.nameEn?.trim() || nameHe;
+  const nameRu = item.nameRu?.trim() || nameEn;
   const descriptionEn = item.descriptionEn?.trim() || descriptionHe;
+  const descriptionRu = item.descriptionRu?.trim() || descriptionEn;
   const image = item.image?.trim() || DEFAULT_MENU_IMAGE;
 
   return {
@@ -188,8 +190,10 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     description: descriptionHe,
     nameHe,
     nameEn,
+    nameRu,
     descriptionHe,
     descriptionEn,
+    descriptionRu,
     price: Number.isFinite(item.price) ? Math.max(0, Math.round(item.price)) : 0,
     available: item.available ?? true,
     showImage: item.showImage ?? true,
@@ -371,8 +375,10 @@ export async function updateMenuItem(
       | "description"
       | "nameHe"
       | "nameEn"
+      | "nameRu"
       | "descriptionHe"
       | "descriptionEn"
+      | "descriptionRu"
       | "price"
       | "available"
       | "showImage"

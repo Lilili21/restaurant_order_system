@@ -146,8 +146,10 @@ type RecommendationSmartSuggestion = {
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
   draftNameEn: string;
+  draftNameRu: string;
   draftDescriptionHe: string;
   draftDescriptionEn: string;
+  draftDescriptionRu: string;
   draftCategory: MenuCategory;
   draftPrice: string;
   draftVolumeOptionsText: string;
@@ -160,8 +162,10 @@ type EditableMenuItem = MenuItem & {
 type NewMenuItemDraft = {
   nameHe: string;
   nameEn: string;
+  nameRu: string;
   descriptionHe: string;
   descriptionEn: string;
+  descriptionRu: string;
   price: string;
   volumeOptionsText: string;
   image: string;
@@ -331,8 +335,11 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
     ...item,
     draftNameHe: item.nameHe || item.name,
     draftNameEn: item.nameEn || item.nameHe || item.name,
+    draftNameRu: item.nameRu || item.nameEn || item.nameHe || item.name,
     draftDescriptionHe: item.descriptionHe || item.description,
     draftDescriptionEn: item.descriptionEn || item.descriptionHe || item.description,
+    draftDescriptionRu:
+      item.descriptionRu || item.descriptionEn || item.descriptionHe || item.description,
     draftCategory: item.category,
     draftPrice: String(item.price),
     draftVolumeOptionsText: (item.volumeOptions ?? [])
@@ -342,6 +349,14 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
     draftShowImage: item.showImage ?? true,
     draftBadges: item.badges ?? []
   };
+}
+
+function getPreferredDraftName(input: {
+  nameHe?: string;
+  nameEn?: string;
+  nameRu?: string;
+}) {
+  return input.nameHe?.trim() || input.nameEn?.trim() || input.nameRu?.trim() || "";
 }
 
 function readImageFile(file: File) {
@@ -609,7 +624,7 @@ export function MenuEditor() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [recommendationsOpen, setRecommendationsOpen] = useState(false);
   const [settingsRecommendationsOpen, setSettingsRecommendationsOpen] = useState(false);
-  const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en">("he");
+  const [newItemLanguage, setNewItemLanguage] = useState<"he" | "en" | "ru">("he");
   const [newDescriptionExpanded, setNewDescriptionExpanded] = useState(false);
   const [waiterRedirecting, setWaiterRedirecting] = useState(false);
   const [dashboardOpen, setDashboardOpen] = useState(true);
@@ -621,7 +636,7 @@ export function MenuEditor() {
   const [promotionDraft, setPromotionDraft] =
     useState<EditablePromotion | null>(null);
   const [promotionMessage, setPromotionMessage] = useState<string | null>(null);
-  const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en">>(
+  const [itemLanguages, setItemLanguages] = useState<Record<string, "he" | "en" | "ru">>(
     {}
   );
   const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>(
@@ -630,8 +645,10 @@ export function MenuEditor() {
   const [newItem, setNewItem] = useState<NewMenuItemDraft>({
     nameHe: "",
     nameEn: "",
+    nameRu: "",
     descriptionHe: "",
     descriptionEn: "",
+    descriptionRu: "",
     price: "",
     volumeOptionsText: "",
     image: "",
@@ -1466,8 +1483,10 @@ export function MenuEditor() {
     field:
       | "draftNameHe"
       | "draftNameEn"
+      | "draftNameRu"
       | "draftDescriptionHe"
       | "draftDescriptionEn"
+      | "draftDescriptionRu"
       | "draftCategory"
       | "draftPrice"
       | "draftVolumeOptionsText"
@@ -2401,7 +2420,13 @@ export function MenuEditor() {
       currentItem.draftVolumeOptionsText
     );
 
-    if (!currentItem.draftNameHe.trim() || !Number.isFinite(basePrice)) {
+    const preferredName = getPreferredDraftName({
+      nameHe: currentItem.draftNameHe,
+      nameEn: currentItem.draftNameEn,
+      nameRu: currentItem.draftNameRu
+    });
+
+    if (!preferredName || !Number.isFinite(basePrice)) {
       setMessage(
         itemKind === "drinks"
           ? "Fill in the item name and at least one volume and price."
@@ -2424,13 +2449,21 @@ export function MenuEditor() {
       },
       body: JSON.stringify({
         id: itemId,
-        name: currentItem.draftNameHe,
+        name: preferredName,
         description: currentItem.draftDescriptionHe,
-        nameHe: currentItem.draftNameHe,
-        nameEn: currentItem.draftNameEn || currentItem.draftNameHe,
+        nameHe: currentItem.draftNameHe || preferredName,
+        nameEn: currentItem.draftNameEn || currentItem.draftNameRu || currentItem.draftNameHe || preferredName,
+        nameRu:
+          currentItem.draftNameRu ||
+          currentItem.draftNameEn ||
+          currentItem.draftNameHe,
         descriptionHe: currentItem.draftDescriptionHe,
         descriptionEn:
           currentItem.draftDescriptionEn || currentItem.draftDescriptionHe,
+        descriptionRu:
+          currentItem.draftDescriptionRu ||
+          currentItem.draftDescriptionEn ||
+          currentItem.draftDescriptionHe,
         price: basePrice,
         volumeOptions:
           itemKind === "drinks"
@@ -2485,7 +2518,13 @@ export function MenuEditor() {
       newItem.volumeOptionsText
     );
 
-    if (!newItem.nameHe.trim() || !Number.isFinite(basePrice)) {
+    const preferredName = getPreferredDraftName({
+      nameHe: newItem.nameHe,
+      nameEn: newItem.nameEn,
+      nameRu: newItem.nameRu
+    });
+
+    if (!preferredName || !Number.isFinite(basePrice)) {
       setMessage(
         selectedKind === "drinks"
           ? "Fill in the item name and at least one volume and price for the new entry."
@@ -2505,12 +2544,17 @@ export function MenuEditor() {
       },
       body: JSON.stringify({
         restaurantSlug: "olive-bistro",
-        name: newItem.nameHe,
+        name: preferredName,
         description: newItem.descriptionHe,
-        nameHe: newItem.nameHe,
-        nameEn: newItem.nameEn || newItem.nameHe,
+        nameHe: newItem.nameHe || preferredName,
+        nameEn: newItem.nameEn || newItem.nameRu || newItem.nameHe || preferredName,
+        nameRu: newItem.nameRu || newItem.nameEn || newItem.nameHe,
         descriptionHe: newItem.descriptionHe,
         descriptionEn: newItem.descriptionEn || newItem.descriptionHe,
+        descriptionRu:
+          newItem.descriptionRu ||
+          newItem.descriptionEn ||
+          newItem.descriptionHe,
         price: basePrice,
         volumeOptions:
           selectedKind === "drinks"
@@ -2536,8 +2580,10 @@ export function MenuEditor() {
     setNewItem({
       nameHe: "",
       nameEn: "",
+      nameRu: "",
       descriptionHe: "",
       descriptionEn: "",
+      descriptionRu: "",
       price: "",
       volumeOptionsText: "",
       image: "",
@@ -2625,7 +2671,7 @@ export function MenuEditor() {
 
   const setItemLanguage = useCallback(function setItemLanguage(
     itemId: string,
-    language: "he" | "en"
+    language: "he" | "en" | "ru"
   ) {
     setItemLanguages((current) => ({ ...current, [itemId]: language }));
   }, []);

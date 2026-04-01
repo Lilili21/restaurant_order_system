@@ -47,8 +47,10 @@ export async function PATCH(request: NextRequest) {
       description?: string;
       nameHe?: string;
       nameEn?: string;
+      nameRu?: string;
       descriptionHe?: string;
       descriptionEn?: string;
+      descriptionRu?: string;
       price?: number;
       available?: boolean;
       showImage?: boolean;
@@ -67,8 +69,10 @@ export async function PATCH(request: NextRequest) {
       description: body.description,
       nameHe: body.nameHe,
       nameEn: body.nameEn,
+      nameRu: body.nameRu,
       descriptionHe: body.descriptionHe,
       descriptionEn: body.descriptionEn,
+      descriptionRu: body.descriptionRu,
       price: body.price,
       available: body.available,
       showImage: body.showImage,
@@ -115,8 +119,10 @@ export async function POST(request: NextRequest) {
       description?: string;
       nameHe?: string;
       nameEn?: string;
+      nameRu?: string;
       descriptionHe?: string;
       descriptionEn?: string;
+      descriptionRu?: string;
       price?: number;
       available?: boolean;
       showImage?: boolean;
@@ -148,8 +154,11 @@ export async function POST(request: NextRequest) {
       description: body.description ?? "",
       nameHe: body.nameHe ?? body.name,
       nameEn: body.nameEn ?? body.name,
+      nameRu: body.nameRu ?? body.nameEn ?? body.name,
       descriptionHe: body.descriptionHe ?? body.description ?? "",
       descriptionEn: body.descriptionEn ?? body.description ?? "",
+      descriptionRu:
+        body.descriptionRu ?? body.descriptionEn ?? body.description ?? "",
       price: body.price,
       available: body.available ?? true,
       showImage: body.showImage ?? true,

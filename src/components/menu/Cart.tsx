@@ -284,6 +284,100 @@ const uiText = {
       "⭐ Leave a review",
       "📲 Follow us"
     ]
+  },
+  ru: {
+    restaurantHeader: "Olive Bistro",
+    table: "Стол",
+    tableOrderingHint: "📍 Вы оформляете заказ со стола",
+    callWaiter: "Позвать официанта",
+    requestBill: "Принести счёт",
+    serviceHelp: "Помощь / вопрос",
+    welcomeTitle: "Добро пожаловать",
+    welcomeText:
+      "Выберите блюда из меню и отправьте заказ прямо со своего стола.",
+    welcomeOk: "ОК",
+    reviewOrderTitle: "Проверьте ваш заказ",
+    reviewOrderText: "Пожалуйста, проверьте заказ перед отправкой.",
+    reviewOrderOk: "ОК",
+    reviewOrderChange: "Изменить",
+    dessertPromptTitle: "Ещё один момент",
+    dessertPromptText: "Добавить десерт?",
+    drinksPromptTitle: "Ещё один момент",
+    drinksPromptText: "Добавить напитки?",
+    dessertDrinksPromptTitle: "Ещё один момент",
+    dessertDrinksPromptText: "Добавить напиток или десерт?",
+    dessertPromptLater: "Позже",
+    dessertPromptNow: "Да",
+    serveModeTitle: "Как подать ваш заказ?",
+    serveModeText: "Выберите удобный вариант подачи.",
+    serveAll: "Подать всё вместе",
+    serveAsReady: "Подавайте по готовности",
+    newOrder: "Мой заказ",
+    emptyCart: "Ваш заказ пуст. Добавьте что-нибудь вкусное из меню.",
+    recommendationTitle: "Вам также может понравиться",
+    priorityHintTitle: "Рекомендуем",
+    addDrinkHint: "В вашем заказе пока нет напитков. Добавить что-нибудь выпить?",
+    addDessertHint: "В вашем заказе пока нет десерта. Добавить что-нибудь сладкое?",
+    addStarterHint: "В корзине сейчас только напитки. Добавить закуску?",
+    recommendationPrefix: "Вы выбрали",
+    recommendationJoiner: ". Добавить",
+    recommendationAdd: "Добавить",
+    recommendationView: "Открыть",
+    recommendationViewDrinks: "Напитки",
+    recommendationViewDesserts: "Десерты",
+    recommendationViewStarters: "Закуски",
+    total: "Итого",
+    happyHourDiscount: "Скидка Happy hour",
+    submit: "Оформить заказ",
+    submitting: "Отправка...",
+    currentOrders: "Текущие заказы",
+    currentOrdersActiveHint: "Ваш активный заказ ниже 👇",
+    orderNew: "Новый",
+    orderPreparing: "Готовится",
+    orderServed: "Подан",
+    thankYou: "Спасибо",
+    orderSent: "Ваш заказ отправлен. Мы готовим с любовью.",
+    orderStatusOptIn: "Получить WhatsApp-уведомление, когда заказ будет готов.",
+    orderStatusName: "Имя",
+    orderStatusPhone: "Номер телефона",
+    privacyPolicy: "Privacy Policy",
+    waiterCalled: "Официант вызван",
+    billRequested: "Официант скоро принесёт счёт.\nСпасибо, что были у нас!",
+    waiterServiceNote: "Официант уже идёт к вам.",
+    waiterAlreadyCalled: "Официант скоро подойдёт к вашему столику.",
+    kitchenOpen: "Кухня закроется через",
+    kitchenClosed: "Кухня закрыта",
+    kitchenClosedNote: "Сейчас доступны только напитки.",
+    barOpen: "Бар закроется через",
+    barClosed: "Бар закрыт",
+    barClosedNote: "Сейчас доступны только блюда кухни.",
+    kitchenClosedAction: "К сожалению, кухня закрыта",
+    kitchenClosedOrderCheck:
+      "Кухня закрыта. Проверьте заказ, оставьте только напитки и подтвердите ещё раз.",
+    barClosedOrderCheck:
+      "Бар закрыт. Проверьте заказ, оставьте только блюда кухни и подтвердите ещё раз.",
+    waiterAvailable: "Официант всё ещё доступен, если вам нужна помощь.",
+    kitchenLoadWarning:
+      "Из-за большого количества заказов время приготовления может быть дольше обычного. Спасибо за терпение.",
+    happyHour: "Happy hour",
+    businessLunchNow: "Бизнес-ланч доступен сейчас",
+    happyHourStartsFrom: "с",
+    happyHourUntil: "до",
+    addDish: "Добавьте хотя бы одно блюдо.",
+    submitCooldown: "Этот заказ уже был отправлен.",
+    submitRetrySafe:
+      "Мы не смогли подтвердить получение заказа. Корзина сохранена, можно безопасно попробовать ещё раз без дубля.",
+    submitLoadingNote: "Отправляем… Пожалуйста, не закрывайте страницу.",
+    submitError: "Не удалось отправить заказ",
+    waiterError: "Не удалось вызвать официанта",
+    billError: "Не удалось запросить счёт",
+    close: "Закрыть",
+    jumpToOrder: "Мой заказ",
+    quickInfo: [
+      "📍 Другие локации",
+      "⭐ Оставить отзыв",
+      "📲 Подписаться"
+    ]
   }
 } as const;
 
@@ -439,28 +533,28 @@ export function Cart({
   const shouldAnimateSubmitButton = detailedItems.length > 0 && !submitDisabled;
   const promoCategoryLabels = useMemo<Record<MenuCategory, string>>(
     () => ({
-      starters: language === "he" ? "מנות פתיחה" : "starters",
-      mains: language === "he" ? "עיקריות" : "main courses",
-      drinks: language === "he" ? "drinks" : "drinks",
-      fluids: language === "he" ? "fluids" : "fluids",
-      draft: language === "he" ? "draft" : "draft",
-      bottled: language === "he" ? "bottled" : "bottled",
-      fuel: language === "he" ? "fuel" : "fuel",
-      whiskey: language === "he" ? "whiskey" : "whiskey",
-      vodka: language === "he" ? "vodka" : "vodka",
-      rum: language === "he" ? "rum" : "rum",
-      cognac: language === "he" ? "cognac" : "cognac",
-      gin: language === "he" ? "gin" : "gin",
-      tequila: language === "he" ? "tequila" : "tequila",
-      absent: language === "he" ? "absent" : "absent",
-      ouzo: language === "he" ? "ouzo" : "ouzo",
-      likers: language === "he" ? "likers" : "likers",
+      starters: language === "he" ? "מנות פתיחה" : language === "ru" ? "закуски" : "starters",
+      mains: language === "he" ? "עיקריות" : language === "ru" ? "основные блюда" : "main courses",
+      drinks: language === "ru" ? "напитки" : "drinks",
+      fluids: language === "ru" ? "напитки" : "fluids",
+      draft: language === "ru" ? "разливное" : "draft",
+      bottled: language === "ru" ? "бутылочное" : "bottled",
+      fuel: language === "ru" ? "fuel" : "fuel",
+      whiskey: language === "ru" ? "виски" : "whiskey",
+      vodka: language === "ru" ? "водка" : "vodka",
+      rum: language === "ru" ? "ром" : "rum",
+      cognac: language === "ru" ? "коньяк" : "cognac",
+      gin: language === "ru" ? "джин" : "gin",
+      tequila: language === "ru" ? "текила" : "tequila",
+      absent: language === "ru" ? "абсент" : "absent",
+      ouzo: language === "ru" ? "узо" : "ouzo",
+      likers: language === "ru" ? "ликёры" : "likers",
       two_component_mixture:
-        language === "he" ? "2 component mixture" : "2 component mixture",
-      dot4: language === "he" ? "DOT 4" : "DOT 4",
+        language === "ru" ? "2-компонентный микс" : "2 component mixture",
+      dot4: "DOT 4",
       non_alcoholic_drinks:
-        language === "he" ? "משקאות קלים" : "non-alcoholic drinks",
-      desserts: language === "he" ? "קינוחים" : "desserts"
+        language === "he" ? "משקאות קלים" : language === "ru" ? "безалкогольные напитки" : "non-alcoholic drinks",
+      desserts: language === "he" ? "קינוחים" : language === "ru" ? "десерты" : "desserts"
     }),
     [language]
   );
@@ -583,7 +677,7 @@ export function Cart({
           `🎉 ${baseText}`,
           promotion.discountPercent > 0 ? `-${promotion.discountPercent}%` : null,
           promoCategorySummary
-            ? `${language === "he" ? "על" : "on"} ${promoCategorySummary}`
+            ? `${language === "he" ? "על" : language === "ru" ? "на" : "on"} ${promoCategorySummary}`
             : null
         ]
           .filter(Boolean)
@@ -600,7 +694,7 @@ export function Cart({
         const baseText = businessLunch.text.trim() || text.businessLunchNow;
 
         return categorySummary
-          ? `🍽 ${baseText} · ${language === "he" ? "על" : "on"} ${categorySummary}`
+          ? `🍽 ${baseText} · ${language === "he" ? "על" : language === "ru" ? "на" : "on"} ${categorySummary}`
           : `🍽 ${baseText}`;
       }),
     [activeBusinessLunches, language, promoCategoryLabels, text.businessLunchNow]
@@ -644,8 +738,10 @@ export function Cart({
 
     const baseName =
       language === "he"
-      ? menuItem.nameHe || menuItem.name
-      : menuItem.nameEn || menuItem.nameHe || menuItem.name;
+        ? menuItem.nameHe || menuItem.name
+        : language === "ru"
+          ? menuItem.nameRu || menuItem.nameEn || menuItem.nameHe || menuItem.name
+          : menuItem.nameEn || menuItem.nameHe || menuItem.name;
 
     return volumeLabel ? `${baseName} · ${volumeLabel}` : baseName;
   }
@@ -941,7 +1037,7 @@ export function Cart({
       `menu-language:${restaurantSlug}:${tableToken}`
     );
 
-    if (savedLanguage === "he" || savedLanguage === "en") {
+    if (savedLanguage === "he" || savedLanguage === "en" || savedLanguage === "ru") {
       setLanguage(savedLanguage);
     }
   }, [restaurantSlug, tableToken]);
@@ -1509,8 +1605,9 @@ export function Cart({
   }
 
   function formatOrderLabel(timestamp: string) {
-    const locale = language === "he" ? "he-IL" : "en-US";
-    const prefix = language === "he" ? "הזמנה" : "Order";
+    const locale =
+      language === "he" ? "he-IL" : language === "ru" ? "ru-RU" : "en-US";
+    const prefix = language === "he" ? "הזמנה" : language === "ru" ? "Заказ" : "Order";
 
     return `${prefix} · ${new Date(timestamp).toLocaleTimeString(locale, {
       hour12: false,
@@ -1623,7 +1720,7 @@ export function Cart({
                 ? "הודעה"
                 : language === "en"
                   ? "Message"
-                  : "Message"
+                  : "Сообщение"
             }
           >
             <p className="modal-card__message">{dialogMessage}</p>
@@ -1870,6 +1967,17 @@ export function Cart({
                   onClick={() => setNextLanguage("en")}
                 >
                   EN
+                </button>
+                <button
+                  className={
+                    language === "ru"
+                      ? "language-toggle__button language-toggle__button--active"
+                      : "language-toggle__button"
+                  }
+                  type="button"
+                  onClick={() => setNextLanguage("ru")}
+                >
+                  RU
                 </button>
               </div>
             </div>

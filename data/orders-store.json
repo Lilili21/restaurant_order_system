@@ -1,6 +1,29 @@
 {
   "orders": [
     {
+      "id": "ord_1775065185281",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 8,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-04-01T17:39:45.281Z",
+      "updatedAt": "2026-04-01T17:39:45.281Z",
+      "items": [
+        {
+          "id": "item_1775065185281_huox8q",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 32
+    },
+    {
       "id": "ord_1775037884975",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

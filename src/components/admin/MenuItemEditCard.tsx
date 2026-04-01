@@ -2,7 +2,7 @@
 
 import { ChangeEvent } from "react";
 
-import { MenuBadge, MenuCategory } from "@/lib/types";
+import { MenuBadge, MenuCategory, MenuLanguage } from "@/lib/types";
 import {
   BadgeOptionsByKind,
   CategoryOptionsByKind,
@@ -23,8 +23,8 @@ type Props = {
   addVolumeRow: (value: string) => string;
   removeVolumeRow: (value: string) => string;
   updateVolumeRow: VolumeRowUpdater;
-  getItemLanguage: (itemId: string) => "he" | "en";
-  setItemLanguage: (itemId: string, language: "he" | "en") => void;
+  getItemLanguage: (itemId: string) => MenuLanguage;
+  setItemLanguage: (itemId: string, language: MenuLanguage) => void;
   expandedDescriptions: Record<string, boolean>;
   toggleItemDescription: (itemId: string) => void;
   updateDraft: (
@@ -100,17 +100,44 @@ export function MenuItemEditCard({
             >
               EN
             </button>
+            <button
+              type="button"
+              className={
+                itemLanguage === "ru"
+                  ? "menu-editor__language-chip menu-editor__language-chip--active"
+                  : "menu-editor__language-chip"
+              }
+              onClick={() => setItemLanguage(item.id, "ru")}
+            >
+              RU
+            </button>
           </div>
           <input
             className="modal-input"
             type="text"
-            placeholder={itemLanguage === "he" ? "שם המנה" : "Dish name"}
-            value={itemLanguage === "he" ? item.draftNameHe : item.draftNameEn}
+            placeholder={
+              itemLanguage === "he"
+                ? "שם המנה"
+                : itemLanguage === "ru"
+                  ? "Название блюда"
+                  : "Dish name"
+            }
+            value={
+              itemLanguage === "he"
+                ? item.draftNameHe
+                : itemLanguage === "ru"
+                  ? item.draftNameRu
+                  : item.draftNameEn
+            }
             dir={itemLanguage === "he" ? "rtl" : "ltr"}
             onChange={(event) =>
               updateDraft(
                 item.id,
-                itemLanguage === "he" ? "draftNameHe" : "draftNameEn",
+                itemLanguage === "he"
+                  ? "draftNameHe"
+                  : itemLanguage === "ru"
+                    ? "draftNameRu"
+                    : "draftNameEn",
                 event.target.value
               )
             }
@@ -158,11 +185,19 @@ export function MenuItemEditCard({
           {expandedDescriptions[item.id] ? (
             <textarea
               className="modal-input menu-editor__textarea"
-              placeholder={itemLanguage === "he" ? "תיאור" : "Description"}
+              placeholder={
+                itemLanguage === "he"
+                  ? "תיאור"
+                  : itemLanguage === "ru"
+                    ? "Описание"
+                    : "Description"
+              }
               value={
                 itemLanguage === "he"
                   ? item.draftDescriptionHe
-                  : item.draftDescriptionEn
+                  : itemLanguage === "ru"
+                    ? item.draftDescriptionRu
+                    : item.draftDescriptionEn
               }
               dir={itemLanguage === "he" ? "rtl" : "ltr"}
               onChange={(event) =>
@@ -170,7 +205,9 @@ export function MenuItemEditCard({
                   item.id,
                   itemLanguage === "he"
                     ? "draftDescriptionHe"
-                    : "draftDescriptionEn",
+                    : itemLanguage === "ru"
+                      ? "draftDescriptionRu"
+                      : "draftDescriptionEn",
                   event.target.value
                 )
               }

@@ -6,20 +6,20 @@ import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
 const badgeMeta: Record<
   MenuBadge,
-  { icon: string; label: { he: string; en: string } }
+  { icon: string; label: { he: string; en: string; ru: string } }
 > = {
-  chef_special: { icon: "🔥", label: { he: "מיוחד של השף", en: "Chef's special" } },
-  most_popular: { icon: "⭐", label: { he: "הכי פופולרי", en: "Most popular" } },
-  vegan: { icon: "🌱", label: { he: "טבעוני", en: "Vegan" } },
-  spicy: { icon: "🌶️", label: { he: "חריף", en: "Spicy" } },
-  kids_favorite: { icon: "🧸", label: { he: "אהוב על ילדים", en: "Kids favorite" } },
-  new: { icon: "🆕", label: { he: "חדש", en: "New" } },
-  kosher: { icon: "Ⓚ", label: { he: "כשר", en: "Kosher" } },
-  meat: { icon: "🥩", label: { he: "בשרי", en: "Meat" } },
-  dairy: { icon: "🧀", label: { he: "חלבי", en: "Dairy" } },
-  gluten_free: { icon: "🌾", label: { he: "ללא גלוטן", en: "Gluten free" } },
-  dairy_free: { icon: "🥛", label: { he: "ללא חלב", en: "Dairy free" } },
-  nut_free: { icon: "🥜", label: { he: "ללא אגוזים", en: "Nut free" } }
+  chef_special: { icon: "🔥", label: { he: "מיוחד של השף", en: "Chef's special", ru: "Блюдо от шефа" } },
+  most_popular: { icon: "⭐", label: { he: "הכי פופולרי", en: "Most popular", ru: "Самое популярное" } },
+  vegan: { icon: "🌱", label: { he: "טבעוני", en: "Vegan", ru: "Веганское" } },
+  spicy: { icon: "🌶️", label: { he: "חריף", en: "Spicy", ru: "Острое" } },
+  kids_favorite: { icon: "🧸", label: { he: "אהוב על ילדים", en: "Kids favorite", ru: "Любят дети" } },
+  new: { icon: "🆕", label: { he: "חדש", en: "New", ru: "Новинка" } },
+  kosher: { icon: "Ⓚ", label: { he: "כשר", en: "Kosher", ru: "Кошерно" } },
+  meat: { icon: "🥩", label: { he: "בשרי", en: "Meat", ru: "Мясное" } },
+  dairy: { icon: "🧀", label: { he: "חלבי", en: "Dairy", ru: "Молочное" } },
+  gluten_free: { icon: "🌾", label: { he: "ללא גלוטן", en: "Gluten free", ru: "Без глютена" } },
+  dairy_free: { icon: "🥛", label: { he: "ללא חלב", en: "Dairy free", ru: "Без молока" } },
+  nut_free: { icon: "🥜", label: { he: "ללא אגוזים", en: "Nut free", ru: "Без орехов" } }
 };
 
 const imageBadgeSet = new Set<MenuBadge>([
@@ -57,15 +57,23 @@ export function MenuItemCard({
   onAdd,
   onDecrease
 }: MenuItemCardProps) {
-  const addLabel = language === "he" ? "הוסף" : "Add";
+  const addLabel =
+    language === "he" ? "הוסף" : language === "ru" ? "Добавить" : "Add";
   const name =
     language === "he"
       ? item.nameHe || item.name
-      : item.nameEn || item.nameHe || item.name;
+      : language === "ru"
+        ? item.nameRu || item.nameEn || item.nameHe || item.name
+        : item.nameEn || item.nameHe || item.name;
   const description =
     language === "he"
       ? item.descriptionHe || item.description
-      : item.descriptionEn || item.descriptionHe || item.description;
+      : language === "ru"
+        ? item.descriptionRu ||
+          item.descriptionEn ||
+          item.descriptionHe ||
+          item.description
+        : item.descriptionEn || item.descriptionHe || item.description;
   const hasImage = Boolean(item.showImage);
   const imageBadges = hasImage
     ? (item.badges ?? []).filter((badge) => imageBadgeSet.has(badge))

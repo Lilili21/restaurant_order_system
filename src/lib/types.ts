@@ -37,7 +37,7 @@ export type MenuCategory =
   | "dot4"
   | "non_alcoholic_drinks"
   | "desserts";
-export type MenuLanguage = "he" | "en";
+export type MenuLanguage = "he" | "en" | "ru";
 export type MenuBadge =
   | "chef_special"
   | "most_popular"
@@ -66,8 +66,10 @@ export type MenuItem = {
   description: string;
   nameHe: string;
   nameEn: string;
+  nameRu?: string;
   descriptionHe: string;
   descriptionEn: string;
+  descriptionRu?: string;
   price: number;
   image: string;
   showImage: boolean;

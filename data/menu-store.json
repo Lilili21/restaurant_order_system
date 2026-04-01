@@ -22,7 +22,9 @@
         "label": "",
         "price": 50
       }
-    ]
+    ],
+    "nameRu": "Captain Morgan",
+    "descriptionRu": "Classic dark rum, served in your selected pour."
   },
   {
     "id": "m_1773757074844",
@@ -45,7 +47,9 @@
         "label": "",
         "price": 20
       }
-    ]
+    ],
+    "nameRu": "Pina Colada",
+    "descriptionRu": "A tropical cocktail with rum, pineapple and coconut."
   },
   {
     "id": "m_1773741164354",
@@ -80,7 +84,9 @@
         "label": "1L",
         "price": 42
       }
-    ]
+    ],
+    "nameRu": "Fresh Orange Juice",
+    "descriptionRu": "Freshly squeezed orange juice, served cold."
   },
   {
     "id": "m_soft_cola",
@@ -103,7 +109,9 @@
         "label": "330ml",
         "price": 14
       }
-    ]
+    ],
+    "nameRu": "Coca-Cola",
+    "descriptionRu": "A chilled personal bottle of Coca-Cola."
   },
   {
     "id": "m_soft_water",
@@ -126,7 +134,9 @@
         "label": "500ml",
         "price": 10
       }
-    ]
+    ],
+    "nameRu": "Still Water",
+    "descriptionRu": "A chilled bottle of still mineral water."
   },
   {
     "id": "m_soft_sparkling",
@@ -149,7 +159,9 @@
         "label": "330ml",
         "price": 12
       }
-    ]
+    ],
+    "nameRu": "Sparkling Water",
+    "descriptionRu": "A refreshing bottle of sparkling water."
   },
   {
     "id": "m_soft_iced_tea",
@@ -172,12 +184,14 @@
         "label": "330ml",
         "price": 14
       }
-    ]
+    ],
+    "nameRu": "Peach Iced Tea",
+    "descriptionRu": "Peach iced tea, served chilled."
   },
   {
     "id": "m_1773255842139",
     "restaurantSlug": "olive-bistro",
-    "category": "starters",
+    "category": "mains",
     "name": "חביתה 5",
     "description": "חביתה אוורירית.",
     "price": 100,
@@ -192,7 +206,9 @@
       "vegan",
       "most_popular"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Omelette 5",
+    "descriptionRu": "Fluffy omelette."
   },
   {
     "id": "m1",
@@ -212,7 +228,9 @@
       "spicy",
       "chef_special"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Hummus with pita",
+    "descriptionRu": "Classic hummus, olive oil and warm pita."
   },
   {
     "id": "m2",
@@ -232,7 +250,9 @@
       "new",
       "gluten_free"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Tabbouleh salad",
+    "descriptionRu": "Bulgur, lots of greens, lemon, tomatoes and mint."
   },
   {
     "id": "m3",
@@ -252,7 +272,9 @@
       "kids_favorite",
       "dairy_free"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Shawarma plate",
+    "descriptionRu": "Chicken, potatoes, pickles, tahini and fresh salad."
   },
   {
     "id": "m4",
@@ -271,7 +293,9 @@
     "badges": [
       "nut_free"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Salmon fillet",
+    "descriptionRu": "Served with bulgur and lemon sauce."
   },
   {
     "id": "m5",
@@ -294,7 +318,9 @@
         "label": "",
         "price": 10
       }
-    ]
+    ],
+    "nameRu": "Mint lemonade",
+    "descriptionRu": "Homemade lemonade without syrups."
   },
   {
     "id": "m6",
@@ -313,6 +339,65 @@
     "badges": [
       "gluten_free"
     ],
-    "volumeOptions": []
+    "volumeOptions": [],
+    "nameRu": "Kanafeh",
+    "descriptionRu": "Warm dessert with cheese, pistachios and syrup."
+  },
+  {
+    "restaurantSlug": "olive-bistro",
+    "name": "מרק",
+    "description": "",
+    "nameHe": "מרק",
+    "nameEn": "soup",
+    "nameRu": "soup",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "descriptionRu": "",
+    "price": 10,
+    "available": true,
+    "showImage": false,
+    "category": "starters",
+    "image": "/images/default-menu-item.svg",
+    "badges": [],
+    "volumeOptions": [],
+    "id": "m_1775065258299"
+  },
+  {
+    "restaurantSlug": "olive-bistro",
+    "name": "גלידה",
+    "description": "",
+    "nameHe": "גלידה",
+    "nameEn": "ice cream",
+    "nameRu": "мороженное",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "descriptionRu": "",
+    "price": 20,
+    "available": true,
+    "showImage": true,
+    "category": "desserts",
+    "image": "/images/default-menu-item.svg",
+    "badges": [],
+    "volumeOptions": [],
+    "id": "m_1775065302129"
+  },
+  {
+    "restaurantSlug": "olive-bistro",
+    "name": "cheesecake",
+    "description": "",
+    "nameHe": "cheesecake",
+    "nameEn": "cheesecake",
+    "nameRu": "cheesecake",
+    "descriptionHe": "",
+    "descriptionEn": "",
+    "descriptionRu": "",
+    "price": 20,
+    "available": true,
+    "showImage": false,
+    "category": "desserts",
+    "image": "/images/default-menu-item.svg",
+    "badges": [],
+    "volumeOptions": [],
+    "id": "m_1775065537069"
   }
 ]

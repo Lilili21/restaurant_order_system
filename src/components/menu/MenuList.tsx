@@ -75,6 +75,30 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     dot4: "🛢 DOT 4",
     non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
     desserts: "🍰 Desserts"
+  },
+  ru: {
+    dishes: "🍽️ Блюда",
+    drinks_group: "🍹 Напитки",
+    starters: "🥗 Закуски",
+    mains: "🍲 Основные блюда",
+    drinks: "🍹 Напитки",
+    fluids: "🍹 Напитки",
+    draft: "🍺 Разливное",
+    bottled: "🍾 Бутылочное",
+    fuel: "⛽ Fuel",
+    whiskey: "🥃 Виски",
+    vodka: "🍸 Водка",
+    rum: "🥃 Ром",
+    cognac: "🥃 Коньяк",
+    gin: "🍸 Джин",
+    tequila: "🍸 Текила",
+    absent: "🍸 Абсент",
+    ouzo: "🍸 Узо",
+    likers: "🍷 Ликёры",
+    two_component_mixture: "🧪 2-компонентный микс",
+    dot4: "🛢 DOT 4",
+    non_alcoholic_drinks: "🥤 Безалкогольные напитки",
+    desserts: "🍰 Десерты"
   }
 };
 

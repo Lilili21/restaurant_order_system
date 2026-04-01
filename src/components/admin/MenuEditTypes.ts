@@ -7,8 +7,10 @@ import { MenuBadge, MenuCategory, MenuItem } from "@/lib/types";
 export type EditableMenuItem = MenuItem & {
   draftNameHe: string;
   draftNameEn: string;
+  draftNameRu: string;
   draftDescriptionHe: string;
   draftDescriptionEn: string;
+  draftDescriptionRu: string;
   draftCategory: MenuCategory;
   draftPrice: string;
   draftVolumeOptionsText: string;
@@ -21,8 +23,10 @@ export type EditableMenuItem = MenuItem & {
 export type NewMenuItemDraft = {
   nameHe: string;
   nameEn: string;
+  nameRu: string;
   descriptionHe: string;
   descriptionEn: string;
+  descriptionRu: string;
   price: string;
   volumeOptionsText: string;
   image: string;
@@ -36,8 +40,10 @@ export type NewMenuItemDraft = {
 export type NewItemField =
   | "nameHe"
   | "nameEn"
+  | "nameRu"
   | "descriptionHe"
   | "descriptionEn"
+  | "descriptionRu"
   | "price"
   | "volumeOptionsText"
   | "image"
@@ -50,8 +56,10 @@ export type NewItemField =
 export type DraftField =
   | "draftNameHe"
   | "draftNameEn"
+  | "draftNameRu"
   | "draftDescriptionHe"
   | "draftDescriptionEn"
+  | "draftDescriptionRu"
   | "draftCategory"
   | "draftPrice"
   | "draftVolumeOptionsText"
