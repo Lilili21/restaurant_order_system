@@ -4,11 +4,15 @@ type ClientCacheEnvelope<T> = {
 };
 
 function getStorage(kind: "local" | "session") {
-  if (typeof window === "undefined") {
+  try {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    return kind === "local" ? window.localStorage : window.sessionStorage;
+  } catch {
     return null;
   }
-
-  return kind === "local" ? window.localStorage : window.sessionStorage;
 }
 
 function readClientCacheValue<T>(

@@ -336,6 +336,7 @@ export function Cart({
   const [flyingOrderItems, setFlyingOrderItems] = useState<FlyingOrderItem[]>([]);
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const orderPanelRef = useRef<HTMLElement | null>(null);
+  const menuSectionRef = useRef<HTMLDivElement | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
   const lastSuccessfulOrderSignatureRef = useRef<{
@@ -895,6 +896,16 @@ export function Cart({
     text.recommendationViewDrinks,
     text.recommendationViewStarters
   ]);
+
+  function jumpToMenuFilter(filter: MenuFilter) {
+    setSelectedMenuFilter(filter);
+    window.requestAnimationFrame(() => {
+      menuSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+  }
 
   function createOrderPayloadSignature(serveMode: ServeMode) {
     const normalizedItems = [...items]
@@ -1977,18 +1988,20 @@ export function Cart({
         </section>
 
         <div className="content-grid">
-          <MenuList
-            items={visibleMenu}
-            language={language}
-            quantities={quantities}
-            orderingEnabled={orderingEnabled}
-            dishesClosed={showKitchenClosedBanner}
-            drinksClosed={showBarClosedBanner}
-            categoryDiscounts={categoryDiscounts}
-            onAdd={addItem}
-            onDecrease={decreaseItem}
-            selectedFilter={effectiveSelectedFilter}
-          />
+          <div ref={menuSectionRef}>
+            <MenuList
+              items={visibleMenu}
+              language={language}
+              quantities={quantities}
+              orderingEnabled={orderingEnabled}
+              dishesClosed={showKitchenClosedBanner}
+              drinksClosed={showBarClosedBanner}
+              categoryDiscounts={categoryDiscounts}
+              onAdd={addItem}
+              onDecrease={decreaseItem}
+              selectedFilter={effectiveSelectedFilter}
+            />
+          </div>
 
           {orderingEnabled ? (
           <aside
@@ -2069,7 +2082,7 @@ export function Cart({
                     <button
                       type="button"
                       className="button-success cart-recommendation__button cart-recommendation__button--priority"
-                      onClick={() => setSelectedMenuFilter(suggestion.filter)}
+                      onClick={() => jumpToMenuFilter(suggestion.filter)}
                     >
                       {suggestion.buttonLabel}
                     </button>
@@ -2122,7 +2135,7 @@ export function Cart({
                           return;
                         }
 
-                        setSelectedMenuFilter(recommendation.suggestedCategory);
+                        jumpToMenuFilter(recommendation.suggestedCategory);
                       }}
                     >
                       {recommendation.kind === "item"

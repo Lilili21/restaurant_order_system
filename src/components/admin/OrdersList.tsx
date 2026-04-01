@@ -207,15 +207,59 @@ type OrdersFiltersCache = {
   selectedKitchenStatuses: Array<"new" | "on_time" | "late">;
 };
 
-export function OrdersList() {
-  const cachedOrders = readSessionCache<Order[]>(
+function readCachedOrders() {
+  const cachedOrders = readSessionCache<unknown>(
     ORDERS_CACHE_KEY,
     ORDERS_CACHE_TTL_MS
   );
-  const cachedFilters = readLocalCache<OrdersFiltersCache>(
+
+  return Array.isArray(cachedOrders) ? (cachedOrders as Order[]) : null;
+}
+
+function readCachedFilters(): OrdersFiltersCache {
+  const cachedFilters = readLocalCache<unknown>(
     ORDERS_FILTERS_CACHE_KEY,
     ORDERS_FILTERS_CACHE_TTL_MS
   );
+
+  if (!cachedFilters || typeof cachedFilters !== "object") {
+    return {
+      selectedTables: [],
+      selectedZone: "hall",
+      selectedKitchenStatuses: ["new", "on_time", "late"]
+    };
+  }
+
+  const candidate = cachedFilters as Partial<OrdersFiltersCache>;
+  const selectedZone =
+    candidate.selectedZone === "hall" ||
+    candidate.selectedZone === "kitchen" ||
+    candidate.selectedZone === "bar"
+      ? candidate.selectedZone
+      : "hall";
+  const selectedTables = Array.isArray(candidate.selectedTables)
+    ? candidate.selectedTables.filter((value): value is number => typeof value === "number")
+    : [];
+  const selectedKitchenStatuses = Array.isArray(candidate.selectedKitchenStatuses)
+    ? candidate.selectedKitchenStatuses.filter(
+        (value): value is "new" | "on_time" | "late" =>
+          value === "new" || value === "on_time" || value === "late"
+      )
+    : [];
+
+  return {
+    selectedTables,
+    selectedZone,
+    selectedKitchenStatuses:
+      selectedKitchenStatuses.length > 0
+        ? selectedKitchenStatuses
+        : ["new", "on_time", "late"]
+  };
+}
+
+export function OrdersList() {
+  const cachedOrders = readCachedOrders();
+  const cachedFilters = readCachedFilters();
   const [orders, setOrders] = useState<Order[]>(() => cachedOrders ?? []);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
