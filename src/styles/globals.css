@@ -797,7 +797,7 @@ button:disabled {
   justify-items: end;
   gap: 16px;
   width: 100%;
-  margin-top: -168px;
+  margin-top: -72px;
   margin-bottom: 56px;
 }
 
@@ -892,6 +892,30 @@ button:disabled {
   box-shadow:
     0 10px 20px rgba(55, 36, 20, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 1320px) {
+  .menu-editor__toolbar {
+    margin-top: -24px;
+    justify-items: stretch;
+  }
+
+  .menu-editor__toolbar-row {
+    justify-content: flex-start;
+  }
+
+  .menu-editor__toolbar-group {
+    max-width: 100%;
+  }
+
+  .menu-editor__toolbar-group--open {
+    width: min(100%, 760px);
+    justify-self: start;
+  }
+
+  .menu-editor__toolbar-subrow {
+    justify-content: flex-start;
+  }
 }
 
 .admin-menu-bubble__chevron {

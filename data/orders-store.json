@@ -1,6 +1,38 @@
 {
   "orders": [
     {
+      "id": "ord_1775036040340",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 5,
+      "sessionId": 4,
+      "status": "new",
+      "serveMode": "as_ready",
+      "createdAt": "2026-04-01T09:34:00.340Z",
+      "updatedAt": "2026-04-01T09:34:16.839Z",
+      "items": [
+        {
+          "id": "item_1775036040340_cn9apq",
+          "menuItemId": "m2",
+          "category": "starters",
+          "name": "Tabbouleh salad",
+          "price": 29,
+          "quantity": 1,
+          "served": false
+        },
+        {
+          "id": "item_1775036056837_y5gb6v",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "served": false
+        }
+      ],
+      "total": 61
+    },
+    {
       "id": "ord_1775031567107",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",

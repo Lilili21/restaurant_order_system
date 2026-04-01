@@ -28,7 +28,7 @@ export function RestaurantLanding({
               href={`/${restaurantSlug}/waiter/orders`}
               className="button-link button-link--hero"
             >
-              Waiter
+              Live Orders
             </Link>
             <Link
               href={`/${restaurantSlug}/admin`}

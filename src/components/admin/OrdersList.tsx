@@ -258,21 +258,19 @@ function readCachedFilters(): OrdersFiltersCache {
 }
 
 export function OrdersList() {
-  const cachedOrders = readCachedOrders();
-  const cachedFilters = readCachedFilters();
-  const [orders, setOrders] = useState<Order[]>(() => cachedOrders ?? []);
+  const [orders, setOrders] = useState<Order[]>(() => readCachedOrders() ?? []);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
-  const [loading, setLoading] = useState(() => cachedOrders === null);
+  const [loading, setLoading] = useState(() => readCachedOrders() === null);
   const [selectedTables, setSelectedTables] = useState<number[]>(
-    () => cachedFilters?.selectedTables ?? []
+    () => readCachedFilters().selectedTables
   );
   const [selectedZone, setSelectedZone] = useState<"hall" | "kitchen" | "bar">(
-    () => cachedFilters?.selectedZone ?? "hall"
+    () => readCachedFilters().selectedZone
   );
   const [selectedKitchenStatuses, setSelectedKitchenStatuses] = useState<
     Array<"new" | "on_time" | "late">
-  >(() => cachedFilters?.selectedKitchenStatuses ?? ["new", "on_time", "late"]);
+  >(() => readCachedFilters().selectedKitchenStatuses);
   const [authOrder, setAuthOrder] = useState<Order | null>(null);
   const [editOrder, setEditOrder] = useState<Order | null>(null);
   const [editedQuantities, setEditedQuantities] = useState<Record<string, number>>({});
@@ -282,13 +280,13 @@ export function OrdersList() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   function readStoredWaiterCalls() {
-    const raw = window.localStorage.getItem(WAITER_CALLS_STORAGE_KEY);
-
-    if (!raw) {
-      return [] as Order[];
-    }
-
     try {
+      const raw = window.localStorage.getItem(WAITER_CALLS_STORAGE_KEY);
+
+      if (!raw) {
+        return [] as Order[];
+      }
+
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? (parsed as Order[]) : [];
     } catch {
@@ -297,10 +295,14 @@ export function OrdersList() {
   }
 
   function writeStoredWaiterCalls(nextCalls: Order[]) {
-    window.localStorage.setItem(
-      WAITER_CALLS_STORAGE_KEY,
-      JSON.stringify(nextCalls)
-    );
+    try {
+      window.localStorage.setItem(
+        WAITER_CALLS_STORAGE_KEY,
+        JSON.stringify(nextCalls)
+      );
+    } catch {
+      // Ignore client storage write issues for ephemeral waiter-call cache.
+    }
   }
 
   function mergeOrdersWithStoredWaiterCalls(nextOrders: unknown) {
@@ -612,10 +614,6 @@ export function OrdersList() {
     }
   }
 
-  if (loading) {
-    return <p className="muted">Loading incoming orders...</p>;
-  }
-
   const selectedTablesSet = useMemo(() => new Set(selectedTables), [selectedTables]);
 
   const tableOptions = useMemo(
@@ -839,6 +837,10 @@ export function OrdersList() {
         ? current.filter((value) => value !== status)
         : [...current, status]
     );
+  }
+
+  if (loading && orders.length === 0) {
+    return <p className="muted">Loading incoming orders...</p>;
   }
 
   if (!orders.length) {

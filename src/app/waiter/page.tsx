@@ -5,7 +5,7 @@ export default function WaiterPage() {
     <main className="page-shell">
       <section className="hero hero--compact">
         <div>
-          <p className="eyebrow">Waiter</p>
+          <p className="eyebrow">Live Orders</p>
           <h1>Service dashboard</h1>
           <p className="muted">
             Review incoming orders, manage table sessions, and respond to guest

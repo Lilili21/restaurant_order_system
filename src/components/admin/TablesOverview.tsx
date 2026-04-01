@@ -342,22 +342,23 @@ function getHappyHourDiscountAmountFromOrder(
 }
 
 export function TablesOverview() {
-  const cachedView = readSessionCache<TablesViewCache>(
-    TABLES_VIEW_CACHE_KEY,
-    TABLES_VIEW_CACHE_TTL_MS
-  );
-  const cachedArchives = readSessionCache<WeeklyOrdersArchiveMeta[]>(
-    TABLES_ARCHIVES_CACHE_KEY,
-    TABLES_ARCHIVES_CACHE_TTL_MS
-  );
   const [data, setData] = useState<TablesResponse>(
     () =>
-      cachedView?.data ?? {
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.data ?? {
         tables: [],
         closedSessions: []
       }
   );
-  const [loading, setLoading] = useState(() => cachedView === null);
+  const [loading, setLoading] = useState(
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      ) === null
+  );
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [moveAuthTable, setMoveAuthTable] = useState<TableOverview | null>(null);
   const [targetTableNumber, setTargetTableNumber] = useState("");
@@ -366,32 +367,68 @@ export function TablesOverview() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [weeklyArchives, setWeeklyArchives] = useState<WeeklyOrdersArchiveMeta[]>(
-    () => cachedArchives ?? []
+    () =>
+      readSessionCache<WeeklyOrdersArchiveMeta[]>(
+        TABLES_ARCHIVES_CACHE_KEY,
+        TABLES_ARCHIVES_CACHE_TTL_MS
+      ) ?? []
   );
   const [serviceRequests, setServiceRequests] = useState<Order[]>(
-    () => cachedView?.serviceRequests ?? []
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.serviceRequests ?? []
   );
   const [happyHourEnabled, setHappyHourEnabled] = useState(
-    () => cachedView?.happyHourEnabled ?? false
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.happyHourEnabled ?? false
   );
   const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(
-    () => cachedView?.happyHourDiscountPercent ?? 0
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.happyHourDiscountPercent ?? 0
   );
   const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>(
-    () => cachedView?.happyHourCategories ?? []
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.happyHourCategories ?? []
   );
   const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(
-    () => cachedView?.happyHourStartsFrom ?? null
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.happyHourStartsFrom ?? null
   );
   const [happyHourUntil, setHappyHourUntil] = useState<string | null>(
-    () => cachedView?.happyHourUntil ?? null
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.happyHourUntil ?? null
   );
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(
-    () => cachedView?.workingHoursFrom ?? null
+    () =>
+      readSessionCache<TablesViewCache>(
+        TABLES_VIEW_CACHE_KEY,
+        TABLES_VIEW_CACHE_TTL_MS
+      )?.workingHoursFrom ?? null
   );
   const [workingHoursRules, setWorkingHoursRules] =
     useState<MenuSettingsResponse["workingHoursRules"]>(
-      () => cachedView?.workingHoursRules ?? []
+      () =>
+        readSessionCache<TablesViewCache>(
+          TABLES_VIEW_CACHE_KEY,
+          TABLES_VIEW_CACHE_TTL_MS
+        )?.workingHoursRules ?? []
     );
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
 
@@ -544,10 +581,33 @@ export function TablesOverview() {
       }
     }
 
-    void loadWeeklyArchives();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let idleCallbackId: number | null = null;
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleCallbackId = window.requestIdleCallback(() => {
+        void loadWeeklyArchives();
+      });
+    } else {
+      timeoutId = globalThis.setTimeout(() => {
+        void loadWeeklyArchives();
+      }, 250);
+    }
 
     return () => {
       cancelled = true;
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      if (
+        idleCallbackId !== null &&
+        typeof window !== "undefined" &&
+        "cancelIdleCallback" in window
+      ) {
+        window.cancelIdleCallback(idleCallbackId);
+      }
     };
   }, []);
 
