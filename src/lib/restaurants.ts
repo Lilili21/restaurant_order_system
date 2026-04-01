@@ -2,6 +2,7 @@ import { restaurants } from "@/lib/mock-data";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { MenuItem, Restaurant, TableSession } from "@/lib/types";
 import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
+import { randomBytes } from "node:crypto";
 
 const RESTAURANTS_CACHE_TTL_MS = 60_000;
 
@@ -28,6 +29,29 @@ type RestaurantTableRow = {
   zone: string | null;
   is_active: boolean | null;
 };
+
+function generateSecureTableToken() {
+  return `tbl_${randomBytes(9).toString("base64url")}`;
+}
+
+function isInsecureTableToken(
+  token: string | null | undefined,
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  if (!token || !token.trim()) {
+    return true;
+  }
+
+  const normalizedToken = token.trim();
+
+  return (
+    normalizedToken === `${restaurantSlug}-${tableNumber}` ||
+    normalizedToken === `${restaurantSlug}_table_${tableNumber}` ||
+    normalizedToken === `table-${tableNumber}` ||
+    normalizedToken.length < 12
+  );
+}
 
 declare global {
   // eslint-disable-next-line no-var
@@ -87,6 +111,22 @@ async function getRestaurantsFromSupabase() {
 
   const normalizedRestaurants = (restaurantRows as RestaurantRow[]).map((restaurant) => {
     const restaurantTables = tablesByRestaurant.get(restaurant.id) ?? [];
+    const tokenUpdates = restaurantTables
+      .filter((table) =>
+        isInsecureTableToken(table.access_token, restaurant.slug, Number(table.table_number))
+      )
+      .map((table) => ({
+        id: table.id,
+        access_token: generateSecureTableToken()
+      }));
+
+    if (tokenUpdates.length > 0) {
+      void supabase.from("restaurant_tables").upsert(tokenUpdates, { onConflict: "id" });
+    }
+
+    const tokenByTableId = new Map(
+      tokenUpdates.map((table) => [table.id, table.access_token] as const)
+    );
 
     return {
       id: restaurant.id,
@@ -99,8 +139,10 @@ async function getRestaurantsFromSupabase() {
         number: Number(table.table_number),
         seats: table.seats ?? 4,
         zone: table.zone ?? "Hall",
-        accessToken: table.access_token,
-        qrCodeValue: `/${restaurant.slug}/menu/${table.access_token}`
+        accessToken: tokenByTableId.get(table.id) ?? table.access_token,
+        qrCodeValue: `/${restaurant.slug}/menu/${
+          tokenByTableId.get(table.id) ?? table.access_token
+        }`
       }))
     } satisfies Restaurant;
   });

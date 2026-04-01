@@ -2604,11 +2604,9 @@ async function normalizeOrderState(
 
 export async function getOrders(restaurantSlug?: string) {
   const { ordersStore } = await readRuntimeStateAsync();
-  const shiftWindow = getCurrentAdminShiftWindow(await getMenuSettings());
-
-  if (!shiftWindow) {
-    return [];
-  }
+  const shiftWindow = getCurrentAdminShiftWindow(
+    await getMenuSettings(restaurantSlug)
+  );
 
   return ordersStore
     .filter((order) => {
@@ -2619,7 +2617,7 @@ export async function getOrders(restaurantSlug?: string) {
       return (
         order.status !== "served" &&
         order.status !== "cancelled" &&
-        isOrderWithinAdminShiftWindow(order, shiftWindow)
+        (!shiftWindow || isOrderWithinAdminShiftWindow(order, shiftWindow))
       );
     })
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
