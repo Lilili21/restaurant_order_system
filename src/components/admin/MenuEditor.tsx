@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { ControlCenterDashboard } from "@/components/admin/ControlCenterDashboard";
 import { MenuAlertsPanel } from "@/components/admin/MenuAlertsPanel";
-impлаort { MenuEditPanel } from "@/components/admin/MenuEditPanel";
+import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
 import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
 import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
