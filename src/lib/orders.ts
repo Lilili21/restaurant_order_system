@@ -35,7 +35,7 @@ type OrdersMetaPersistence = {
   closedTableSummaries: ClosedTableSummary[];
 };
 
-type OrderRow = {
+type LegacyOrderRow = {
   order_id: string;
   restaurant_slug: string;
   restaurant_name: string;
@@ -49,7 +49,24 @@ type OrderRow = {
   total: number;
 };
 
-type OrderItemRow = {
+type ActiveOrderRow = {
+  id: string;
+  restaurant_id: string;
+  table_id?: string | null;
+  table_number: number;
+  session_id: number;
+  kind: "order" | "waiter_call" | "bill_request";
+  serve_mode: ServeMode | null;
+  status: OrderStatus;
+  restaurant_name: string;
+  guest_contact_name: string | null;
+  guest_contact_phone: string | null;
+  created_at: string;
+  updated_at: string | null;
+  total: number;
+};
+
+type LegacyOrderItemRow = {
   id: string;
   order_id: string;
   menu_item_id: string;
@@ -61,6 +78,22 @@ type OrderItemRow = {
   quantity: number;
   note: string | null;
   served: boolean;
+};
+
+type ActiveOrderItemRow = {
+  id: string;
+  order_id: string;
+  restaurant_id: string;
+  menu_item_id: string | null;
+  category: string | null;
+  name: string;
+  volume_option_id: string | null;
+  volume_label: string | null;
+  price: number;
+  quantity: number;
+  note: string | null;
+  served: boolean;
+  created_at?: string;
 };
 
 type ClosedSessionRow = {
@@ -914,7 +947,7 @@ function toOrdersMetaPersistence(
   };
 }
 
-function mapOrderToRow(order: Order): OrderRow {
+function mapOrderToLegacyRow(order: Order): LegacyOrderRow {
   return {
     order_id: order.id,
     restaurant_slug: order.restaurantSlug,
@@ -930,7 +963,25 @@ function mapOrderToRow(order: Order): OrderRow {
   };
 }
 
-function mapOrderItemToRow(orderId: string, item: OrderItem): OrderItemRow {
+function mapOrderToActiveRow(order: Order, restaurantId: string): ActiveOrderRow {
+  return {
+    id: order.id,
+    restaurant_id: restaurantId,
+    table_number: order.tableNumber,
+    session_id: order.sessionId,
+    kind: order.kind ?? "order",
+    serve_mode: order.serveMode ?? null,
+    status: order.status,
+    restaurant_name: order.restaurantName,
+    guest_contact_name: normalizeGuestContactValue(order.guestContactName) ?? null,
+    guest_contact_phone: normalizeGuestContactValue(order.guestContactPhone) ?? null,
+    created_at: order.createdAt,
+    updated_at: order.updatedAt ?? null,
+    total: order.total
+  };
+}
+
+function mapOrderItemToLegacyRow(orderId: string, item: OrderItem): LegacyOrderItemRow {
   return {
     id: item.id,
     order_id: orderId,
@@ -946,9 +997,30 @@ function mapOrderItemToRow(orderId: string, item: OrderItem): OrderItemRow {
   };
 }
 
-function mapRowsToOrders(
-  orderRows: OrderRow[],
-  itemRows: OrderItemRow[]
+function mapOrderItemToActiveRow(
+  orderId: string,
+  restaurantId: string,
+  item: OrderItem
+): ActiveOrderItemRow {
+  return {
+    id: item.id,
+    order_id: orderId,
+    restaurant_id: restaurantId,
+    menu_item_id: item.menuItemId,
+    category: item.category ?? null,
+    name: item.name,
+    volume_option_id: item.volumeOptionId ?? null,
+    volume_label: item.volumeLabel ?? null,
+    price: item.price,
+    quantity: item.quantity,
+    note: item.note ?? null,
+    served: item.served
+  };
+}
+
+function mapLegacyRowsToOrders(
+  orderRows: LegacyOrderRow[],
+  itemRows: LegacyOrderItemRow[]
 ): Order[] {
   const itemsByOrder = new Map<string, OrderItem[]>();
 
@@ -983,6 +1055,59 @@ function mapRowsToOrders(
     items: itemsByOrder.get(row.order_id) ?? [],
     total: Number(row.total) || 0
   }));
+}
+
+function mapActiveRowsToOrders(
+  orderRows: ActiveOrderRow[],
+  itemRows: ActiveOrderItemRow[],
+  restaurantLookup: Map<string, RestaurantRow>
+): Order[] {
+  const itemsByOrder = new Map<string, OrderItem[]>();
+
+  for (const item of itemRows) {
+    const current = itemsByOrder.get(item.order_id) ?? [];
+    current.push({
+      id: item.id,
+      menuItemId: item.menu_item_id ?? "",
+      category: (item.category as OrderItem["category"]) ?? undefined,
+      name: item.name,
+      volumeOptionId: item.volume_option_id ?? undefined,
+      volumeLabel: item.volume_label ?? undefined,
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 0,
+      note: item.note ?? undefined,
+      served: Boolean(item.served)
+    });
+    itemsByOrder.set(item.order_id, current);
+  }
+
+  return orderRows
+    .map((row) => {
+      const restaurant = restaurantLookup.get(row.restaurant_id);
+      const restaurantSlug = restaurant?.slug;
+
+      if (!restaurantSlug) {
+        return null;
+      }
+
+      return {
+        id: row.id,
+        restaurantSlug,
+        restaurantName: row.restaurant_name || restaurant.name,
+        tableNumber: Number(row.table_number),
+        sessionId: Number(row.session_id),
+        kind: row.kind === "order" ? undefined : row.kind,
+        serveMode: row.serve_mode ?? undefined,
+        status: row.status,
+        guestContactName: normalizeGuestContactValue(row.guest_contact_name) ?? undefined,
+        guestContactPhone: normalizeGuestContactValue(row.guest_contact_phone) ?? undefined,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at ?? undefined,
+        items: itemsByOrder.get(row.id) ?? [],
+        total: Number(row.total) || 0
+      } satisfies Order;
+    })
+    .filter(Boolean) as Order[];
 }
 
 function mapServiceRequestToRow(
@@ -1093,6 +1218,8 @@ function isMissingTableError(error: unknown) {
     (
       message.includes("orders_store") ||
       message.includes("order_items_store") ||
+      message.includes("orders") ||
+      message.includes("order_items") ||
       message.includes("closed_sessions") ||
       message.includes("restaurant_table_sessions") ||
       message.includes("service_requests")
@@ -1590,31 +1717,20 @@ async function loadStateFromLegacySupabase(
 async function loadStateFromRowSupabase(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
 ): Promise<OrdersPersistence> {
+  let activeOrders: Order[] = [];
   const [
-    ordersResult,
-    orderItemsResult,
     metaResult,
     closedSessionsResult,
     tableSessionsResult,
     serviceRequestsResult,
     restaurantsResult
   ] = await Promise.all([
-    supabase.from("orders_store").select("*").order("created_at", { ascending: false }),
-    supabase.from("order_items_store").select("*"),
     supabase.from("app_state").select("value").eq("key", ORDERS_META_KEY).maybeSingle(),
     supabase.from("closed_sessions").select("*").order("closed_at", { ascending: false }),
     supabase.from("restaurant_table_sessions").select("*"),
     supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
     supabase.from("restaurants").select("id, slug, name")
   ]);
-
-  if (ordersResult.error) {
-    throw new Error(ordersResult.error.message);
-  }
-
-  if (orderItemsResult.error) {
-    throw new Error(orderItemsResult.error.message);
-  }
 
   if (metaResult.error) {
     throw new Error(metaResult.error.message);
@@ -1635,8 +1751,6 @@ async function loadStateFromRowSupabase(
     throw new Error(restaurantsResult.error.message);
   }
 
-  const rows = (ordersResult.data ?? []) as OrderRow[];
-  const itemRows = (orderItemsResult.data ?? []) as OrderItemRow[];
   const closedSessionRows = (closedSessionsResult.data ?? []) as ClosedSessionRow[];
   const tableSessionRows = Array.isArray(tableSessionsResult.data)
     ? (tableSessionsResult.data as RestaurantTableSessionRow[])
@@ -1648,8 +1762,51 @@ async function loadStateFromRowSupabase(
   const restaurantLookup = new Map(
     restaurantRows.map((restaurant) => [restaurant.id, restaurant] as const)
   );
-  const orders = mapRowsToOrders(rows, itemRows);
-  const defaultSessionsFromRows = [...createSessionsFromOrders(orders).entries()];
+
+  try {
+    const [ordersResult, orderItemsResult] = await Promise.all([
+      supabase.from("orders").select("*").order("created_at", { ascending: false }),
+      supabase.from("order_items").select("*")
+    ]);
+
+    if (ordersResult.error) {
+      throw new Error(ordersResult.error.message);
+    }
+
+    if (orderItemsResult.error) {
+      throw new Error(orderItemsResult.error.message);
+    }
+
+    activeOrders = mapActiveRowsToOrders(
+      (ordersResult.data ?? []) as ActiveOrderRow[],
+      (orderItemsResult.data ?? []) as ActiveOrderItemRow[],
+      restaurantLookup
+    );
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      throw error;
+    }
+
+    const [legacyOrdersResult, legacyOrderItemsResult] = await Promise.all([
+      supabase.from("orders_store").select("*").order("created_at", { ascending: false }),
+      supabase.from("order_items_store").select("*")
+    ]);
+
+    if (legacyOrdersResult.error) {
+      throw new Error(legacyOrdersResult.error.message);
+    }
+
+    if (legacyOrderItemsResult.error) {
+      throw new Error(legacyOrderItemsResult.error.message);
+    }
+
+    activeOrders = mapLegacyRowsToOrders(
+      (legacyOrdersResult.data ?? []) as LegacyOrderRow[],
+      (legacyOrderItemsResult.data ?? []) as LegacyOrderItemRow[]
+    );
+  }
+
+  const defaultSessionsFromRows = [...createSessionsFromOrders(activeOrders).entries()];
   const parsedMeta = (metaResult.data?.value ?? null) as
     | Partial<OrdersMetaPersistence>
     | null;
@@ -1676,8 +1833,8 @@ async function loadStateFromRowSupabase(
   const normalized: OrdersPersistence = {
     orders:
       serviceRequestRows.length > 0
-        ? [...mapServiceRequestRowsToOrders(serviceRequestRows, restaurantLookup), ...orders]
-        : orders,
+        ? [...mapServiceRequestRowsToOrders(serviceRequestRows, restaurantLookup), ...activeOrders]
+        : activeOrders,
     currentTableSessions,
     closedTableSummaries:
       closedSessionRows.length > 0
@@ -1709,10 +1866,6 @@ async function persistStateToRowSupabase(
   const serviceRequestOrders = state.ordersStore.filter(
     (order) => order.kind === "waiter_call" || order.kind === "bill_request"
   );
-  const orderRows = standardOrders.map(mapOrderToRow);
-  const orderItemRows = standardOrders.flatMap((order) =>
-    order.items.map((item) => mapOrderItemToRow(order.id, item))
-  );
   const orderIds = standardOrders.map((order) => order.id);
   const restaurantRowsResult = await supabase.from("restaurants").select("id, slug, name");
 
@@ -1724,33 +1877,171 @@ async function persistStateToRowSupabase(
   const restaurantIdBySlug = new Map(
     restaurantRows.map((restaurant) => [restaurant.slug, restaurant.id] as const)
   );
+  const activeOrderRows = standardOrders
+    .map((order) => {
+      const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+      return restaurantId ? mapOrderToActiveRow(order, restaurantId) : null;
+    })
+    .filter(Boolean);
+  const activeOrderItemRows = standardOrders.flatMap((order) => {
+    const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+    return restaurantId
+      ? order.items.map((item) => mapOrderItemToActiveRow(order.id, restaurantId, item))
+      : [];
+  });
 
-  if (orderIds.length === 0) {
-    const { error: deleteAllItemsError } = await supabase
-      .from("order_items_store")
-      .delete()
-      .neq("id", "");
+  try {
+    if (orderIds.length === 0) {
+      const { error: deleteAllItemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .neq("id", "");
 
-    if (deleteAllItemsError) {
-      throw new Error(deleteAllItemsError.message);
+      if (deleteAllItemsError) {
+        throw new Error(deleteAllItemsError.message);
+      }
+
+      const { error: deleteAllOrdersError } = await supabase
+        .from("orders")
+        .delete()
+        .neq("id", "");
+
+      if (deleteAllOrdersError) {
+        throw new Error(deleteAllOrdersError.message);
+      }
+    } else {
+      const { error: deleteItemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .in("order_id", orderIds);
+
+      if (deleteItemsError) {
+        throw new Error(deleteItemsError.message);
+      }
     }
 
-    const { error: deleteAllOrdersError } = await supabase
-      .from("orders_store")
-      .delete()
-      .neq("order_id", "");
+    if (activeOrderRows.length > 0) {
+      const { error: upsertOrdersError } = await supabase
+        .from("orders")
+        .upsert(activeOrderRows, { onConflict: "id" });
 
-    if (deleteAllOrdersError) {
-      throw new Error(deleteAllOrdersError.message);
+      if (upsertOrdersError) {
+        throw new Error(upsertOrdersError.message);
+      }
+
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("orders")
+        .select("id");
+
+      if (existingRowsError) {
+        throw new Error(existingRowsError.message);
+      }
+
+      const staleIds = (existingRows ?? [])
+        .map((row) => String((row as { id: string }).id))
+        .filter((id) => !orderIds.includes(id));
+
+      if (staleIds.length > 0) {
+        const { error: deleteStaleOrdersError } = await supabase
+          .from("orders")
+          .delete()
+          .in("id", staleIds);
+
+        if (deleteStaleOrdersError) {
+          throw new Error(deleteStaleOrdersError.message);
+        }
+      }
     }
-  } else {
-    const { error: deleteItemsError } = await supabase
-      .from("order_items_store")
-      .delete()
-      .in("order_id", orderIds);
 
-    if (deleteItemsError) {
-      throw new Error(deleteItemsError.message);
+    if (activeOrderItemRows.length > 0) {
+      const { error: upsertItemsError } = await supabase
+        .from("order_items")
+        .upsert(activeOrderItemRows, { onConflict: "id" });
+
+      if (upsertItemsError) {
+        throw new Error(upsertItemsError.message);
+      }
+    }
+  } catch (error) {
+    if (!isMissingTableError(error)) {
+      throw error;
+    }
+
+    const legacyOrderRows = standardOrders.map(mapOrderToLegacyRow);
+    const legacyOrderItemRows = standardOrders.flatMap((order) =>
+      order.items.map((item) => mapOrderItemToLegacyRow(order.id, item))
+    );
+
+    if (orderIds.length === 0) {
+      const { error: deleteAllItemsError } = await supabase
+        .from("order_items_store")
+        .delete()
+        .neq("id", "");
+
+      if (deleteAllItemsError) {
+        throw new Error(deleteAllItemsError.message);
+      }
+
+      const { error: deleteAllOrdersError } = await supabase
+        .from("orders_store")
+        .delete()
+        .neq("order_id", "");
+
+      if (deleteAllOrdersError) {
+        throw new Error(deleteAllOrdersError.message);
+      }
+    } else {
+      const { error: deleteItemsError } = await supabase
+        .from("order_items_store")
+        .delete()
+        .in("order_id", orderIds);
+
+      if (deleteItemsError) {
+        throw new Error(deleteItemsError.message);
+      }
+    }
+
+    if (legacyOrderRows.length > 0) {
+      const { error: upsertOrdersError } = await supabase
+        .from("orders_store")
+        .upsert(legacyOrderRows, { onConflict: "order_id" });
+
+      if (upsertOrdersError) {
+        throw new Error(upsertOrdersError.message);
+      }
+
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("orders_store")
+        .select("order_id");
+
+      if (existingRowsError) {
+        throw new Error(existingRowsError.message);
+      }
+
+      const staleIds = (existingRows ?? [])
+        .map((row) => String((row as { order_id: string }).order_id))
+        .filter((id) => !orderIds.includes(id));
+
+      if (staleIds.length > 0) {
+        const { error: deleteStaleOrdersError } = await supabase
+          .from("orders_store")
+          .delete()
+          .in("order_id", staleIds);
+
+        if (deleteStaleOrdersError) {
+          throw new Error(deleteStaleOrdersError.message);
+        }
+      }
+    }
+
+    if (legacyOrderItemRows.length > 0) {
+      const { error: upsertItemsError } = await supabase
+        .from("order_items_store")
+        .upsert(legacyOrderItemRows, { onConflict: "id" });
+
+      if (upsertItemsError) {
+        throw new Error(upsertItemsError.message);
+      }
     }
   }
 
@@ -1818,49 +2109,6 @@ async function persistStateToRowSupabase(
   } catch (error) {
     if (!isMissingTableError(error)) {
       throw error;
-    }
-  }
-
-  if (orderRows.length > 0) {
-    const { error: upsertOrdersError } = await supabase
-      .from("orders_store")
-      .upsert(orderRows, { onConflict: "order_id" });
-
-    if (upsertOrdersError) {
-      throw new Error(upsertOrdersError.message);
-    }
-
-    const { data: existingRows, error: existingRowsError } = await supabase
-      .from("orders_store")
-      .select("order_id");
-
-    if (existingRowsError) {
-      throw new Error(existingRowsError.message);
-    }
-
-    const staleIds = (existingRows ?? [])
-      .map((row) => String((row as { order_id: string }).order_id))
-      .filter((id) => !orderIds.includes(id));
-
-    if (staleIds.length > 0) {
-      const { error: deleteStaleOrdersError } = await supabase
-        .from("orders_store")
-        .delete()
-        .in("order_id", staleIds);
-
-      if (deleteStaleOrdersError) {
-        throw new Error(deleteStaleOrdersError.message);
-      }
-    }
-  }
-
-  if (orderItemRows.length > 0) {
-    const { error: upsertItemsError } = await supabase
-      .from("order_items_store")
-      .upsert(orderItemRows, { onConflict: "id" });
-
-    if (upsertItemsError) {
-      throw new Error(upsertItemsError.message);
     }
   }
 
