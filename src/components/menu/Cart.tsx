@@ -1944,7 +1944,7 @@ export function Cart({
         <section className="hero">
           <div>
             <div className="menu-hero-header">
-              <h1>{text.restaurantHeader || restaurantName}</h1>
+              <h1>{restaurantName || text.restaurantHeader}</h1>
               <div className="language-toggle" role="group" aria-label="Language">
                 <button
                   className={

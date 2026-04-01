@@ -77,7 +77,7 @@ type MenuPageProps = {
 
 export default async function MenuPage({ params }: MenuPageProps) {
   const { restaurantSlug, tableToken } = await params;
-  const menuSettingsPromise = getMenuSettings();
+  const menuSettingsPromise = getMenuSettings(restaurantSlug);
 
   if (tableToken === "0") {
     preloadAvailableMenuByRestaurant(restaurantSlug);
