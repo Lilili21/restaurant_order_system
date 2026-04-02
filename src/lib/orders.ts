@@ -1002,11 +1002,16 @@ function mapOrderItemToActiveRow(
   restaurantId: string,
   item: OrderItem
 ): ActiveOrderItemRow {
+  const normalizedMenuItemId =
+    typeof item.menuItemId === "string" && item.menuItemId.trim()
+      ? item.menuItemId.trim()
+      : null;
+
   return {
     id: item.id,
     order_id: orderId,
     restaurant_id: restaurantId,
-    menu_item_id: item.menuItemId,
+    menu_item_id: normalizedMenuItemId,
     category: item.category ?? null,
     name: item.name,
     volume_option_id: item.volumeOptionId ?? null,
@@ -1068,7 +1073,10 @@ function mapActiveRowsToOrders(
     const current = itemsByOrder.get(item.order_id) ?? [];
     current.push({
       id: item.id,
-      menuItemId: item.menu_item_id ?? "",
+      menuItemId:
+        typeof item.menu_item_id === "string" && item.menu_item_id.trim()
+          ? item.menu_item_id.trim()
+          : "__unknown_menu_item__",
       category: (item.category as OrderItem["category"]) ?? undefined,
       name: item.name,
       volumeOptionId: item.volume_option_id ?? undefined,
