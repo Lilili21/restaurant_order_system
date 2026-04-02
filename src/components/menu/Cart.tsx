@@ -1535,6 +1535,11 @@ export function Cart({
   async function callWaiter() {
     setMessage(null);
 
+    if (serviceRequestDisabled) {
+      setDialogMessage(text.waiterAlreadyCalled);
+      return;
+    }
+
     try {
       const response = await fetch("/api/orders", {
         method: "POST",
