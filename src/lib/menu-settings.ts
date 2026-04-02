@@ -124,6 +124,29 @@ type RestaurantRow = {
   slug: string;
 };
 
+type RestaurantSettingsRow = {
+  restaurant_id: string;
+  working_hours_from: string | null;
+  working_hours_until: string | null;
+  working_hours_rules: unknown;
+  kitchen_load_warning_enabled: boolean | null;
+  happy_hour_enabled: boolean | null;
+  happy_hour_text: string | null;
+  happy_hour_categories: unknown;
+  happy_hour_days: unknown;
+  happy_hour_discount_percent: number | null;
+  happy_hour_starts_from: string | null;
+  happy_hour_until: string | null;
+  promotions: unknown;
+  business_lunches: unknown;
+  recommendations: unknown;
+  kitchen_open_enabled: boolean | null;
+  kitchen_open_until: string | null;
+  bar_open_enabled: boolean | null;
+  bar_open_until: string | null;
+  updated_at?: string | null;
+};
+
 declare global {
   // eslint-disable-next-line no-var
   var __menuSettingsCache: Record<string, MenuSettingsCacheEntry> | undefined;
@@ -472,6 +495,75 @@ function normalizeSettings(
   };
 }
 
+function mapRestaurantSettingsRowToSettings(
+  row: RestaurantSettingsRow | null | undefined
+): Partial<MenuSettings> {
+  if (!row) {
+    return {};
+  }
+
+  return {
+    workingHoursFrom: row.working_hours_from,
+    workingHoursUntil: row.working_hours_until,
+    workingHoursRules: Array.isArray(row.working_hours_rules)
+      ? (row.working_hours_rules as MenuSettings["workingHoursRules"])
+      : [],
+    kitchenLoadWarningEnabled: Boolean(row.kitchen_load_warning_enabled),
+    happyHourEnabled: Boolean(row.happy_hour_enabled),
+    happyHourText: row.happy_hour_text ?? "",
+    happyHourCategories: Array.isArray(row.happy_hour_categories)
+      ? (row.happy_hour_categories as MenuCategory[])
+      : [],
+    happyHourDays: Array.isArray(row.happy_hour_days)
+      ? (row.happy_hour_days as number[])
+      : [],
+    happyHourDiscountPercent: row.happy_hour_discount_percent ?? 0,
+    happyHourStartsFrom: row.happy_hour_starts_from,
+    happyHourUntil: row.happy_hour_until,
+    promotions: Array.isArray(row.promotions)
+      ? (row.promotions as PromotionSettings[])
+      : [],
+    businessLunches: Array.isArray(row.business_lunches)
+      ? (row.business_lunches as BusinessLunchSettings[])
+      : [],
+    recommendations: Array.isArray(row.recommendations)
+      ? (row.recommendations as RecommendationRuleSettings[])
+      : [],
+    kitchenOpenEnabled: Boolean(row.kitchen_open_enabled),
+    kitchenOpenUntil: row.kitchen_open_until,
+    barOpenEnabled: Boolean(row.bar_open_enabled),
+    barOpenUntil: row.bar_open_until
+  };
+}
+
+function mapSettingsToRestaurantSettingsRow(
+  restaurantId: string,
+  settings: MenuSettings
+) {
+  return {
+    restaurant_id: restaurantId,
+    working_hours_from: settings.workingHoursFrom,
+    working_hours_until: settings.workingHoursUntil,
+    working_hours_rules: settings.workingHoursRules,
+    kitchen_load_warning_enabled: settings.kitchenLoadWarningEnabled,
+    happy_hour_enabled: settings.happyHourEnabled,
+    happy_hour_text: settings.happyHourText,
+    happy_hour_categories: settings.happyHourCategories,
+    happy_hour_days: settings.happyHourDays,
+    happy_hour_discount_percent: settings.happyHourDiscountPercent,
+    happy_hour_starts_from: settings.happyHourStartsFrom,
+    happy_hour_until: settings.happyHourUntil,
+    promotions: settings.promotions,
+    business_lunches: settings.businessLunches,
+    recommendations: settings.recommendations,
+    kitchen_open_enabled: settings.kitchenOpenEnabled,
+    kitchen_open_until: settings.kitchenOpenUntil,
+    bar_open_enabled: settings.barOpenEnabled,
+    bar_open_until: settings.barOpenUntil,
+    updated_at: new Date().toISOString()
+  };
+}
+
 function hasWorkingHoursConfigured(settings: MenuSettings) {
   return Boolean(
     (settings.workingHoursFrom && settings.workingHoursUntil) ||
@@ -672,7 +764,7 @@ async function getRestaurantSettingsFromSupabase(
   );
 
   const normalized = normalizeSettings({
-    ...(settingsRow ?? {}),
+    ...mapRestaurantSettingsRowToSettings((settingsRow ?? null) as RestaurantSettingsRow | null),
     tableCount: tableRowsSafe.length || 1,
     tableTokens
   });
@@ -716,14 +808,11 @@ async function persistRestaurantSettingsAsync(
 
   const { tableCount: _tableCount, tableTokens: _tableTokens, ...settingsPayload } = settings;
 
-  const { error } = await supabase.from("restaurant_settings").upsert(
-    {
-      restaurant_id: restaurant.id,
-      ...settingsPayload,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "restaurant_id" }
-  );
+  const { error } = await supabase
+    .from("restaurant_settings")
+    .upsert(mapSettingsToRestaurantSettingsRow(restaurant.id, settings), {
+      onConflict: "restaurant_id"
+    });
 
   if (error) {
     throw new Error(`Supabase persist failed: ${error.message}`);
