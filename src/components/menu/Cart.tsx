@@ -141,7 +141,7 @@ const uiText = {
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
-    currentOrdersActiveHint: "ההזמנה שלכם כאן למטה 👇",
+    currentOrdersActiveHint: "ההזמנה שלכם למטה 👇",
     orderNew: "חדש",
     orderPreparing: "בהכנה",
     orderServed: "הוגש",
@@ -2395,4 +2395,3 @@ export function Cart({
     </>
   );
 }
-                                                                 

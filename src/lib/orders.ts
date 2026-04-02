@@ -3392,12 +3392,3 @@ export async function moveTableOrders(
     toTableNumber,
     movedOrders: movableOrders.length
   };
-}
-
-export async function getClosedTableSummaries(restaurantSlug?: string) {
-  const { closedTableSummaries } = await readRuntimeStateAsync();
-
-  return closedTableSummaries.filter((summary) =>
-    restaurantSlug ? summary.restaurantSlug === restaurantSlug : true
-  );
-}
