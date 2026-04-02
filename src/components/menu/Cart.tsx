@@ -97,7 +97,6 @@ const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 
 const uiText = {
   he: {
-    restaurantHeader: "Olive Bistro",
     table: "שולחן",
     tableOrderingHint: "📍 אתם מזמינים משולחן מספר",
     callWaiter: "קרא למלצר",
@@ -192,7 +191,6 @@ const uiText = {
     ]
   },
   en: {
-    restaurantHeader: "Olive Bistro",
     table: "Table",
     tableOrderingHint: "📍 You are ordering from table",
     callWaiter: "Call waiter",
@@ -286,7 +284,6 @@ const uiText = {
     ]
   },
   ru: {
-    restaurantHeader: "Olive Bistro",
     table: "Стол",
     tableOrderingHint: "📍 Вы оформляете заказ со стола",
     callWaiter: "Позвать официанта",
@@ -1944,7 +1941,7 @@ export function Cart({
         <section className="hero">
           <div>
             <div className="menu-hero-header">
-              <h1>{restaurantName || text.restaurantHeader}</h1>
+              <h1>{restaurantName}</h1>
               <div className="language-toggle" role="group" aria-label="Language">
                 <button
                   className={

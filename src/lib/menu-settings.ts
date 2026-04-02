@@ -806,8 +806,6 @@ async function persistRestaurantSettingsAsync(
     throw new Error(`Restaurant not found: ${restaurantSlug}`);
   }
 
-  const { tableCount: _tableCount, tableTokens: _tableTokens, ...settingsPayload } = settings;
-
   const { error } = await supabase
     .from("restaurant_settings")
     .upsert(mapSettingsToRestaurantSettingsRow(restaurant.id, settings), {
