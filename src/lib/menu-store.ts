@@ -668,34 +668,15 @@ export async function getTableSession(
 
   let restaurant = await getRestaurantBySlug(restaurantSlug);
 
-  if (!restaurant) {
-    cache.set(cacheKey, {
-      session: null,
-      expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
-    });
-    return null;
-  }
-
-  let table = restaurant.tables.find((item) => item.accessToken === tableToken);
+  let table = restaurant?.tables.find((item) => item.accessToken === tableToken);
 
   if (!table) {
     invalidateRestaurantsCache();
     restaurant = await getRestaurantBySlug(restaurantSlug);
-
-    if (restaurant) {
-      table = restaurant.tables.find((item) => item.accessToken === tableToken);
-    }
+    table = restaurant?.tables.find((item) => item.accessToken === tableToken);
   }
 
-  if (!table) {
-    cache.set(cacheKey, {
-      session: null,
-      expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
-    });
-    return null;
-  }
-
-  if (!restaurant) {
+  if (!restaurant || !table) {
     cache.set(cacheKey, {
       session: null,
       expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
