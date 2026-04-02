@@ -94,8 +94,8 @@ const MENU_SETTINGS_CACHE_TTL_MS = 60_000;
 const DEFAULT_SETTINGS: MenuSettings = {
   workingHoursRules: [],
   kitchenLoadWarningEnabled: false,
-  workingHoursFrom: "08:00",
-  workingHoursUntil: "22:00",
+  workingHoursFrom: null,
+  workingHoursUntil: null,
   happyHourEnabled: false,
   happyHourText: "",
   happyHourCategories: [],

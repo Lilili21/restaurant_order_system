@@ -94,6 +94,7 @@ const drinkCategories = new Set<MenuCategory>([
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 const ORDER_SUBMIT_THROTTLE_MS = 3 * 1000;
 const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
+const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
 
 const uiText = {
   he: {
@@ -478,8 +479,8 @@ export function Cart({
   );
   const submittedOrdersSummaryStatus = useMemo(() => {
     const visibleStatuses = submittedOrders
-      .map((order) => order.status)
-      .filter((status) => status !== "cancelled");
+      .map((order) => getGuestVisibleOrderStatus(order))
+      .filter(Boolean) as OrderStatus[];
 
     if (visibleStatuses.includes("new")) {
       return "new" as const;
@@ -494,7 +495,7 @@ export function Cart({
     }
 
     return null;
-  }, [submittedOrders]);
+  }, [countdownNow, submittedOrders]);
   const OPEN_COUNTDOWN_VISIBILITY_MS = 30 * 60 * 1000;
   const serviceRequestDisabled =
     hasActiveServiceRequest || serviceRequestBlockedUntil > Date.now();
@@ -761,6 +762,39 @@ export function Cart({
     }
 
     return null;
+  }
+
+  function isCookedOrder(order: Order) {
+    return (
+      order.kind !== "waiter_call" &&
+      order.kind !== "bill_request" &&
+      order.items.length > 0 &&
+      order.items.some((item) =>
+        typeof item.note === "string"
+          ? item.note.includes("__menu_order_cooked__")
+          : false
+      )
+    );
+  }
+
+  function getGuestVisibleOrderStatus(order: Order): OrderStatus | null {
+    if (order.status === "cancelled") {
+      return null;
+    }
+
+    if (order.status === "served") {
+      return "served";
+    }
+
+    if (
+      order.status === "preparing" ||
+      isCookedOrder(order) ||
+      countdownNow - new Date(order.createdAt).getTime() >= AUTO_COOKING_AFTER_MS
+    ) {
+      return "preparing";
+    }
+
+    return "new";
   }
 
   function getMenuCategoryDisplayName(category: MenuCategory) {
@@ -2355,36 +2389,40 @@ export function Cart({
                   </span>
                 </summary>
                 <div className="submitted-orders__content">
-                  {submittedOrders.map((order) => (
-                    <article key={order.id} className="submitted-order-card">
-                      <div className="order-card__header">
-                        <div>
-                          <strong>
-                            {formatOrderLabel(order.createdAt)}
-                          </strong>
-                        </div>
-                        {getOrderStatusLabel(order.status) ? (
-                          <span className={`status-pill status-pill--${order.status}`}>
-                            {getOrderStatusLabel(order.status)}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="table-order-items">
-                        {order.items.map((item) => (
-                          <div key={item.id} className="table-order-item">
-                            <span>
-                              {item.quantity} x{" "}
-                              {getMenuItemDisplayName(
-                                item.menuItemId,
-                                item.volumeLabel
-                              ) || item.name}
-                            </span>
-                            <strong>{formatCurrency(item.price * item.quantity)}</strong>
+                  {submittedOrders.map((order) => {
+                    const visibleStatus = getGuestVisibleOrderStatus(order);
+
+                    return (
+                      <article key={order.id} className="submitted-order-card">
+                        <div className="order-card__header">
+                          <div>
+                            <strong>
+                              {formatOrderLabel(order.createdAt)}
+                            </strong>
                           </div>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
+                          {visibleStatus && getOrderStatusLabel(visibleStatus) ? (
+                            <span className={`status-pill status-pill--${visibleStatus}`}>
+                              {getOrderStatusLabel(visibleStatus)}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="table-order-items">
+                          {order.items.map((item) => (
+                            <div key={item.id} className="table-order-item">
+                              <span>
+                                {item.quantity} x{" "}
+                                {getMenuItemDisplayName(
+                                  item.menuItemId,
+                                  item.volumeLabel
+                                ) || item.name}
+                              </span>
+                              <strong>{formatCurrency(item.price * item.quantity)}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               </details>
             ) : null}
