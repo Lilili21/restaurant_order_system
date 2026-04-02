@@ -3,19 +3,21 @@
     {
       "id": "hours-1774523215656-io8aue",
       "days": [
+        0,
         1,
         2,
         3,
         4,
-        5
+        5,
+        6
       ],
-      "from": "10:00",
-      "until": "02:00"
+      "from": "08:00",
+      "until": "22:00"
     }
   ],
   "kitchenLoadWarningEnabled": false,
-  "workingHoursFrom": "10:00",
-  "workingHoursUntil": "02:00",
+  "workingHoursFrom": "08:00",
+  "workingHoursUntil": "22:00",
   "happyHourEnabled": false,
   "happyHourText": "dfg",
   "happyHourCategories": [
