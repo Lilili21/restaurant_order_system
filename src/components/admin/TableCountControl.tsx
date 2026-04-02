@@ -30,45 +30,39 @@ export function TableCountControl({
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSettings() {
-      const response = await fetch(
-        `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
-        {
-          cache: "no-store"
-        }
-      );
-
-      if (!response.ok) {
-        return;
+  async function loadSettings() {
+    const response = await fetch(
+      `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+      {
+        cache: "no-store"
       }
+    );
 
-      const settings = (await response.json()) as MenuSettingsResponse;
-
-      if (!cancelled) {
-        const nextCount = settings.tableCount ?? 8;
-        setTableCount(nextCount);
-        setDraftCount(nextCount);
-        setTableTokens(settings.tableTokens ?? {});
-        setSelectedTable((current) => {
-          const next = Number.parseInt(current, 10);
-          if (Number.isFinite(next) && next >= 1 && next <= nextCount) {
-            return current;
-          }
-
-          return "1";
-        });
-      }
+    if (!response.ok) {
+      return false;
     }
 
-    void loadSettings();
+    const settings = (await response.json()) as MenuSettingsResponse;
+    const nextCount = settings.tableCount ?? 8;
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setTableCount(nextCount);
+    setDraftCount(nextCount);
+    setTableTokens(settings.tableTokens ?? {});
+    setSelectedTable((current) => {
+      const next = Number.parseInt(current, 10);
+      if (Number.isFinite(next) && next >= 1 && next <= nextCount) {
+        return current;
+      }
+
+      return "1";
+    });
+
+    return true;
+  }
+
+  useEffect(() => {
+    void loadSettings();
+  }, [restaurantSlug]);
 
   async function saveTableCount() {
     setSaving(true);
@@ -108,8 +102,9 @@ export function TableCountControl({
 
       return "1";
     });
-    setSaving(false);
     setDialogOpen(false);
+    await loadSettings();
+    setSaving(false);
     return true;
   }
 
@@ -159,7 +154,7 @@ export function TableCountControl({
                   value={selectedTable}
                   onChange={(event) => setSelectedTable(event.target.value)}
                 >
-                  {Array.from({ length: tableCount }, (_, index) => {
+                  {Array.from({ length: draftCount }, (_, index) => {
                     const number = index + 1;
 
                     return (
@@ -210,16 +205,8 @@ export function TableCountControl({
         type="button"
         onClick={() => {
           onOpen?.();
-          setDraftCount(tableCount);
-          setSelectedTable((current) => {
-            const next = Number.parseInt(current, 10);
-            if (Number.isFinite(next) && next >= 1 && next <= tableCount) {
-              return current;
-            }
-
-            return "1";
-          });
           setDialogOpen(true);
+          void loadSettings();
         }}
       >
         <span>Tables QR links</span>

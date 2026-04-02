@@ -88,7 +88,7 @@
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,
   "barOpenUntil": null,
-  "tableCount": 8,
+  "tableCount": 6,
   "tableTokens": {
     "1": "tbl_3oBYi40Rklr4",
     "2": "tbl_jLSiG2j1rTS9",
@@ -97,6 +97,7 @@
     "5": "tbl_m81gRRBvtQCF",
     "6": "tbl_J3fM7IgFjTZK",
     "7": "tbl_EYawXN3mbzHc",
-    "8": "tbl_ZvDGky-BUDSm"
+    "8": "tbl_ZvDGky-BUDSm",
+    "9": "tbl_CQ-wvS_P-qax"
   }
 }
