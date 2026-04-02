@@ -2066,6 +2066,7 @@ export function Cart({
                   onClick={() => setServiceMenuOpen((current) => !current)}
                   aria-expanded={serviceMenuOpen}
                   aria-controls="service-action-menu"
+                  disabled={serviceRequestDisabled}
                 >
                   {text.callWaiter}
                 </button>
