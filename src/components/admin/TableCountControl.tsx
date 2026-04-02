@@ -154,7 +154,7 @@ export function TableCountControl({
                   value={selectedTable}
                   onChange={(event) => setSelectedTable(event.target.value)}
                 >
-                  {Array.from({ length: draftCount }, (_, index) => {
+                  {Array.from({ length: tableCount }, (_, index) => {
                     const number = index + 1;
 
                     return (

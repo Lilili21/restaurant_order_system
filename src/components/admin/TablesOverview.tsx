@@ -461,6 +461,18 @@ export function TablesOverview() {
     };
   }
 
+  async function refreshTablesData() {
+    const response = await fetch("/api/tables");
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const nextData = normalizeTablesResponse(await response.json());
+    setData(nextData);
+    return true;
+  }
+
   useEffect(() => {
     writeSessionCache(TABLES_VIEW_CACHE_KEY, {
       data,
@@ -648,17 +660,20 @@ export function TablesOverview() {
     setDialogMessage(
       `Table ${summary.tableNumber} closed. Session #${summary.sessionId}: ${formatCurrency(summary.total)}.${happyHourNote}`
     );
+    const refreshed = await refreshTablesData();
 
-    setData((current) => ({
-      tables: current.tables.filter(
-        (table) =>
-          !(
-            table.restaurantSlug === restaurantSlug &&
-            table.tableNumber === tableNumber
-          )
-      ),
-      closedSessions: [summary, ...current.closedSessions]
-    }));
+    if (!refreshed) {
+      setData((current) => ({
+        tables: current.tables.filter(
+          (table) =>
+            !(
+              table.restaurantSlug === restaurantSlug &&
+              table.tableNumber === tableNumber
+            )
+        ),
+        closedSessions: [summary, ...current.closedSessions]
+      }));
+    }
   }
 
   async function resolveServiceRequest(orderId: string) {
@@ -756,14 +771,7 @@ export function TablesOverview() {
       `Orders moved from table ${moveAuthTable.tableNumber} to table ${nextTableNumber}.`
     );
 
-    const refreshResponse = await fetch("/api/tables");
-
-    if (!refreshResponse.ok) {
-      return;
-    }
-
-    const nextData = normalizeTablesResponse(await refreshResponse.json());
-    setData(nextData);
+    await refreshTablesData();
   }
 
   function sendTableToPos(table: TableOverview) {
@@ -1031,14 +1039,6 @@ export function TablesOverview() {
     const safeRightTime = Number.isFinite(rightTime) ? rightTime : 0;
     return safeRightTime - safeLeftTime;
   });
-  const currentShiftStartTs = getCurrentShiftStartTimestampByRules(
-    workingHoursRules,
-    workingHoursFrom
-  );
-  const currentShiftClosedSessions = sortedClosedSessions.filter((session) => {
-    const closedAtTs = new Date(session.closedAt).getTime();
-    return Number.isFinite(closedAtTs) && closedAtTs >= currentShiftStartTs;
-  });
   return (
     <>
       {dialogMessage ? (
@@ -1297,11 +1297,11 @@ export function TablesOverview() {
             ))}
           </div>
 
-          {currentShiftClosedSessions.length === 0 ? (
+          {sortedClosedSessions.length === 0 ? (
             <p className="muted">No closed tables yet.</p>
           ) : (
             <div className="closed-grid">
-              {currentShiftClosedSessions.slice(0, 10).map((session) => {
+              {sortedClosedSessions.slice(0, 10).map((session) => {
                 const sessionItems = groupClosedSessionItems(
                   session,
                   happyHourSettings

@@ -2661,8 +2661,8 @@ textarea.modal-input {
 }
 
 .status-pill--preparing {
-  background: rgba(37, 108, 75, 0.14);
-  color: var(--success);
+  background: rgba(229, 184, 77, 0.22);
+  color: #9a6a00;
 }
 
 .status-pill--served {
