@@ -123,7 +123,7 @@ const uiText = {
     serveAll: "להגיש הכול יחד",
     serveAsReady: "להגיש לפי המוכן",
     newOrder: "ההזמנה שלי",
-    emptyCart: "ההזמנה שלכם עדיין ריקה. הוסיפו משהו טעים מהתפריט.",
+    emptyCart: "הוסיפו משהו טעים מהתפריט.",
     recommendationTitle: "אולי תוסיפו גם",
     priorityHintTitle: "מומלץ להוסיף",
     addDrinkHint: "אין עדיין שתייה בהזמנה. תרצו לבחור משהו לשתות?",
@@ -141,7 +141,7 @@ const uiText = {
     submit: "שלח הזמנה",
     submitting: "שולח...",
     currentOrders: "הזמנות נוכחיות",
-    currentOrdersActiveHint: "ההזמנה הפעילה שלכם כאן למטה 👇",
+    currentOrdersActiveHint: "ההזמנה שלכם כאן למטה 👇",
     orderNew: "חדש",
     orderPreparing: "בהכנה",
     orderServed: "הוגש",
@@ -217,7 +217,7 @@ const uiText = {
     serveAll: "Serve everything together",
     serveAsReady: "Serve as ready",
     newOrder: "My order",
-    emptyCart: "Your order is empty. Add something tasty from the menu.",
+    emptyCart: "Add something tasty from the menu.",
     recommendationTitle: "You may also like",
     priorityHintTitle: "Recommended",
     addDrinkHint: "There are no drinks in your order yet. Add something to drink?",
@@ -235,7 +235,7 @@ const uiText = {
     submit: "Place order",
     submitting: "Sending...",
     currentOrders: "Current orders",
-    currentOrdersActiveHint: "Your active order below 👇",
+    currentOrdersActiveHint: "Your order below 👇",
     orderNew: "New",
     orderPreparing: "Preparing",
     orderServed: "Served",
@@ -310,7 +310,7 @@ const uiText = {
     serveAll: "Подать всё вместе",
     serveAsReady: "Подавайте по готовности",
     newOrder: "Мой заказ",
-    emptyCart: "Ваш заказ пуст. Добавьте что-нибудь вкусное из меню.",
+    emptyCart: "Добавьте что-нибудь вкусное из меню.",
     recommendationTitle: "Вам также может понравиться",
     priorityHintTitle: "Рекомендуем",
     addDrinkHint: "В вашем заказе пока нет напитков. Добавить что-нибудь выпить?",
@@ -328,7 +328,7 @@ const uiText = {
     submit: "Оформить заказ",
     submitting: "Отправка...",
     currentOrders: "Текущие заказы",
-    currentOrdersActiveHint: "Ваш активный заказ ниже 👇",
+    currentOrdersActiveHint: "Ваш заказ ниже 👇",
     orderNew: "Новый",
     orderPreparing: "Готовится",
     orderServed: "Подан",
@@ -2131,7 +2131,9 @@ export function Cart({
                 <span className="cart-empty-state__icon" aria-hidden="true">
                   🍽
                 </span>
-                <p className="cart-empty-state__text">{text.emptyCart}</p>
+                {text.emptyCart ? (
+                  <p className="cart-empty-state__text">{text.emptyCart}</p>
+                ) : null}
                 {submittedOrders.length ? (
                   <p className="cart-empty-state__active-hint">
                     {text.currentOrdersActiveHint}
@@ -2393,3 +2395,4 @@ export function Cart({
     </>
   );
 }
+                                                                 
