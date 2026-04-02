@@ -543,8 +543,6 @@ function archiveCompletedShiftsForNewActiveShift(
   }
 
   const ordersByWeek = new Map<string, Order[]>();
-  const summariesByWeek = new Map<string, ClosedTableSummary[]>();
-
   const remainingOrders = state.ordersStore.filter((order) => {
     const createdAtTs = new Date(order.createdAt).getTime();
 
@@ -564,29 +562,7 @@ function archiveCompletedShiftsForNewActiveShift(
     return false;
   });
 
-  const remainingClosedSummaries = state.closedTableSummaries.filter((summary) => {
-    const closedAtTs = new Date(summary.closedAt).getTime();
-
-    if (
-      !Number.isFinite(closedAtTs) ||
-      closedAtTs >= currentShiftWindow.start.getTime()
-    ) {
-      return true;
-    }
-
-    const shiftWeekKey = getIsoWeekKey(
-      getShiftWindowForTimestamp(settings, closedAtTs).start
-    );
-    const current = summariesByWeek.get(shiftWeekKey) ?? [];
-    current.push(summary);
-    summariesByWeek.set(shiftWeekKey, current);
-    return false;
-  });
-
-  if (
-    remainingOrders.length === state.ordersStore.length &&
-    remainingClosedSummaries.length === state.closedTableSummaries.length
-  ) {
+  if (remainingOrders.length === state.ordersStore.length) {
     return false;
   }
 
@@ -598,34 +574,17 @@ function archiveCompletedShiftsForNewActiveShift(
       mergedOrders.set(order.id, order);
     }
 
-    const mergedSummaries = new Map(
-      archive.closedTableSummaries.map((summary) => [
-        `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
-        summary
-      ] as const)
-    );
-
-    for (const summary of summariesByWeek.get(weekKey) ?? []) {
-      mergedSummaries.set(
-        `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
-        summary
-      );
-    }
-
     persistWeeklyArchive({
       weekKey,
       orders: [...mergedOrders.values()].sort((left, right) =>
         left.createdAt.localeCompare(right.createdAt)
       ),
-      closedTableSummaries: [...mergedSummaries.values()].sort((left, right) =>
-        left.closedAt.localeCompare(right.closedAt)
-      )
+      closedTableSummaries: archive.closedTableSummaries
     });
   }
 
   pruneWeeklyArchiveFiles();
   state.ordersStore = remainingOrders;
-  state.closedTableSummaries = remainingClosedSummaries;
   return true;
 }
 
