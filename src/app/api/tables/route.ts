@@ -9,6 +9,21 @@ import {
   moveTableOrders
 } from "@/lib/orders";
 
+const TABLES_API_DEBUG_ENABLED = ["1", "true", "yes", "on"].includes(
+  (process.env.DEBUG_ORDERS_STATE ?? "").toLowerCase()
+);
+
+function logTablesApiDebug(event: string, payload?: Record<string, unknown>) {
+  if (!TABLES_API_DEBUG_ENABLED) {
+    return;
+  }
+
+  console.info("[tables-api-debug]", event, {
+    at: new Date().toISOString(),
+    ...(payload ?? {})
+  });
+}
+
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminAccess(request, "admin");
 
@@ -17,10 +32,20 @@ export async function GET(request: NextRequest) {
   }
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+  const [tables, closedSessions] = await Promise.all([
+    getTableOverviews(restaurantSlug ?? undefined),
+    getClosedTableSummaries(restaurantSlug ?? undefined)
+  ]);
+
+  logTablesApiDebug("GET", {
+    restaurantSlug: restaurantSlug ?? null,
+    tablesCount: tables.length,
+    closedSessionsCount: closedSessions.length
+  });
 
   return NextResponse.json({
-    tables: await getTableOverviews(restaurantSlug ?? undefined),
-    closedSessions: await getClosedTableSummaries(restaurantSlug ?? undefined)
+    tables,
+    closedSessions
   });
 }
 
@@ -80,17 +105,35 @@ export async function PATCH(request: NextRequest) {
 
       const targetTableNumber = body.targetTableNumber as number;
 
-      return NextResponse.json(
-        await moveTableOrders(
-          restaurantSlug,
-          tableNumber,
-          targetTableNumber
-        )
+      const payload = await moveTableOrders(
+        restaurantSlug,
+        tableNumber,
+        targetTableNumber
       );
+      logTablesApiDebug("PATCH.move", {
+        restaurantSlug,
+        tableNumber,
+        targetTableNumber,
+        movedOrders: payload.movedOrders
+      });
+
+      return NextResponse.json(payload);
     }
 
-    return NextResponse.json(await closeTable(restaurantSlug, tableNumber));
+    const payload = await closeTable(restaurantSlug, tableNumber);
+    logTablesApiDebug("PATCH.close", {
+      restaurantSlug,
+      tableNumber,
+      sessionId: payload.sessionId,
+      orderCount: payload.orderCount,
+      total: payload.total
+    });
+
+    return NextResponse.json(payload);
   } catch (error) {
+    logTablesApiDebug("PATCH.error", {
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
     return NextResponse.json(
       {
         message: error instanceof Error ? error.message : "Unknown error"

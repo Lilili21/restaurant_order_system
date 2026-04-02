@@ -177,6 +177,9 @@ const MERGE_ORDER_WINDOW_MS = 3 * 60 * 1000;
 const SHIFT_CLOSE_GRACE_MS = 60 * 60 * 1000;
 const COOKED_MARKER = "__menu_order_cooked__";
 const MAX_WEEKLY_ARCHIVE_FILES = 4;
+const ORDERS_DEBUG_ENABLED = ["1", "true", "yes", "on"].includes(
+  (process.env.DEBUG_ORDERS_STATE ?? "").toLowerCase()
+);
 
 type WeeklyOrdersArchive = {
   weekKey: string;
@@ -206,6 +209,17 @@ type MenuLookupCacheEntry = {
   lookup: Map<string, MenuItem>;
   expiresAt: number;
 };
+
+function logOrdersDebug(event: string, payload?: Record<string, unknown>) {
+  if (!ORDERS_DEBUG_ENABLED) {
+    return;
+  }
+
+  console.info("[orders-debug]", event, {
+    at: new Date().toISOString(),
+    ...(payload ?? {})
+  });
+}
 
 declare global {
   // eslint-disable-next-line no-var
@@ -1127,7 +1141,7 @@ function mapClosedSummaryToRow(
   restaurantId: string
 ): ClosedSessionRow {
   return {
-    id: `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`,
+    id: getClosedSummaryPersistenceId(summary),
     restaurant_id: restaurantId,
     table_number: summary.tableNumber,
     session_id: summary.sessionId,
@@ -1136,6 +1150,39 @@ function mapClosedSummaryToRow(
     order_ids: summary.orderIds,
     orders_snapshot: summary.orders
   };
+}
+
+function getClosedSummaryPersistenceId(
+  summary: Pick<
+    ClosedTableSummary,
+    "restaurantSlug" | "tableNumber" | "sessionId" | "closedAt"
+  >
+) {
+  return `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`;
+}
+
+function sortClosedTableSummariesDesc(summaries: ClosedTableSummary[]) {
+  return [...summaries].sort((left, right) => {
+    const leftTs = new Date(left.closedAt).getTime();
+    const rightTs = new Date(right.closedAt).getTime();
+    const safeLeftTs = Number.isFinite(leftTs) ? leftTs : 0;
+    const safeRightTs = Number.isFinite(rightTs) ? rightTs : 0;
+    return safeRightTs - safeLeftTs;
+  });
+}
+
+function mergeClosedTableSummaries(
+  ...summaryGroups: ClosedTableSummary[][]
+): ClosedTableSummary[] {
+  const merged = new Map<string, ClosedTableSummary>();
+
+  for (const group of summaryGroups) {
+    for (const summary of group) {
+      merged.set(getClosedSummaryPersistenceId(summary), summary);
+    }
+  }
+
+  return sortClosedTableSummariesDesc([...merged.values()]);
 }
 
 function mapClosedSessionRowsToSummaries(
@@ -1797,19 +1844,35 @@ async function loadStateFromRowSupabase(
         ? parsedMeta.currentTableSessions
         : defaultSessionsFromRows;
 
+  const parsedMetaClosedSummaries = Array.isArray(parsedMeta?.closedTableSummaries)
+    ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
+    : [];
+  const closedTableSummaries =
+    closedSessionRows.length > 0
+      ? mergeClosedTableSummaries(
+          mapClosedSessionRowsToSummaries(closedSessionRows, restaurantLookup),
+          parsedMetaClosedSummaries
+        )
+      : parsedMetaClosedSummaries;
+
   const normalized: OrdersPersistence = {
     orders:
       serviceRequestRows.length > 0
         ? [...mapServiceRequestRowsToOrders(serviceRequestRows, restaurantLookup), ...activeOrders]
         : activeOrders,
     currentTableSessions,
-    closedTableSummaries:
-      closedSessionRows.length > 0
-        ? mapClosedSessionRowsToSummaries(closedSessionRows, restaurantLookup)
-        : Array.isArray(parsedMeta?.closedTableSummaries)
-          ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
-          : []
+    closedTableSummaries
   };
+
+  logOrdersDebug("loadStateFromRowSupabase.normalized", {
+    activeOrdersCount: activeOrders.length,
+    serviceRequestRowsCount: serviceRequestRows.length,
+    closedSessionRowsCount: closedSessionRows.length,
+    metaClosedSummariesCount: parsedMetaClosedSummaries.length,
+    normalizedOrdersCount: normalized.orders.length,
+    normalizedClosedSummariesCount: normalized.closedTableSummaries.length,
+    normalizedTableSessionsCount: normalized.currentTableSessions.length
+  });
 
   // Backward compatibility: if new tables are empty, try legacy payload once.
   if (
@@ -1843,6 +1906,9 @@ async function persistStateToRowSupabase(
   const restaurantRows = (restaurantRowsResult.data ?? []) as RestaurantRow[];
   const restaurantIdBySlug = new Map(
     restaurantRows.map((restaurant) => [restaurant.slug, restaurant.id] as const)
+  );
+  const restaurantLookup = new Map(
+    restaurantRows.map((restaurant) => [restaurant.id, restaurant] as const)
   );
   const activeOrderRows = standardOrders
     .map((order) => {
@@ -2079,7 +2145,38 @@ async function persistStateToRowSupabase(
     }
   }
 
-  const closedSessionRows = state.closedTableSummaries
+  const stateClosedSummariesBeforeMerge = state.closedTableSummaries.length;
+  const retentionCutoffTs =
+    Date.now() - CLOSED_SUMMARIES_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const retainedStateClosedSummaries = state.closedTableSummaries.filter((summary) => {
+    const closedAtTs = new Date(summary.closedAt).getTime();
+    return Number.isFinite(closedAtTs) && closedAtTs >= retentionCutoffTs;
+  });
+  const { data: existingClosedSessionRowsData, error: existingClosedSessionsError } =
+    await supabase.from("closed_sessions").select("*");
+
+  if (existingClosedSessionsError) {
+    throw new Error(existingClosedSessionsError.message);
+  }
+
+  const existingClosedSummaries = mapClosedSessionRowsToSummaries(
+    (existingClosedSessionRowsData ?? []) as ClosedSessionRow[],
+    restaurantLookup
+  );
+  const mergedClosedSummaries = mergeClosedTableSummaries(
+    existingClosedSummaries,
+    retainedStateClosedSummaries
+  );
+  state.closedTableSummaries = mergedClosedSummaries;
+
+  logOrdersDebug("persistStateToRowSupabase.closed_merge", {
+    stateClosedSummariesBeforeMerge,
+    retainedStateClosedSummariesCount: retainedStateClosedSummaries.length,
+    existingClosedSessionRowsCount: (existingClosedSessionRowsData ?? []).length,
+    mergedClosedSummariesCount: mergedClosedSummaries.length
+  });
+
+  const closedSessionRows = mergedClosedSummaries
     .map((summary) => {
       const restaurantId = restaurantIdBySlug.get(summary.restaurantSlug);
       return restaurantId ? mapClosedSummaryToRow(summary, restaurantId) : null;
@@ -2087,13 +2184,19 @@ async function persistStateToRowSupabase(
     .filter(Boolean);
 
   if (closedSessionRows.length === 0) {
-    const { error: deleteClosedSessionsError } = await supabase
-      .from("closed_sessions")
-      .delete()
-      .neq("id", "");
+    if (mergedClosedSummaries.length === 0) {
+      const { error: deleteClosedSessionsError } = await supabase
+        .from("closed_sessions")
+        .delete()
+        .neq("id", "");
 
-    if (deleteClosedSessionsError) {
-      throw new Error(deleteClosedSessionsError.message);
+      if (deleteClosedSessionsError) {
+        throw new Error(deleteClosedSessionsError.message);
+      }
+
+      logOrdersDebug("persistStateToRowSupabase.closed_delete_all", {
+        reason: "merged_closed_summaries_empty"
+      });
     }
   } else {
     const { error: upsertClosedSessionsError } = await supabase
@@ -2104,15 +2207,8 @@ async function persistStateToRowSupabase(
       throw new Error(upsertClosedSessionsError.message);
     }
 
-    const { data: existingClosedSessionRows, error: existingClosedSessionsError } =
-      await supabase.from("closed_sessions").select("id");
-
-    if (existingClosedSessionsError) {
-      throw new Error(existingClosedSessionsError.message);
-    }
-
     const currentClosedSessionIds = closedSessionRows.map((row) => row!.id);
-    const staleClosedSessionIds = (existingClosedSessionRows ?? [])
+    const staleClosedSessionIds = ((existingClosedSessionRowsData ?? []) as Array<{ id: string }>)
       .map((row) => String((row as { id: string }).id))
       .filter((id) => !currentClosedSessionIds.includes(id));
 
@@ -2125,6 +2221,11 @@ async function persistStateToRowSupabase(
       if (deleteStaleClosedSessionsError) {
         throw new Error(deleteStaleClosedSessionsError.message);
       }
+
+      logOrdersDebug("persistStateToRowSupabase.closed_delete_stale", {
+        staleClosedSessionIdsCount: staleClosedSessionIds.length,
+        upsertedClosedSessionRowsCount: closedSessionRows.length
+      });
     }
   }
 
@@ -2180,23 +2281,31 @@ async function persistStateToRowSupabase(
     }
   }
 
-  if (!tableSessionsStoredInDedicatedTable) {
-    const { error: metaError } = await supabase.from("app_state").upsert(
-      {
-        key: ORDERS_META_KEY,
-        value: {
-          currentTableSessions: toOrdersMetaPersistence(state).currentTableSessions,
-          closedTableSummaries: []
-        },
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "key" }
-    );
+  const { error: metaError } = await supabase.from("app_state").upsert(
+    {
+      key: ORDERS_META_KEY,
+      value: tableSessionsStoredInDedicatedTable
+        ? {
+            currentTableSessions: [],
+            closedTableSummaries: state.closedTableSummaries
+          }
+        : toOrdersMetaPersistence(state),
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "key" }
+  );
 
-    if (metaError) {
-      throw new Error(metaError.message);
-    }
+  if (metaError) {
+    throw new Error(metaError.message);
   }
+
+  logOrdersDebug("persistStateToRowSupabase.completed", {
+    standardOrdersCount: standardOrders.length,
+    serviceRequestOrdersCount: serviceRequestOrders.length,
+    closedSummariesCount: state.closedTableSummaries.length,
+    tableSessionsCount: state.currentTableSessions.size,
+    tableSessionsStoredInDedicatedTable
+  });
 }
 
 async function loadStateAsync(): Promise<OrdersPersistence> {
@@ -2210,6 +2319,11 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
 
   if (!supabase) {
     const localState = loadState();
+    logOrdersDebug("loadStateAsync.local_no_supabase", {
+      ordersCount: localState.orders.length,
+      closedSummariesCount: localState.closedTableSummaries.length,
+      tableSessionsCount: localState.currentTableSessions.length
+    });
     setOrdersStateCache(localState);
     return cloneOrdersPersistence(localState);
   }
@@ -2226,6 +2340,12 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
           } catch {
             // ignore migration failures, keep serving legacy state
           }
+          logOrdersDebug("loadStateAsync.legacy_fallback_after_empty_row_state", {
+            rowOrdersCount: normalizedState.orders.length,
+            rowClosedSummariesCount: normalizedState.closedTableSummaries.length,
+            legacyOrdersCount: legacyState.orders.length,
+            legacyClosedSummariesCount: legacyState.closedTableSummaries.length
+          });
           setOrdersStateCache(legacyState);
           return cloneOrdersPersistence(legacyState);
         }
@@ -2234,15 +2354,34 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
       }
     }
 
+    logOrdersDebug("loadStateAsync.row_state", {
+      ordersCount: normalizedState.orders.length,
+      closedSummariesCount: normalizedState.closedTableSummaries.length,
+      tableSessionsCount: normalizedState.currentTableSessions.length
+    });
     setOrdersStateCache(normalizedState);
     return cloneOrdersPersistence(normalizedState);
-  } catch {
+  } catch (rowLoadError) {
+    logOrdersDebug("loadStateAsync.row_state_error", {
+      message: rowLoadError instanceof Error ? rowLoadError.message : String(rowLoadError)
+    });
+
     try {
       const legacyState = await loadStateFromLegacySupabase(supabase);
+      logOrdersDebug("loadStateAsync.legacy_state", {
+        ordersCount: legacyState.orders.length,
+        closedSummariesCount: legacyState.closedTableSummaries.length,
+        tableSessionsCount: legacyState.currentTableSessions.length
+      });
       setOrdersStateCache(legacyState);
       return cloneOrdersPersistence(legacyState);
     } catch {
       const localState = loadState();
+      logOrdersDebug("loadStateAsync.local_fallback_after_legacy_error", {
+        ordersCount: localState.orders.length,
+        closedSummariesCount: localState.closedTableSummaries.length,
+        tableSessionsCount: localState.currentTableSessions.length
+      });
       setOrdersStateCache(localState);
       return cloneOrdersPersistence(localState);
     }
@@ -2259,6 +2398,11 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     closedTableSummaries: persistedState.closedTableSummaries
   };
   const settings = await getMenuSettings();
+  const countsBeforeCleanup = {
+    ordersCount: state.ordersStore.length,
+    closedSummariesCount: state.closedTableSummaries.length,
+    tableSessionsCount: state.currentTableSessions.size
+  };
 
   const expiredShiftOrdersClosed = autoCloseExpiredShiftOrders(state, settings);
   const staleServiceRequestsClosed = autoCloseStaleServiceRequests(state);
@@ -2282,6 +2426,26 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     activeOrdersTrimmed ||
     closedSummariesCompacted
   ) {
+    const countsAfterCleanup = {
+      ordersCount: state.ordersStore.length,
+      closedSummariesCount: state.closedTableSummaries.length,
+      tableSessionsCount: state.currentTableSessions.size
+    };
+    logOrdersDebug("readRuntimeStateAsync.cleanup_and_persist", {
+      ordersCountBeforeCleanup: countsBeforeCleanup.ordersCount,
+      closedSummariesCountBeforeCleanup: countsBeforeCleanup.closedSummariesCount,
+      tableSessionsCountBeforeCleanup: countsBeforeCleanup.tableSessionsCount,
+      ordersCountAfterCleanup: countsAfterCleanup.ordersCount,
+      closedSummariesCountAfterCleanup: countsAfterCleanup.closedSummariesCount,
+      tableSessionsCountAfterCleanup: countsAfterCleanup.tableSessionsCount,
+      expiredShiftOrdersClosed,
+      staleServiceRequestsClosed,
+      shiftedSessionsRotated,
+      completedShiftOrdersArchived,
+      staleClosedSummariesPruned,
+      activeOrdersTrimmed,
+      closedSummariesCompacted
+    });
     await persistStateAsync(state);
   }
 
@@ -3158,10 +3322,19 @@ export async function getTableOverviews(
   restaurantSlug?: string
 ): Promise<TableOverview[]> {
   const state = await readRuntimeStateAsync();
-  const shiftWindow = getCurrentAdminShiftWindow(await getMenuSettings());
-  let shouldPersist = false;
+  const settings = await getMenuSettings();
+  const shiftWindow = getCurrentAdminShiftWindow(settings);
 
   if (!shiftWindow) {
+    logOrdersDebug("getTableOverviews.no_active_shift", {
+      restaurantSlug: restaurantSlug ?? null,
+      nowIso: new Date().toISOString(),
+      workingHoursFrom: settings.workingHoursFrom,
+      workingHoursUntil: settings.workingHoursUntil,
+      workingHoursRulesCount: settings.workingHoursRules.length,
+      ordersCount: state.ordersStore.length,
+      closedSummariesCount: state.closedTableSummaries.length
+    });
     return [];
   }
 
@@ -3171,15 +3344,11 @@ export async function getTableOverviews(
     )
     .flatMap((restaurant) =>
       restaurant.tables.map((table) => {
-        const { sessionId: currentSessionId, created } = ensureCurrentSessionId(
+        const { sessionId: currentSessionId } = ensureCurrentSessionId(
           state,
           restaurant.slug,
           table.number
         );
-
-        if (created) {
-          shouldPersist = true;
-        }
 
         const sessionOrders = state.ordersStore
           .filter(
@@ -3212,9 +3381,14 @@ export async function getTableOverviews(
     .filter((table) => table.orders.length > 0)
     .sort((left, right) => left.tableNumber - right.tableNumber);
 
-  if (shouldPersist) {
-    await persistStateAsync(state);
-  }
+  logOrdersDebug("getTableOverviews.result", {
+    restaurantSlug: restaurantSlug ?? null,
+    shiftStartIso: shiftWindow.start.toISOString(),
+    shiftEndIso: shiftWindow.end.toISOString(),
+    overviewsCount: overviews.length,
+    ordersCount: state.ordersStore.length,
+    closedSummariesCount: state.closedTableSummaries.length
+  });
 
   return overviews;
 }
@@ -3271,6 +3445,14 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
   };
 
   state.closedTableSummaries.unshift(summary);
+  logOrdersDebug("closeTable.summary_created", {
+    restaurantSlug,
+    tableNumber,
+    sessionId: summary.sessionId,
+    summaryOrderIdsCount: summary.orderIds.length,
+    summaryTotal: summary.total,
+    stateClosedSummariesCountAfterPush: state.closedTableSummaries.length
+  });
   state.ordersStore = state.ordersStore.filter((order) => !summary.orderIds.includes(order.id));
   state.currentTableSessions.set(
     createTableKey(restaurantSlug, tableNumber),
