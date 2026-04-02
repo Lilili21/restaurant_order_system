@@ -92,6 +92,15 @@ const TABLES_ARCHIVES_CACHE_TTL_MS = 15 * 60 * 1000;
 const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
 const TABLES_ARCHIVES_CACHE_KEY = "admin-tables-archives-cache-v1";
 
+function getTablesServiceRequests(orders: Order[]) {
+  return orders.filter(
+    (order) =>
+      order.kind === "bill_request" &&
+      order.status !== "served" &&
+      order.status !== "cancelled"
+  );
+}
+
 function getSessionItemKey(item: { menuItemId: string; volumeOptionId?: string; volumeLabel?: string }) {
   return `${item.menuItemId}:${item.volumeOptionId ?? item.volumeLabel ?? "base"}`;
 }
@@ -375,10 +384,12 @@ export function TablesOverview() {
   );
   const [serviceRequests, setServiceRequests] = useState<Order[]>(
     () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.serviceRequests ?? []
+      getTablesServiceRequests(
+        readSessionCache<TablesViewCache>(
+          TABLES_VIEW_CACHE_KEY,
+          TABLES_VIEW_CACHE_TTL_MS
+        )?.serviceRequests ?? []
+      )
   );
   const [happyHourEnabled, setHappyHourEnabled] = useState(
     () =>
@@ -494,12 +505,7 @@ export function TablesOverview() {
       const payload = tablesResponse.ok ? await tablesResponse.json() : null;
       const nextData = normalizeTablesResponse(payload);
       const nextServiceRequests = ordersResponse.ok
-        ? ((await ordersResponse.json()) as Order[]).filter(
-            (order) =>
-              order.kind === "waiter_call" &&
-              order.status !== "served" &&
-              order.status !== "cancelled"
-          )
+        ? getTablesServiceRequests((await ordersResponse.json()) as Order[])
         : [];
       const menuSettingsPayload: MenuSettingsResponse | null =
         menuSettingsResponse.ok
