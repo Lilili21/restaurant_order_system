@@ -33,7 +33,7 @@ type Props = {
     value: string | boolean | MenuBadge[] | MenuCategory
   ) => void;
   setItemsCategoryDraft: (itemId: string, nextCategory: MenuCategory) => void;
-  toggleAvailability: (itemId: string) => void;
+  toggleAvailability: (itemId: string) => Promise<void>;
   uploadExistingImage: ExistingImageUploader;
   clearExistingImage: (itemId: string) => void;
   toggleItemBadge: (itemId: string, badge: MenuBadge) => void;
@@ -147,7 +147,10 @@ export function MenuItemEditCard({
           <input
             type="checkbox"
             checked={item.available}
-            onChange={() => toggleAvailability(item.id)}
+            disabled={item.saving}
+            onChange={() => {
+              void toggleAvailability(item.id);
+            }}
           />
           <span
             className={`status-pill menu-editor__availability ${

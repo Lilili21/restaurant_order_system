@@ -16,7 +16,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
 const MENU_STORE_KEY = "menu-store";
 const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
-const MENU_STORE_CACHE_TTL_MS = 60_000;
+const MENU_STORE_CACHE_TTL_MS = 5_000;
 const ALLOWED_BADGES: MenuBadge[] = [
   "chef_special",
   "most_popular",

@@ -409,6 +409,7 @@ export function Cart({
     null
   );
   const [language, setLanguage] = useState<MenuLanguage>("he");
+  const [liveMenu, setLiveMenu] = useState<MenuItem[]>(menu);
   const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
     initialSubmittedOrders
@@ -438,14 +439,18 @@ export function Cart({
     submittedAt: number;
   } | null>(null);
 
+  useEffect(() => {
+    setLiveMenu(menu);
+  }, [menu]);
+
   const detailedItems = useMemo(() => {
     return items
       .map((cartItem) => {
-        const menuItem = menu.find((item) => item.id === cartItem.menuItemId);
+        const menuItem = liveMenu.find((item) => item.id === cartItem.menuItemId);
         return menuItem ? { cartItem, menuItem } : null;
       })
       .filter(Boolean) as { cartItem: CartItem; menuItem: MenuItem }[];
-  }, [items, menu]);
+  }, [items, liveMenu]);
 
   const total = detailedItems.reduce(
     (sum, item) =>
@@ -625,15 +630,15 @@ export function Cart({
     );
 
     if (restrictedCategories.size === 0) {
-      return menu;
+      return liveMenu;
     }
 
-    return menu.filter(
+    return liveMenu.filter(
       (item) =>
         !restrictedCategories.has(item.category) ||
         activeBusinessLunchCategories.has(item.category)
     );
-  }, [activeBusinessLunches, businessLunches, menu]);
+  }, [activeBusinessLunches, businessLunches, liveMenu]);
 
   const effectiveSelectedFilter =
     selectedMenuFilter &&
@@ -728,7 +733,7 @@ export function Cart({
     menuItemId: string,
     volumeLabel?: string | null
   ) {
-    const menuItem = menu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenu.find((item) => item.id === menuItemId);
 
     if (!menuItem) {
       return "";
@@ -848,7 +853,7 @@ export function Cart({
           return true;
         }
 
-        const suggestedItem = menu.find((item) => item.id === recommendation.suggestedItemId);
+        const suggestedItem = liveMenu.find((item) => item.id === recommendation.suggestedItemId);
 
         if (!suggestedItem || !suggestedItem.available) {
           return false;
@@ -890,10 +895,10 @@ export function Cart({
         continue;
       }
 
-      const triggerItem = menu.find((item) => item.id === recommendation.triggerItemId);
+      const triggerItem = liveMenu.find((item) => item.id === recommendation.triggerItemId);
       const suggestedItem =
         recommendation.suggestedType === "item"
-          ? menu.find((item) => item.id === recommendation.suggestedItemId)
+          ? liveMenu.find((item) => item.id === recommendation.suggestedItemId)
           : null;
 
       if (!triggerItem) {
@@ -972,7 +977,7 @@ export function Cart({
     }
 
     return nextRecommendations;
-  }, [detailedItems, isBarClosed, isKitchenClosed, menu, recommendations, visibleMenu]);
+  }, [detailedItems, isBarClosed, isKitchenClosed, liveMenu, recommendations, visibleMenu]);
   const priorityCartSuggestions = useMemo(() => {
     if (!detailedItems.length) {
       return [];
@@ -1112,7 +1117,7 @@ export function Cart({
           );
         })
         .map((item) => {
-          const menuItem = menu.find((candidate) => candidate.id === item.menuItemId);
+          const menuItem = liveMenu.find((candidate) => candidate.id === item.menuItemId);
           const matchedVolumeOption = menuItem?.volumeOptions?.find(
             (option) => option.id === item.volumeOptionId
           );
@@ -1136,7 +1141,7 @@ export function Cart({
                 : matchedVolumeOption?.price
           };
         })
-        .filter((item) => menu.some((menuItem) => menuItem.id === item.menuItemId));
+        .filter((item) => liveMenu.some((menuItem) => menuItem.id === item.menuItemId));
 
       if (restoredItems.length) {
         setItems(restoredItems);
@@ -1144,7 +1149,7 @@ export function Cart({
     } catch {
       window.localStorage.removeItem(cartStorageKey);
     }
-  }, [cartStorageKey, menu]);
+  }, [cartStorageKey, liveMenu]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -1228,6 +1233,7 @@ export function Cart({
         currentSessionId?: number;
         submittedOrders?: Order[];
         activeServiceRequests?: Array<Order["kind"]>;
+        menu?: MenuItem[];
       };
 
       if (!cancelled) {
@@ -1239,6 +1245,9 @@ export function Cart({
         );
 
         setCurrentSessionId(nextSessionId);
+        if (Array.isArray(data.menu)) {
+          setLiveMenu(data.menu);
+        }
         setHasActiveServiceRequest(hasActiveServiceRequests);
         if (!hasActiveServiceRequests) {
           setServiceRequestBlockedUntil(0);
@@ -1325,7 +1334,7 @@ export function Cart({
     sourceElement?: HTMLElement | null
   ) {
     const targetElement = orderJumpButtonRef.current;
-    const menuItem = menu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenu.find((item) => item.id === menuItemId);
 
     if (!sourceElement || !targetElement || !menuItem) {
       return;
@@ -1366,7 +1375,7 @@ export function Cart({
     volumeOptionId?: string
   ) {
     animateOrderMovement(menuItemId, "to-order", sourceElement);
-    const menuItem = menu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenu.find((item) => item.id === menuItemId);
     const matchedVolumeOption = menuItem?.volumeOptions?.find(
       (option) => option.id === volumeOptionId
     );

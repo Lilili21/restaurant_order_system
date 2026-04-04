@@ -60,7 +60,7 @@ type Props = {
     value: string | boolean | MenuBadge[] | MenuCategory
   ) => void;
   setItemsCategoryDraft: (itemId: string, nextCategory: MenuCategory) => void;
-  toggleAvailability: (itemId: string) => void;
+  toggleAvailability: (itemId: string) => Promise<void>;
   uploadExistingImage: (
     itemId: string,
     event: ChangeEvent<HTMLInputElement>

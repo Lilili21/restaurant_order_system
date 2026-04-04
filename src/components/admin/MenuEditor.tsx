@@ -1598,13 +1598,68 @@ export function MenuEditor() {
     }
   }, [updateNewItem]);
 
-  const toggleAvailability = useCallback(function toggleAvailability(itemId: string) {
+  const toggleAvailability = useCallback(async function toggleAvailability(itemId: string) {
+    const targetItem = items.find((item) => item.id === itemId);
+
+    if (!targetItem) {
+      return;
+    }
+
+    const nextAvailable = !targetItem.available;
+
     setItems((current) =>
       current.map((item) =>
-        item.id === itemId ? { ...item, available: !item.available } : item
+        item.id === itemId
+          ? {
+              ...item,
+              available: nextAvailable,
+              saving: true
+            }
+          : item
       )
     );
-  }, []);
+
+    const response = await fetch("/api/menu", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+      },
+      body: JSON.stringify({
+        id: itemId,
+        available: nextAvailable
+      })
+    });
+
+    if (!response.ok) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId
+            ? {
+                ...item,
+                available: targetItem.available,
+                saving: false
+              }
+            : item
+        )
+      );
+      setMessage("Failed to update availability.");
+      return;
+    }
+
+    setItems((current) =>
+      current.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              saving: false
+            }
+          : item
+      )
+    );
+    setMessage(nextAvailable ? "Item is now available." : "Item is now unavailable.");
+  }, [items, secondaryCredentials]);
 
   async function toggleKitchenLoadWarning(nextValue: boolean) {
     setKitchenLoadWarningEnabled(nextValue);

@@ -10,7 +10,8 @@ import {
 import { getMenuSettings } from "@/lib/menu-settings";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function parseTime(value: string | null | undefined) {
   if (!value) {

@@ -43,6 +43,7 @@ export async function GET(request: NextRequest, { params }: TableRouteProps) {
 
   const response = NextResponse.json({
     currentSessionId,
+    menu: session.menu,
     submittedOrders,
     activeServiceRequests: activeServiceRequests.map((order) => order.kind)
   });

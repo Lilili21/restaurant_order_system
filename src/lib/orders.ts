@@ -1378,6 +1378,28 @@ function compactClosedTableSummaries(state: RuntimeState) {
   return changed;
 }
 
+function pruneCorruptedEmptyClosedSummaries(state: RuntimeState) {
+  const nextSummaries = state.closedTableSummaries.filter((summary) => {
+    const hasOrderIds = Array.isArray(summary.orderIds) && summary.orderIds.length > 0;
+    const hasOrders = Array.isArray(summary.orders) && summary.orders.length > 0;
+    const hasOrderCount = Number(summary.orderCount) > 0;
+    const hasNonZeroTotal = Number(summary.total) > 0;
+
+    return hasOrderIds || hasOrders || hasOrderCount || hasNonZeroTotal;
+  });
+
+  if (nextSummaries.length === state.closedTableSummaries.length) {
+    return false;
+  }
+
+  const removed = state.closedTableSummaries.length - nextSummaries.length;
+  state.closedTableSummaries = nextSummaries;
+  logOrdersDebug("pruneCorruptedEmptyClosedSummaries.removed", {
+    removedCount: removed
+  });
+  return true;
+}
+
 function createDefaultTableSessions() {
   const sessions = new Map<string, number>();
 
@@ -2414,6 +2436,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
   const staleClosedSummariesPruned = await pruneClosedTableSummariesByWorkingDay(
     state
   );
+  const corruptedEmptyClosedSummariesPruned = pruneCorruptedEmptyClosedSummaries(state);
   const activeOrdersTrimmed = removeClosedSessionOrdersFromActiveState(state);
   const closedSummariesCompacted = compactClosedTableSummaries(state);
 
@@ -2423,6 +2446,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     shiftedSessionsRotated ||
     completedShiftOrdersArchived ||
     staleClosedSummariesPruned ||
+    corruptedEmptyClosedSummariesPruned ||
     activeOrdersTrimmed ||
     closedSummariesCompacted
   ) {
@@ -2443,6 +2467,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
       shiftedSessionsRotated,
       completedShiftOrdersArchived,
       staleClosedSummariesPruned,
+      corruptedEmptyClosedSummariesPruned,
       activeOrdersTrimmed,
       closedSummariesCompacted
     });
@@ -3418,10 +3443,22 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
       order.sessionId === sessionId
   );
 
-  const unservedOrders = orders.filter(
+  const billableOrders = orders.filter(
+    (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
+  );
+
+  if (billableOrders.length === 0) {
+    logOrdersDebug("closeTable.blocked_empty_session", {
+      restaurantSlug,
+      tableNumber,
+      sessionId,
+      allSessionOrdersCount: orders.length
+    });
+    throw new Error("No food/drink orders in this session. Nothing to close.");
+  }
+
+  const unservedOrders = billableOrders.filter(
     (order) =>
-      order.kind !== "waiter_call" &&
-      order.kind !== "bill_request" &&
       order.status !== "served" &&
       order.status !== "cancelled"
   );
@@ -3438,10 +3475,10 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     tableNumber,
     sessionId,
     closedAt: new Date().toISOString(),
-    total: orders.reduce((sum, order) => sum + order.total, 0),
-    orderCount: orders.length,
-    orderIds: orders.map((order) => order.id),
-    orders: orders.map((order) => toClosedTableOrderSnapshot(order))
+    total: billableOrders.reduce((sum, order) => sum + order.total, 0),
+    orderCount: billableOrders.length,
+    orderIds: billableOrders.map((order) => order.id),
+    orders: billableOrders.map((order) => toClosedTableOrderSnapshot(order))
   };
 
   state.closedTableSummaries.unshift(summary);
@@ -3453,7 +3490,8 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     summaryTotal: summary.total,
     stateClosedSummariesCountAfterPush: state.closedTableSummaries.length
   });
-  state.ordersStore = state.ordersStore.filter((order) => !summary.orderIds.includes(order.id));
+  const sessionOrderIds = new Set(orders.map((order) => order.id));
+  state.ordersStore = state.ordersStore.filter((order) => !sessionOrderIds.has(order.id));
   state.currentTableSessions.set(
     createTableKey(restaurantSlug, tableNumber),
     sessionId + 1
