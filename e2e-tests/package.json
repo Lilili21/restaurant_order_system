@@ -1,0 +1,23 @@
+{
+  "name": "menu-ordering-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <26"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:prod": "E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app E2E_USE_WEB_SERVER=false playwright test",
+    "test:local": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "codegen": "playwright codegen",
+    "install:browsers": "playwright install --with-deps chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}
