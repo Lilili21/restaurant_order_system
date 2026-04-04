@@ -1181,6 +1181,41 @@ function sortClosedTableSummariesDesc(summaries: ClosedTableSummary[]) {
   });
 }
 
+function pickPreferredClosedSummary(
+  current: ClosedTableSummary,
+  candidate: ClosedTableSummary
+) {
+  const currentTs = new Date(current.closedAt).getTime();
+  const candidateTs = new Date(candidate.closedAt).getTime();
+
+  if (Number.isFinite(candidateTs) && Number.isFinite(currentTs)) {
+    if (candidateTs > currentTs) {
+      return candidate;
+    }
+
+    if (candidateTs < currentTs) {
+      return current;
+    }
+  } else if (Number.isFinite(candidateTs) && !Number.isFinite(currentTs)) {
+    return candidate;
+  }
+
+  const currentOrderIdsCount = Array.isArray(current.orderIds) ? current.orderIds.length : 0;
+  const candidateOrderIdsCount = Array.isArray(candidate.orderIds)
+    ? candidate.orderIds.length
+    : 0;
+
+  if (candidateOrderIdsCount > currentOrderIdsCount) {
+    return candidate;
+  }
+
+  if (candidateOrderIdsCount < currentOrderIdsCount) {
+    return current;
+  }
+
+  return candidate.total >= current.total ? candidate : current;
+}
+
 function mergeClosedTableSummaries(
   ...summaryGroups: ClosedTableSummary[][]
 ): ClosedTableSummary[] {
@@ -1188,7 +1223,15 @@ function mergeClosedTableSummaries(
 
   for (const group of summaryGroups) {
     for (const summary of group) {
-      merged.set(getClosedSummaryPersistenceId(summary), summary);
+      const id = getClosedSummaryPersistenceId(summary);
+      const existing = merged.get(id);
+
+      if (!existing) {
+        merged.set(id, summary);
+        continue;
+      }
+
+      merged.set(id, pickPreferredClosedSummary(existing, summary));
     }
   }
 
@@ -3536,12 +3579,35 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
       summary.sessionId === sessionId
   );
 
-  if (existingSummary) {
+  if (existingSummary && billableOrders.length === 0) {
+    const sessionOrderIds = new Set(orders.map((order) => order.id));
+    let recovered = false;
+
+    if (sessionOrderIds.size > 0) {
+      state.ordersStore = state.ordersStore.filter(
+        (order) => !sessionOrderIds.has(order.id)
+      );
+      recovered = true;
+    }
+
+    const sessionKey = createTableKey(restaurantSlug, tableNumber);
+    const currentSession = state.currentTableSessions.get(sessionKey);
+
+    if (currentSession === sessionId) {
+      state.currentTableSessions.set(sessionKey, sessionId + 1);
+      recovered = true;
+    }
+
+    if (recovered) {
+      await persistStateAsync(state);
+    }
+
     logOrdersDebug("closeTable.already_closed_session", {
       restaurantSlug,
       tableNumber,
       sessionId,
-      existingClosedAt: existingSummary.closedAt
+      existingClosedAt: existingSummary.closedAt,
+      recovered
     });
     return existingSummary;
   }
@@ -3580,7 +3646,13 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     orders: billableOrders.map((order) => toClosedTableOrderSnapshot(order))
   };
 
-  state.closedTableSummaries.unshift(summary);
+  const summaryId = getClosedSummaryPersistenceId(summary);
+  state.closedTableSummaries = [
+    summary,
+    ...state.closedTableSummaries.filter(
+      (existing) => getClosedSummaryPersistenceId(existing) !== summaryId
+    )
+  ];
   state.closedTableSummaries = mergeClosedTableSummaries(state.closedTableSummaries);
   logOrdersDebug("closeTable.summary_created", {
     restaurantSlug,

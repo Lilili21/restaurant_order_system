@@ -159,4 +159,39 @@ describe("orders", () => {
     expect(Array.isArray(persisted.closedTableSummaries)).toBe(true);
     expect(persisted.closedTableSummaries).toHaveLength(1);
   });
+
+  it("closeTable recovers when a closed summary exists but table session still hangs in active list", async () => {
+    const {
+      closeTable,
+      createOrder,
+      getClosedTableSummaries,
+      getCurrentTableSessionId,
+      getTableOverviews,
+      updateOrderStatus
+    } = await import("@/lib/orders");
+
+    const created = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 6,
+      items: [{ menuItemId: "m1", quantity: 1 }]
+    });
+    const served = await updateOrderStatus(created.id, "served");
+    const firstClose = await closeTable("olive-bistro", 6);
+
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [served],
+      currentTableSessions: [["olive-bistro:6", served.sessionId]],
+      closedTableSummaries: [firstClose]
+    });
+
+    const secondClose = await closeTable("olive-bistro", 6);
+    const tables = await getTableOverviews("olive-bistro");
+    const closed = await getClosedTableSummaries("olive-bistro");
+    const nextSessionId = await getCurrentTableSessionId("olive-bistro", 6);
+
+    expect(secondClose.sessionId).toBe(served.sessionId);
+    expect(tables.find((table) => table.tableNumber === 6)).toBeUndefined();
+    expect(closed.filter((summary) => summary.tableNumber === 6)).toHaveLength(1);
+    expect(nextSessionId).toBe(served.sessionId + 1);
+  });
 });
