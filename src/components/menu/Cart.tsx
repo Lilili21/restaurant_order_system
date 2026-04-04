@@ -1205,9 +1205,26 @@ export function Cart({
 
     let cancelled = false;
     let inFlightAbortController: AbortController | null = null;
+    let pollTimeoutId: number | null = null;
+    const POLL_INTERVAL_MS = 4000;
+
+    function scheduleNextSync() {
+      if (cancelled) {
+        return;
+      }
+
+      pollTimeoutId = window.setTimeout(() => {
+        void syncSubmittedOrders();
+      }, POLL_INTERVAL_MS);
+    }
 
     async function syncSubmittedOrders() {
+      if (cancelled) {
+        return;
+      }
+
       if (document.visibilityState === "hidden") {
+        scheduleNextSync();
         return;
       }
 
@@ -1222,10 +1239,12 @@ export function Cart({
           signal: inFlightAbortController.signal
         });
       } catch {
+        scheduleNextSync();
         return;
       }
 
       if (!response.ok) {
+        scheduleNextSync();
         return;
       }
 
@@ -1274,15 +1293,19 @@ export function Cart({
           );
         });
       }
+
+      scheduleNextSync();
     }
 
     void syncSubmittedOrders();
-    const intervalId = window.setInterval(syncSubmittedOrders, 4000);
 
     return () => {
       cancelled = true;
       inFlightAbortController?.abort();
-      window.clearInterval(intervalId);
+
+      if (pollTimeoutId !== null) {
+        window.clearTimeout(pollTimeoutId);
+      }
     };
   }, [restaurantSlug, tableToken, orderingEnabled]);
 

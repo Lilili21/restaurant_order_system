@@ -3,6 +3,23 @@ import { expect, test } from "@playwright/test";
 import { createMockOrder } from "./fixtures";
 
 test("live orders list refreshes from polling without manual reload", async ({ page }) => {
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
   await page.addInitScript(() => {
     window.localStorage.removeItem("admin-orders-filters-v1");
     window.localStorage.removeItem("admin-waiter-calls-v2");

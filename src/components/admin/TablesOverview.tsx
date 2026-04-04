@@ -1030,9 +1030,19 @@ export function TablesOverview() {
   const happyHourCategoriesLabel = formatHappyHourCategoriesLabel(
     happyHourCategories
   );
-  const sortedClosedSessions = [
-    ...(Array.isArray(data.closedSessions) ? data.closedSessions : [])
-  ].sort((left, right) => {
+  const currentShiftStartTimestamp = getCurrentShiftStartTimestampByRules(
+    workingHoursRules,
+    workingHoursFrom
+  );
+  const currentShiftClosedSessions = (
+    Array.isArray(data.closedSessions) ? data.closedSessions : []
+  ).filter((session) => {
+    const closedAtTime = new Date(session.closedAt).getTime();
+    return (
+      Number.isFinite(closedAtTime) && closedAtTime >= currentShiftStartTimestamp
+    );
+  });
+  const sortedClosedSessions = [...currentShiftClosedSessions].sort((left, right) => {
     const leftTime = new Date(left.closedAt).getTime();
     const rightTime = new Date(right.closedAt).getTime();
     const safeLeftTime = Number.isFinite(leftTime) ? leftTime : 0;
@@ -1298,7 +1308,7 @@ export function TablesOverview() {
           </div>
 
           {sortedClosedSessions.length === 0 ? (
-            <p className="muted">No closed tables yet.</p>
+            <p className="muted">No closed tables in the current shift yet.</p>
           ) : (
             <div className="closed-grid">
               {sortedClosedSessions.slice(0, 10).map((session) => {
