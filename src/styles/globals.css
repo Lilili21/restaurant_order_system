@@ -3051,6 +3051,23 @@ textarea.modal-input {
   align-items: stretch;
 }
 
+.orders-filter__chips--zone .orders-filter__chip {
+  min-height: 56px;
+  padding: 0 24px;
+  font-size: 1.08rem;
+  font-weight: 800;
+}
+
+.orders-filter__chips--zone .orders-filter__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.orders-filter__chips--zone .orders-filter__icon-svg {
+  width: 20px;
+  height: 20px;
+}
+
 .orders-filter__chip {
   display: inline-flex;
   align-items: center;

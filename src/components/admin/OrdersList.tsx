@@ -990,7 +990,7 @@ export function OrdersList() {
       <div className="orders-layout">
       <div className="orders-filter orders-filter--stacked">
         <div className="orders-filter__row">
-        <div className="orders-filter__chips">
+        <div className="orders-filter__chips orders-filter__chips--zone">
           <button
             type="button"
             className={
@@ -1008,7 +1008,7 @@ export function OrdersList() {
                 />
               </svg>
             </span>
-            Hall
+            Floor
           </button>
           <button
             type="button"
