@@ -1145,20 +1145,30 @@ function mapClosedSummaryToRow(
     restaurant_id: restaurantId,
     table_number: summary.tableNumber,
     session_id: summary.sessionId,
-    closed_at: summary.closedAt,
+    closed_at: normalizeTimestampToIso(summary.closedAt),
     total: summary.total,
     order_ids: summary.orderIds,
     orders_snapshot: summary.orders
   };
 }
 
+function normalizeTimestampToIso(value: string) {
+  const timestamp = new Date(value).getTime();
+
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
 function getClosedSummaryPersistenceId(
   summary: Pick<
     ClosedTableSummary,
-    "restaurantSlug" | "tableNumber" | "sessionId" | "closedAt"
+    "restaurantSlug" | "tableNumber" | "sessionId"
   >
 ) {
-  return `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}:${summary.closedAt}`;
+  return `${summary.restaurantSlug}:${summary.tableNumber}:${summary.sessionId}`;
 }
 
 function sortClosedTableSummariesDesc(summaries: ClosedTableSummary[]) {
@@ -1209,7 +1219,7 @@ function mapClosedSessionRowsToSummaries(
         restaurantName: restaurant.name,
         tableNumber: Number(row.table_number),
         sessionId: Number(row.session_id),
-        closedAt: row.closed_at,
+        closedAt: normalizeTimestampToIso(row.closed_at),
         total: Number(row.total) || 0,
         orderCount: orderIds.length || orders.length,
         orderIds,
@@ -1376,6 +1386,21 @@ function compactClosedTableSummaries(state: RuntimeState) {
   });
 
   return changed;
+}
+
+function dedupeClosedTableSummaries(state: RuntimeState) {
+  const merged = mergeClosedTableSummaries(state.closedTableSummaries);
+
+  if (merged.length === state.closedTableSummaries.length) {
+    return false;
+  }
+
+  const removedCount = state.closedTableSummaries.length - merged.length;
+  state.closedTableSummaries = merged;
+  logOrdersDebug("dedupeClosedTableSummaries.removed", {
+    removedCount
+  });
+  return true;
 }
 
 function pruneCorruptedEmptyClosedSummaries(state: RuntimeState) {
@@ -1546,6 +1571,60 @@ function rotateSessionsForNewShift(
 
     if (!hasOlderOrders) {
       continue;
+    }
+
+    const billableOrders = sessionOrders.filter(
+      (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
+    );
+    const referenceOrder = billableOrders[0] ?? sessionOrders[0];
+
+    if (referenceOrder) {
+      const referenceCreatedAtTs = new Date(referenceOrder.createdAt).getTime();
+      const referenceShiftWindow = Number.isFinite(referenceCreatedAtTs)
+        ? getShiftWindowForTimestamp(settings, referenceCreatedAtTs)
+        : null;
+      const closedAtIso = referenceShiftWindow
+        ? referenceShiftWindow.end.toISOString()
+        : new Date().toISOString();
+      const summary: ClosedTableSummary = {
+        restaurantSlug: referenceOrder.restaurantSlug,
+        restaurantName: referenceOrder.restaurantName,
+        tableNumber: referenceOrder.tableNumber,
+        sessionId,
+        closedAt: closedAtIso,
+        total: billableOrders.reduce((sum, order) => sum + order.total, 0),
+        orderCount: billableOrders.length,
+        orderIds: billableOrders.map((order) => order.id),
+        orders: billableOrders.map((order) => toClosedTableOrderSnapshot(order))
+      };
+      const summaryId = getClosedSummaryPersistenceId(summary);
+      const hasSummary = state.closedTableSummaries.some(
+        (existingSummary) => getClosedSummaryPersistenceId(existingSummary) === summaryId
+      );
+
+      if (!hasSummary && summary.orderIds.length > 0) {
+        state.closedTableSummaries.unshift(summary);
+        logOrdersDebug("rotateSessionsForNewShift.auto_closed_session", {
+          restaurantSlug: summary.restaurantSlug,
+          tableNumber: summary.tableNumber,
+          sessionId: summary.sessionId,
+          closedAt: summary.closedAt,
+          orderIdsCount: summary.orderIds.length,
+          summaryTotal: summary.total
+        });
+        changed = true;
+      }
+
+      if (
+        closeServiceRequestsForSession(
+          state,
+          referenceOrder.restaurantSlug,
+          referenceOrder.tableNumber,
+          sessionId
+        )
+      ) {
+        changed = true;
+      }
     }
 
     state.currentTableSessions.set(tableKey, sessionId + 1);
@@ -2437,6 +2516,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     state
   );
   const corruptedEmptyClosedSummariesPruned = pruneCorruptedEmptyClosedSummaries(state);
+  const closedSummariesDeduped = dedupeClosedTableSummaries(state);
   const activeOrdersTrimmed = removeClosedSessionOrdersFromActiveState(state);
   const closedSummariesCompacted = compactClosedTableSummaries(state);
 
@@ -2447,6 +2527,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
     completedShiftOrdersArchived ||
     staleClosedSummariesPruned ||
     corruptedEmptyClosedSummariesPruned ||
+    closedSummariesDeduped ||
     activeOrdersTrimmed ||
     closedSummariesCompacted
   ) {
@@ -2468,6 +2549,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
       completedShiftOrdersArchived,
       staleClosedSummariesPruned,
       corruptedEmptyClosedSummariesPruned,
+      closedSummariesDeduped,
       activeOrdersTrimmed,
       closedSummariesCompacted
     });
@@ -3447,6 +3529,23 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
   );
 
+  const existingSummary = state.closedTableSummaries.find(
+    (summary) =>
+      summary.restaurantSlug === restaurantSlug &&
+      summary.tableNumber === tableNumber &&
+      summary.sessionId === sessionId
+  );
+
+  if (existingSummary) {
+    logOrdersDebug("closeTable.already_closed_session", {
+      restaurantSlug,
+      tableNumber,
+      sessionId,
+      existingClosedAt: existingSummary.closedAt
+    });
+    return existingSummary;
+  }
+
   if (billableOrders.length === 0) {
     logOrdersDebug("closeTable.blocked_empty_session", {
       restaurantSlug,
@@ -3482,6 +3581,7 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
   };
 
   state.closedTableSummaries.unshift(summary);
+  state.closedTableSummaries = mergeClosedTableSummaries(state.closedTableSummaries);
   logOrdersDebug("closeTable.summary_created", {
     restaurantSlug,
     tableNumber,

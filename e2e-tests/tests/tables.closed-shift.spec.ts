@@ -178,3 +178,111 @@ test("closed tables list shows only current shift sessions", async ({ page }) =>
   await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 22" })).toHaveCount(1);
   await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 11" })).toHaveCount(0);
 });
+
+test("closed tables list does not show duplicate cards for the same closed session", async ({
+  page
+}) => {
+  test.skip(
+    process.env.E2E_USE_WEB_SERVER !== "true",
+    "Run in local mode (E2E_USE_WEB_SERVER=true) to verify duplicate-guard against latest frontend code."
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-archives-cache-v1");
+  });
+
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await page.route("**/api/menu-settings**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        workingHoursFrom: "09:00",
+        workingHoursRules: [],
+        happyHourEnabled: false,
+        happyHourDiscountPercent: 0,
+        happyHourCategories: [],
+        happyHourStartsFrom: null,
+        happyHourUntil: null
+      })
+    });
+  });
+
+  await page.route("**/api/orders", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route("**/api/orders-archive**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ archives: [] })
+    });
+  });
+
+  const sharedClosedAt = new Date().toISOString();
+  const duplicateClosedAt = sharedClosedAt.replace("Z", "+00:00");
+
+  await page.route("**/api/tables", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tables: [],
+        closedSessions: [
+          createClosedSession({
+            tableNumber: 33,
+            sessionId: 333,
+            closedAt: sharedClosedAt,
+            total: 96,
+            itemName: "Closed item A"
+          }),
+          createClosedSession({
+            tableNumber: 33,
+            sessionId: 333,
+            closedAt: duplicateClosedAt,
+            total: 96,
+            itemName: "Closed item A duplicate"
+          })
+        ]
+      })
+    });
+  });
+
+  await page.goto("/admin/tables");
+
+  await expect(page.getByRole("heading", { name: "Closed tables" })).toBeVisible();
+  await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 33" })).toHaveCount(1);
+});

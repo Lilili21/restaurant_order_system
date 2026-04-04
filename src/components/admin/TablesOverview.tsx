@@ -117,6 +117,41 @@ function getSessionItemName(item: { name: string; volumeLabel?: string }) {
   return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
 }
 
+function normalizeClosedSessionTimestamp(value: string) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : value;
+}
+
+function dedupeClosedSessions(sessions: ClosedTableSummary[]) {
+  const uniqueBySession = new Map<string, ClosedTableSummary>();
+
+  for (const session of sessions) {
+    const key = `${session.restaurantSlug}:${session.tableNumber}:${session.sessionId}`;
+    const normalizedSession = {
+      ...session,
+      closedAt: normalizeClosedSessionTimestamp(session.closedAt)
+    };
+    const existing = uniqueBySession.get(key);
+
+    if (!existing) {
+      uniqueBySession.set(key, normalizedSession);
+      continue;
+    }
+
+    const existingTs = new Date(existing.closedAt).getTime();
+    const nextTs = new Date(normalizedSession.closedAt).getTime();
+    const shouldReplace =
+      Number.isFinite(nextTs) &&
+      (!Number.isFinite(existingTs) || nextTs > existingTs);
+
+    if (shouldReplace) {
+      uniqueBySession.set(key, normalizedSession);
+    }
+  }
+
+  return [...uniqueBySession.values()];
+}
+
 function formatHappyHourCategoriesLabel(categories: MenuCategory[]) {
   if (!categories.length) {
     return "selected categories";
@@ -453,11 +488,13 @@ export function TablesOverview() {
     }
 
     const candidate = payload as Partial<TablesResponse>;
+    const closedSessions = Array.isArray(candidate.closedSessions)
+      ? dedupeClosedSessions(candidate.closedSessions)
+      : [];
+
     return {
       tables: Array.isArray(candidate.tables) ? candidate.tables : [],
-      closedSessions: Array.isArray(candidate.closedSessions)
-        ? candidate.closedSessions
-        : []
+      closedSessions
     };
   }
 

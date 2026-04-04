@@ -16,6 +16,8 @@ type MockOrder = {
   restaurantName: string;
   tableNumber: number;
   sessionId: number;
+  guestContactName?: string;
+  guestContactPhone?: string;
   status: "new" | "preparing" | "served" | "cancelled";
   createdAt: string;
   updatedAt: string;

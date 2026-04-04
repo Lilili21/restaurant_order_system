@@ -9,6 +9,12 @@ Separate Playwright project for UI regression checks.
   - Verifies top zone chips (`Floor`, `Kitchen`, `Bar`) are larger than lower filter chips.
 - `tests/live-orders.autorefresh.spec.ts`
   - Verifies `Live Orders` list updates from polling without manual reload.
+- `tests/live-orders.expanded.top10.spec.ts`
+  - First 10 extended Live Orders checks (`LIVE-01..LIVE-10`): load/render, zone filters, polling behavior, duplicates, sorting, kitchen timer statuses, and served status actions.
+- `tests/live-orders.expanded.11-25.spec.ts`
+  - Next 15 extended Live Orders checks (`LIVE-11..LIVE-25`): waiter/bill requests, kitchen/floor filters, ready/edit/cancel flows, service requests, close table, export today, and move-table flow.
+- `tests/live-orders.expanded.26-45.spec.ts`
+  - Final 20 extended Live Orders checks (`LIVE-26..LIVE-45`): hall/bar rendering details, cooked/new highlights, table and chunk filters, checkbox update flows, closed-session sorting/limit, close-table errors, and move-table validations.
 - `tests/menu.availability.spec.ts`
   - Verifies `available` toggle in Admin Menu updates item state.
   - Verifies item switched to unavailable in Admin disappears in Guest Menu.
@@ -26,6 +32,10 @@ Separate Playwright project for UI regression checks.
   - Client menu checks 41-54 (polling regressions, refresh consistency, promotions/business lunch, recommendations, localization and fallback behavior).
 - `tests/menu.client.smoke.spec.ts`
   - Fast pre-release smoke run (core menu open, language/filter switch, add-to-cart, submit flow, waiter call).
+- `tests/menu-live.integration.spec.ts`
+  - End-to-end integration between guest menu and admin Live Orders (`INT-01..INT-10`): order submit visibility in admin, served status sync back to guest, waiter/bill roundtrip, multi-order consistency, admin polling pickup, and service-request lock behavior.
+- `tests/menu-live-tables.integration.advanced.spec.ts`
+  - Advanced cross-module integration (`ADV-01..ADV-10`): close table + closed/export, move-table isolation, happy-hour totals across menu/live/tables/export, transient `500/429` retry recovery, cross-device sync/race scenarios, and shift-boundary filtering around `workingHoursFrom`.
 
 ## Quick start
 
@@ -50,6 +60,27 @@ npm run test:prod
 ```bash
 cd e2e-tests
 npm run test:menu-top10
+```
+
+- Run first 10 extended Live Orders checks:
+
+```bash
+cd e2e-tests
+npm run test:live-top10
+```
+
+- Run extended Live Orders checks 11-25:
+
+```bash
+cd e2e-tests
+npm run test:live-11-25
+```
+
+- Run final 20 extended Live Orders checks 26-45:
+
+```bash
+cd e2e-tests
+npm run test:live-26-45
 ```
 
 - Run client-menu checks 11-20:
@@ -94,6 +125,20 @@ cd e2e-tests
 npm run test:menu-smoke
 ```
 
+- Run menu + live-orders integration tests:
+
+```bash
+cd e2e-tests
+npm run test:integration-menu-live
+```
+
+- Run advanced menu + live + tables integration tests:
+
+```bash
+cd e2e-tests
+npm run test:integration-advanced
+```
+
 - Run only current-shift filter check in Closed tables:
 
 ```bash
@@ -134,6 +179,11 @@ npm run test:local
   - `E2E_BUSINESS_LUNCH_MENU_PATH` (and optional `E2E_BUSINESS_LUNCH_HIDDEN_ITEM`) for `TC-44`
 - `menu.client.smoke.spec.ts` needs:
   - `E2E_ORDERING_MENU_PATH` for `SM-03`...`SM-05` (otherwise only preview smoke checks run)
+- `menu-live.integration.spec.ts` needs:
+  - `E2E_ORDERING_MENU_PATH` (real table URL)
+- `menu-live-tables.integration.advanced.spec.ts` needs:
+  - `E2E_ORDERING_MENU_PATH` for `ADV-01..ADV-08` (real table URL)
+  - `ADV-09` and `ADV-10` can run without extra env
 
 ## Debug failed tests
 
