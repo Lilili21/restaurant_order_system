@@ -286,3 +286,238 @@ test("closed tables list does not show duplicate cards for the same closed sessi
   await expect(page.getByRole("heading", { name: "Closed tables" })).toBeVisible();
   await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 33" })).toHaveCount(1);
 });
+
+test("tables view keeps existing tables when a polling request fails", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-archives-cache-v1");
+  });
+
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await page.route("**/api/menu-settings**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        workingHoursFrom: "09:00",
+        workingHoursRules: [],
+        happyHourEnabled: false,
+        happyHourDiscountPercent: 0,
+        happyHourCategories: [],
+        happyHourStartsFrom: null,
+        happyHourUntil: null
+      })
+    });
+  });
+
+  await page.route("**/api/orders", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route("**/api/orders-archive**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ archives: [] })
+    });
+  });
+
+  let tablesCalls = 0;
+  await page.route("**/api/tables", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    tablesCalls += 1;
+
+    if (tablesCalls === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          tables: [
+            {
+              restaurantSlug: "olive-bistro",
+              restaurantName: "Olive Bistro",
+              tableNumber: 44,
+              currentSessionId: 4401,
+              orderCount: 1,
+              total: 54,
+              statuses: ["new"],
+              orders: [
+                {
+                  id: "order-44",
+                  restaurantSlug: "olive-bistro",
+                  restaurantName: "Olive Bistro",
+                  tableNumber: 44,
+                  sessionId: 4401,
+                  status: "new",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  total: 54,
+                  kind: "order",
+                  items: [
+                    {
+                      id: "item-44",
+                      menuItemId: "menu-item-44",
+                      name: "Shawarma plate",
+                      category: "mains",
+                      price: 54,
+                      quantity: 1,
+                      served: false
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          closedSessions: []
+        })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Temporary failure" })
+    });
+  });
+
+  await page.goto("/admin/tables");
+  await expect(page.locator(".tables-grid h3", { hasText: "Table 44" })).toBeVisible();
+
+  await page.waitForTimeout(4500);
+  await expect(page.locator(".tables-grid h3", { hasText: "Table 44" })).toBeVisible();
+});
+
+test("closed tables list hides empty sessions without order items", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-overview-cache-v1");
+    window.sessionStorage.removeItem("admin-tables-archives-cache-v1");
+  });
+
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await page.route("**/api/menu-settings**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        workingHoursFrom: "09:00",
+        workingHoursRules: [],
+        happyHourEnabled: false,
+        happyHourDiscountPercent: 0,
+        happyHourCategories: [],
+        happyHourStartsFrom: null,
+        happyHourUntil: null
+      })
+    });
+  });
+
+  await page.route("**/api/orders", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route("**/api/orders-archive**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ archives: [] })
+    });
+  });
+
+  const nowIso = new Date().toISOString();
+
+  await page.route("**/api/tables", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tables: [],
+        closedSessions: [
+          {
+            restaurantSlug: "olive-bistro",
+            restaurantName: "Olive Bistro",
+            tableNumber: 50,
+            sessionId: 5001,
+            closedAt: nowIso,
+            total: 32,
+            orderCount: 1,
+            orderIds: ["empty-50"],
+            orders: []
+          },
+          createClosedSession({
+            tableNumber: 51,
+            sessionId: 5101,
+            closedAt: nowIso,
+            total: 96,
+            itemName: "Kanafeh"
+          })
+        ]
+      })
+    });
+  });
+
+  await page.goto("/admin/tables");
+  await expect(page.getByRole("heading", { name: "Closed tables" })).toBeVisible();
+  await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 50" })).toHaveCount(0);
+  await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 51" })).toHaveCount(1);
+});

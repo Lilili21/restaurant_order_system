@@ -385,6 +385,12 @@ function getHappyHourDiscountAmountFromOrder(
   }, 0);
 }
 
+function hasRenderableClosedSessionItems(session: ClosedTableSummary) {
+  return (session.orders ?? []).some((order) =>
+    (order.items ?? []).some((item) => item.quantity > 0)
+  );
+}
+
 export function TablesOverview() {
   const [data, setData] = useState<TablesResponse>(
     () =>
@@ -551,8 +557,9 @@ export function TablesOverview() {
         fetch("/api/orders"),
         fetch("/api/menu-settings")
       ]);
-      const payload = tablesResponse.ok ? await tablesResponse.json() : null;
-      const nextData = normalizeTablesResponse(payload);
+      const nextData = tablesResponse.ok
+        ? normalizeTablesResponse(await tablesResponse.json())
+        : null;
       const nextServiceRequests = ordersResponse.ok
         ? getTablesServiceRequests((await ordersResponse.json()) as Order[])
         : [];
@@ -593,7 +600,9 @@ export function TablesOverview() {
         : [];
 
       if (!cancelled) {
-        setData(nextData);
+        if (nextData) {
+          setData(nextData);
+        }
         setServiceRequests(nextServiceRequests);
         setHappyHourEnabled(nextHappyHourEnabled);
         setHappyHourDiscountPercent(nextHappyHourDiscountPercent);
@@ -1076,7 +1085,9 @@ export function TablesOverview() {
   ).filter((session) => {
     const closedAtTime = new Date(session.closedAt).getTime();
     return (
-      Number.isFinite(closedAtTime) && closedAtTime >= currentShiftStartTimestamp
+      Number.isFinite(closedAtTime) &&
+      closedAtTime >= currentShiftStartTimestamp &&
+      hasRenderableClosedSessionItems(session)
     );
   });
   const sortedClosedSessions = [...currentShiftClosedSessions].sort((left, right) => {

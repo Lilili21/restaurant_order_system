@@ -107,4 +107,91 @@ describe("orders", () => {
     const target = tables.find((table) => table.tableNumber === 5);
 
     expect(result.movedOrders).toBe(1);
-    expect(target?.orders.some((item) => item.id === order.id)).toBe(true)
+    expect(target?.orders.some((item) => item.id === order.id)).toBe(true);
+    expect(tables.find((table) => table.tableNumber === 4)).toBeUndefined();
+  });
+
+  it("deduplicates closed table summaries for the same table session", async () => {
+    const duplicateSessionSummaries = [
+      {
+        restaurantSlug: "olive-bistro",
+        restaurantName: "Olive Bistro",
+        tableNumber: 7,
+        sessionId: 701,
+        closedAt: "2026-04-04T21:04:38.123Z",
+        total: 96,
+        orderCount: 1,
+        orderIds: ["order-701"],
+        orders: []
+      },
+      {
+        restaurantSlug: "olive-bistro",
+        restaurantName: "Olive Bistro",
+        tableNumber: 7,
+        sessionId: 701,
+        closedAt: "2026-04-04T21:04:38.123+00:00",
+        total: 96,
+        orderCount: 1,
+        orderIds: ["order-701"],
+        orders: []
+      }
+    ];
+
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [],
+      currentTableSessions: [["olive-bistro:7", 702]],
+      closedTableSummaries: duplicateSessionSummaries
+    });
+
+    const { getClosedTableSummaries } = await import("@/lib/orders");
+    const summaries = await getClosedTableSummaries("olive-bistro");
+
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].tableNumber).toBe(7);
+    expect(summaries[0].sessionId).toBe(701);
+
+    const persisted = JSON.parse(
+      readFileSync(path.join(workspace, "data/orders-store.json"), "utf8")
+    ) as {
+      closedTableSummaries: unknown[];
+    };
+
+    expect(Array.isArray(persisted.closedTableSummaries)).toBe(true);
+    expect(persisted.closedTableSummaries).toHaveLength(1);
+  });
+
+  it("closeTable recovers when a closed summary exists but table session still hangs in active list", async () => {
+    const {
+      closeTable,
+      createOrder,
+      getClosedTableSummaries,
+      getCurrentTableSessionId,
+      getTableOverviews,
+      updateOrderStatus
+    } = await import("@/lib/orders");
+
+    const created = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 6,
+      items: [{ menuItemId: "m1", quantity: 1 }]
+    });
+    const served = await updateOrderStatus(created.id, "served");
+    const firstClose = await closeTable("olive-bistro", 6);
+
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [served],
+      currentTableSessions: [["olive-bistro:6", served.sessionId]],
+      closedTableSummaries: [firstClose]
+    });
+
+    const secondClose = await closeTable("olive-bistro", 6);
+    const tables = await getTableOverviews("olive-bistro");
+    const closed = await getClosedTableSummaries("olive-bistro");
+    const nextSessionId = await getCurrentTableSessionId("olive-bistro", 6);
+
+    expect(secondClose.sessionId).toBe(served.sessionId);
+    expect(tables.find((table) => table.tableNumber === 6)).toBeUndefined();
+    expect(closed.filter((summary) => summary.tableNumber === 6)).toHaveLength(1);
+    expect(nextSessionId).toBe(served.sessionId + 1);
+  });
+});
