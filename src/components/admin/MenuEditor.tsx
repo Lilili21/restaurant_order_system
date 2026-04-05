@@ -90,6 +90,8 @@ const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
 );
 const allDrinkCategories = [...drinkCategories];
 const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
+const DASHBOARD_ACTIVE_POLL_MS = 12_000;
+const DASHBOARD_HIDDEN_POLL_MS = 30_000;
 type InsightStats = {
   revenue: string;
   avgCheck: string;
@@ -1188,10 +1190,33 @@ export function MenuEditor() {
         }
       : undefined;
     let cancelled = false;
+    let timeoutId: number | null = null;
+    let loadingInFlight = false;
+
+    function scheduleNextLoad() {
+      if (cancelled) {
+        return;
+      }
+
+      const delay =
+        document.visibilityState === "hidden"
+          ? DASHBOARD_HIDDEN_POLL_MS
+          : DASHBOARD_ACTIVE_POLL_MS;
+      timeoutId = window.setTimeout(() => {
+        void load();
+      }, delay);
+    }
 
     async function load() {
+      if (cancelled || loadingInFlight) {
+        return;
+      }
+
+      loadingInFlight = true;
+
       try {
-        const [menuResponse, settingsResponse, analyticsResponse] = await Promise.all([
+        const [menuResult, settingsResult, analyticsResult] =
+          await Promise.allSettled([
           fetch(`/api/menu?restaurantSlug=${restaurantSlug}`, {
             cache: "no-store",
             headers: authHeaders
@@ -1205,22 +1230,31 @@ export function MenuEditor() {
           })
         ]);
 
-        if (!menuResponse.ok) {
-          if (!cancelled) {
-            setLoading(false);
-            setMessage("Failed to load menu.");
-          }
+        if (cancelled) {
           return;
         }
 
-        const data = (await menuResponse.json()) as MenuItem[];
+        let hasSuccessfulResponse = false;
+        const menuResponse = menuResult.status === "fulfilled" ? menuResult.value : null;
+        const settingsResponse =
+          settingsResult.status === "fulfilled" ? settingsResult.value : null;
+        const analyticsResponse =
+          analyticsResult.status === "fulfilled" ? analyticsResult.value : null;
 
-        if (!cancelled) {
+        if (menuResponse?.ok) {
+          const data = (await menuResponse.json()) as MenuItem[];
           setItems(data.map(toEditableItem));
-          setLoading(false);
+          hasSuccessfulResponse = true;
+          setMessage((current) => (current === "Failed to load menu." ? null : current));
+        } else if (menuResult.status === "fulfilled" && !menuResponse?.ok) {
+          setMessage("Failed to load menu.");
         }
 
-        if (!cancelled && settingsResponse.ok) {
+        if (menuResult.status === "rejected") {
+          setMessage("Failed to load menu.");
+        }
+
+        if (settingsResponse?.ok) {
           const settings = (await settingsResponse.json()) as {
             kitchenLoadWarningEnabled?: boolean;
             workingHoursRules?: WorkingHoursRule[];
@@ -1318,9 +1352,10 @@ export function MenuEditor() {
                 })
               : ""
           );
+          hasSuccessfulResponse = true;
         }
 
-        if (!cancelled && analyticsResponse.ok) {
+        if (analyticsResponse?.ok) {
           const analytics = (await analyticsResponse.json()) as {
             insights?: Partial<InsightStats> & {
               vsYesterday?: Partial<InsightStats["vsYesterday"]>;
@@ -1378,7 +1413,14 @@ export function MenuEditor() {
               ? analytics.charts.revenueTrend
               : []
           });
+          hasSuccessfulResponse = true;
         }
+
+        if (!hasSuccessfulResponse) {
+          setMessage("Failed to load admin data.");
+        }
+
+        setLoading(false);
       } catch (error) {
         if (!cancelled) {
           setLoading(false);
@@ -1386,20 +1428,41 @@ export function MenuEditor() {
             error instanceof Error ? error.message : "Failed to load admin data."
           );
         }
+      } finally {
+        loadingInFlight = false;
+
+        if (!cancelled) {
+          scheduleNextLoad();
+        }
       }
     }
 
-    load();
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
 
-    const intervalId = window.setInterval(() => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
       void load();
-    }, 60_000);
+    }
+
+    void load();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isAuthorized, secondaryCredentials]);
+  }, [isAuthorized, secondaryCredentials, restaurantSlug]);
 
   const currentShiftLabel = useMemo(() => {
     const today = new Date().getDay();
