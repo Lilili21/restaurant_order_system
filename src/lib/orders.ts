@@ -3467,7 +3467,7 @@ export async function getTableOverviews(
   restaurantSlug?: string
 ): Promise<TableOverview[]> {
   const state = await readRuntimeStateAsync();
-  const settings = await getMenuSettings();
+  const settings = await getMenuSettings(restaurantSlug);
   const shiftWindow = getCurrentAdminShiftWindow(settings);
 
   if (!shiftWindow) {

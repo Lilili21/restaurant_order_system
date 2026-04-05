@@ -9,6 +9,8 @@ import {
   moveTableOrders
 } from "@/lib/orders";
 
+export const dynamic = "force-dynamic";
+
 const TABLES_API_DEBUG_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.DEBUG_ORDERS_STATE ?? "").toLowerCase()
 );

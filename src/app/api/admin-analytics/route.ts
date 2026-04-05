@@ -120,6 +120,51 @@ function getActiveShiftBounds(
   return activeCandidate ?? null;
 }
 
+function getMostRecentCompletedShiftBounds(
+  rules: Array<{
+    id: string;
+    days: number[];
+    from: string | null;
+    until: string | null;
+  }>,
+  fallbackFrom: string | null,
+  fallbackUntil: string | null,
+  now = new Date()
+) {
+  const candidates = [
+    new Date(now.getTime() - 48 * 60 * 60 * 1000),
+    new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    now
+  ]
+    .map((date) => {
+      const fromValue = getRuleTimeForDate(rules, date, "from", fallbackFrom);
+      const untilValue = getRuleTimeForDate(rules, date, "until", fallbackUntil);
+      const fromTime = parseTime(fromValue);
+      const untilTime = parseTime(untilValue);
+
+      if (!fromTime || !untilTime) {
+        return null;
+      }
+
+      const start = new Date(date);
+      start.setHours(fromTime.hours, fromTime.minutes, 0, 0);
+
+      const end = new Date(date);
+      end.setHours(untilTime.hours, untilTime.minutes, 0, 0);
+
+      if (end.getTime() <= start.getTime()) {
+        end.setDate(end.getDate() + 1);
+      }
+
+      return { start, end };
+    })
+    .filter((candidate): candidate is { start: Date; end: Date } => candidate !== null)
+    .filter((candidate) => candidate.end.getTime() <= now.getTime())
+    .sort((left, right) => right.end.getTime() - left.end.getTime());
+
+  return candidates[0] ?? null;
+}
+
 function getCurrentShiftStartTimestamp(
   rules: Array<{
     id: string;
@@ -189,7 +234,7 @@ function getRecentDishItems(orders: Order[], start: Date, end: Date) {
       return createdAt >= start.getTime() && createdAt <= end.getTime();
     })
     .flatMap((order) =>
-      order.items
+      (Array.isArray(order.items) ? order.items : [])
         .filter((item) => isDishCategory(item.category))
         .map((item) => ({
           name: item.name,
@@ -456,7 +501,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
-    const settings = await getMenuSettings();
+    const settings = await getMenuSettings(restaurantSlug ?? undefined);
     const analyticsDayBounds = getActiveShiftBounds(
       settings.workingHoursRules,
       settings.workingHoursFrom,
@@ -467,11 +512,42 @@ export async function GET(request: NextRequest) {
       settings.workingHoursFrom,
       settings.workingHoursUntil
     );
-    const [allOrders, closedSessions, tables] = await Promise.all([
-      getAllStoredOrders(restaurantSlug ?? undefined),
-      getClosedTableSummaries(restaurantSlug ?? undefined),
-      getTableOverviews(restaurantSlug ?? undefined)
-    ]);
+    const nowTs = Date.now();
+    const fallbackShiftStartDate = new Date(nowTs);
+    fallbackShiftStartDate.setHours(0, 0, 0, 0);
+    const mostRecentCompletedShift = getMostRecentCompletedShiftBounds(
+      settings.workingHoursRules,
+      settings.workingHoursFrom,
+      settings.workingHoursUntil,
+      new Date(nowTs)
+    );
+    const effectiveShiftStartTs =
+      currentShiftStartTs ??
+      mostRecentCompletedShift?.start.getTime() ??
+      fallbackShiftStartDate.getTime();
+    const shiftSource = currentShiftStartTs
+      ? "active_shift"
+      : mostRecentCompletedShift
+        ? "last_completed_shift"
+        : "calendar_day_fallback";
+    const [allOrdersResult, closedSessionsResult, tablesResult] =
+      await Promise.allSettled([
+        getAllStoredOrders(restaurantSlug ?? undefined),
+        getClosedTableSummaries(restaurantSlug ?? undefined),
+        getTableOverviews(restaurantSlug ?? undefined)
+      ]);
+    const allOrders =
+      allOrdersResult.status === "fulfilled" ? allOrdersResult.value : [];
+    const closedSessions =
+      closedSessionsResult.status === "fulfilled" ? closedSessionsResult.value : [];
+    const tables = tablesResult.status === "fulfilled" ? tablesResult.value : [];
+    const sourceWarnings = [
+      allOrdersResult.status === "rejected" ? "orders_source_failed" : null,
+      closedSessionsResult.status === "rejected"
+        ? "closed_sessions_source_failed"
+        : null,
+      tablesResult.status === "rejected" ? "tables_source_failed" : null
+    ].filter((value): value is string => Boolean(value));
 
     const currentShiftWindow = getWindowBounds(
       settings.workingHoursRules,
@@ -479,31 +555,27 @@ export async function GET(request: NextRequest) {
       settings.workingHoursUntil
     );
 
-    const shiftOrdersToNow = currentShiftStartTs
-      ? allOrders.filter((order) => {
-          if (
-            order.kind === "waiter_call" ||
-            order.kind === "bill_request" ||
-            order.status === "cancelled"
-          ) {
-            return false;
-          }
+    const shiftOrdersToNow = allOrders.filter((order) => {
+      if (
+        order.kind === "waiter_call" ||
+        order.kind === "bill_request" ||
+        order.status === "cancelled"
+      ) {
+        return false;
+      }
 
-          const createdAt = new Date(order.createdAt).getTime();
-          return createdAt >= currentShiftStartTs && createdAt <= Date.now();
-        })
-      : [];
+      const createdAt = new Date(order.createdAt).getTime();
+      return createdAt >= effectiveShiftStartTs && createdAt <= nowTs;
+    });
     const analyticsOrders = shiftOrdersToNow;
-    const closedSessionsInCurrentShift = currentShiftStartTs
-      ? closedSessions.filter((session) => {
-          const closedAtTs = new Date(session.closedAt).getTime();
-          return (
-            Number.isFinite(closedAtTs) &&
-            closedAtTs >= currentShiftStartTs &&
-            closedAtTs <= Date.now()
-          );
-        })
-      : [];
+    const closedSessionsInCurrentShift = closedSessions.filter((session) => {
+      const closedAtTs = new Date(session.closedAt).getTime();
+      return (
+        Number.isFinite(closedAtTs) &&
+        closedAtTs >= effectiveShiftStartTs &&
+        closedAtTs <= nowTs
+      );
+    });
     const analyticsClosedSessions = closedSessionsInCurrentShift.map((session) => ({
       closedAt: session.closedAt,
       total: session.total
@@ -518,25 +590,23 @@ export async function GET(request: NextRequest) {
         : 0;
     const activeTablesCount = tables.length;
     const totalTablesOrdersCount = activeTablesCount + closedSessionsInCurrentShift.length;
-    const waiterCallsCount = currentShiftStartTs
-      ? allOrders.filter((order) => {
-          if (order.kind !== "waiter_call") {
-            return false;
-          }
+    const waiterCallsCount = allOrders.filter((order) => {
+      if (order.kind !== "waiter_call") {
+        return false;
+      }
 
-          const createdAt = new Date(order.createdAt).getTime();
-          return createdAt >= currentShiftStartTs && createdAt <= Date.now();
-        }).length
-      : 0;
-    const currentShiftStartDate = currentShiftStartTs ? new Date(currentShiftStartTs) : null;
-    const previousShiftStartTs = currentShiftStartDate
+      const createdAt = new Date(order.createdAt).getTime();
+      return createdAt >= effectiveShiftStartTs && createdAt <= nowTs;
+    }).length;
+    const currentShiftStartDate = new Date(effectiveShiftStartTs);
+    const previousShiftStartTs = currentShiftStartTs
       ? getShiftStartTimestampForDate(
           new Date(currentShiftStartDate.getTime() - 24 * 60 * 60 * 1000),
           settings.workingHoursRules,
           settings.workingHoursFrom
         )
-      : null;
-    const elapsedInCurrentShiftMs = currentShiftStartTs ? Date.now() - currentShiftStartTs : 0;
+      : effectiveShiftStartTs - 24 * 60 * 60 * 1000;
+    const elapsedInCurrentShiftMs = nowTs - effectiveShiftStartTs;
     const previousComparableEndTs = previousShiftStartTs
       ? previousShiftStartTs + elapsedInCurrentShiftMs
       : null;
@@ -655,6 +725,13 @@ export async function GET(request: NextRequest) {
         labels: hourlySeries.labels,
         ordersByHour: hourlySeries.ordersByHour,
         revenueTrend: hourlySeries.revenueTrend
+      },
+      meta: {
+        restaurantSlug: restaurantSlug ?? null,
+        shiftSource,
+        effectiveShiftStart: new Date(effectiveShiftStartTs).toISOString(),
+        hasActiveShift: Boolean(currentShiftStartTs),
+        sourceWarnings
       }
     });
   } catch (error) {
@@ -685,6 +762,11 @@ export async function GET(request: NextRequest) {
           labels: [],
           ordersByHour: [],
           revenueTrend: []
+        },
+        meta: {
+          error:
+            error instanceof Error ? error.message : "Failed to build admin analytics",
+          at: new Date().toISOString()
         }
       },
       { status: 200 }

@@ -15,6 +15,8 @@ import {
 } from "@/lib/orders";
 import { OrderStatus } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
