@@ -1,9 +1,9 @@
 import { MouseEvent } from "react";
 
+import { getDefaultMenuImageByRestaurantSlug } from "@/lib/menu-images";
 import { formatCurrency } from "@/lib/menu";
 import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
 
-const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
 const badgeMeta: Record<
   MenuBadge,
   { icon: string; label: { he: string; en: string; ru: string } }
@@ -89,6 +89,7 @@ export function MenuItemCard({
         return leftPriority - rightPriority;
       });
   const hasVolumeOptions = Boolean(item.volumeOptions?.length);
+  const defaultImage = getDefaultMenuImageByRestaurantSlug(item.restaurantSlug);
 
   function getQuantityKey(volumeOptionId?: string) {
     return `${item.id}:${volumeOptionId ?? "base"}`;
@@ -137,12 +138,12 @@ export function MenuItemCard({
           ) : null}
           <img
             className="menu-card__image"
-            src={item.image || DEFAULT_MENU_IMAGE}
+            src={item.image || defaultImage}
             alt={name}
             loading="lazy"
             onError={(event) => {
               event.currentTarget.onerror = null;
-              event.currentTarget.src = DEFAULT_MENU_IMAGE;
+              event.currentTarget.src = defaultImage;
             }}
           />
         </div>
