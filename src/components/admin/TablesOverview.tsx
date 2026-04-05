@@ -91,6 +91,9 @@ const TABLES_VIEW_CACHE_TTL_MS = 30 * 1000;
 const TABLES_ARCHIVES_CACHE_TTL_MS = 15 * 60 * 1000;
 const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
 const TABLES_ARCHIVES_CACHE_KEY = "admin-tables-archives-cache-v1";
+const TABLES_ACTIVE_POLL_MS = 4_000;
+const TABLES_HIDDEN_POLL_MS = 12_000;
+const TABLES_REQUEST_TIMEOUT_MS = 8_000;
 
 function getTablesServiceRequests(orders: Order[]) {
   return orders.filter(
@@ -505,7 +508,9 @@ export function TablesOverview() {
   }
 
   async function refreshTablesData() {
-    const response = await fetch("/api/tables");
+    const response = await fetch("/api/tables", {
+      cache: "no-store"
+    });
 
     if (!response.ok) {
       return false;
@@ -546,81 +551,154 @@ export function TablesOverview() {
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: number | null = null;
+    let loadingInFlight = false;
 
-    async function load() {
-      if (document.visibilityState === "hidden") {
+    function scheduleNextLoad() {
+      if (cancelled) {
         return;
       }
 
-      const [tablesResponse, ordersResponse, menuSettingsResponse] = await Promise.all([
-        fetch("/api/tables"),
-        fetch("/api/orders"),
-        fetch("/api/menu-settings")
-      ]);
-      const nextData = tablesResponse.ok
-        ? normalizeTablesResponse(await tablesResponse.json())
-        : null;
-      const nextServiceRequests = ordersResponse.ok
-        ? getTablesServiceRequests((await ordersResponse.json()) as Order[])
-        : [];
-      const menuSettingsPayload: MenuSettingsResponse | null =
-        menuSettingsResponse.ok
-          ? ((await menuSettingsResponse.json()) as MenuSettingsResponse)
-          : null;
-      const parsedHappyHourDiscountPercent = Number(
-        menuSettingsPayload?.happyHourDiscountPercent ?? 0
-      );
-      const nextHappyHourEnabled = Boolean(menuSettingsPayload?.happyHourEnabled);
-      const nextHappyHourDiscountPercent = Number.isFinite(
-        parsedHappyHourDiscountPercent
-      )
-        ? Math.max(0, parsedHappyHourDiscountPercent)
-        : 0;
-      const nextHappyHourCategories = Array.isArray(
-        menuSettingsPayload?.happyHourCategories
-      )
-        ? menuSettingsPayload.happyHourCategories
-        : [];
-      const nextHappyHourStartsFrom =
-        typeof menuSettingsPayload?.happyHourStartsFrom === "string"
-          ? menuSettingsPayload.happyHourStartsFrom
-          : null;
-      const nextHappyHourUntil =
-        typeof menuSettingsPayload?.happyHourUntil === "string"
-          ? menuSettingsPayload.happyHourUntil
-          : null;
-      const nextWorkingHoursFrom =
-        typeof menuSettingsPayload?.workingHoursFrom === "string"
-          ? menuSettingsPayload.workingHoursFrom
-          : null;
-      const nextWorkingHoursRules = Array.isArray(
-        menuSettingsPayload?.workingHoursRules
-      )
-        ? menuSettingsPayload.workingHoursRules
-        : [];
+      const delay =
+        document.visibilityState === "hidden"
+          ? TABLES_HIDDEN_POLL_MS
+          : TABLES_ACTIVE_POLL_MS;
+      timeoutId = window.setTimeout(() => {
+        void load();
+      }, delay);
+    }
 
-      if (!cancelled) {
-        if (nextData) {
-          setData(nextData);
-        }
-        setServiceRequests(nextServiceRequests);
-        setHappyHourEnabled(nextHappyHourEnabled);
-        setHappyHourDiscountPercent(nextHappyHourDiscountPercent);
-        setHappyHourCategories(nextHappyHourCategories);
-        setHappyHourStartsFrom(nextHappyHourStartsFrom);
-        setHappyHourUntil(nextHappyHourUntil);
-        setWorkingHoursFrom(nextWorkingHoursFrom);
-        setWorkingHoursRules(nextWorkingHoursRules);
-        setLoading(false);
+    async function fetchTablesResource(url: string, init?: RequestInit) {
+      const controller = new AbortController();
+      const abortTimeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, TABLES_REQUEST_TIMEOUT_MS);
+
+      try {
+        return await fetch(url, {
+          ...init,
+          signal: controller.signal
+        });
+      } finally {
+        window.clearTimeout(abortTimeoutId);
       }
     }
 
+    async function load() {
+      if (cancelled || loadingInFlight) {
+        return;
+      }
+
+      loadingInFlight = true;
+
+      try {
+        const [tablesResult, ordersResult, menuSettingsResult] =
+          await Promise.allSettled([
+            fetchTablesResource("/api/tables", { cache: "no-store" }),
+            fetchTablesResource("/api/orders", { cache: "no-store" }),
+            fetchTablesResource("/api/menu-settings", { cache: "no-store" })
+          ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        const tablesResponse =
+          tablesResult.status === "fulfilled" ? tablesResult.value : null;
+        const ordersResponse =
+          ordersResult.status === "fulfilled" ? ordersResult.value : null;
+        const menuSettingsResponse =
+          menuSettingsResult.status === "fulfilled" ? menuSettingsResult.value : null;
+
+        if (tablesResponse?.ok) {
+          setData(normalizeTablesResponse(await tablesResponse.json()));
+        }
+
+        if (ordersResponse?.ok) {
+          setServiceRequests(
+            getTablesServiceRequests((await ordersResponse.json()) as Order[])
+          );
+        }
+
+        if (menuSettingsResponse?.ok) {
+          const menuSettingsPayload = (await menuSettingsResponse.json()) as MenuSettingsResponse;
+          const parsedHappyHourDiscountPercent = Number(
+            menuSettingsPayload?.happyHourDiscountPercent ?? 0
+          );
+          const nextHappyHourEnabled = Boolean(menuSettingsPayload?.happyHourEnabled);
+          const nextHappyHourDiscountPercent = Number.isFinite(
+            parsedHappyHourDiscountPercent
+          )
+            ? Math.max(0, parsedHappyHourDiscountPercent)
+            : 0;
+          const nextHappyHourCategories = Array.isArray(
+            menuSettingsPayload?.happyHourCategories
+          )
+            ? menuSettingsPayload.happyHourCategories
+            : [];
+          const nextHappyHourStartsFrom =
+            typeof menuSettingsPayload?.happyHourStartsFrom === "string"
+              ? menuSettingsPayload.happyHourStartsFrom
+              : null;
+          const nextHappyHourUntil =
+            typeof menuSettingsPayload?.happyHourUntil === "string"
+              ? menuSettingsPayload.happyHourUntil
+              : null;
+          const nextWorkingHoursFrom =
+            typeof menuSettingsPayload?.workingHoursFrom === "string"
+              ? menuSettingsPayload.workingHoursFrom
+              : null;
+          const nextWorkingHoursRules = Array.isArray(
+            menuSettingsPayload?.workingHoursRules
+          )
+            ? menuSettingsPayload.workingHoursRules
+            : [];
+
+          setHappyHourEnabled(nextHappyHourEnabled);
+          setHappyHourDiscountPercent(nextHappyHourDiscountPercent);
+          setHappyHourCategories(nextHappyHourCategories);
+          setHappyHourStartsFrom(nextHappyHourStartsFrom);
+          setHappyHourUntil(nextHappyHourUntil);
+          setWorkingHoursFrom(nextWorkingHoursFrom);
+          setWorkingHoursRules(nextWorkingHoursRules);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+
+        loadingInFlight = false;
+
+        if (!cancelled) {
+          scheduleNextLoad();
+        }
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      void load();
+    }
+
     load();
-    const intervalId = window.setInterval(load, 4000);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 

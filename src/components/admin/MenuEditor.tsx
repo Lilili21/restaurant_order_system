@@ -92,6 +92,7 @@ const allDrinkCategories = [...drinkCategories];
 const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const DASHBOARD_ACTIVE_POLL_MS = 12_000;
 const DASHBOARD_HIDDEN_POLL_MS = 30_000;
+const DASHBOARD_REQUEST_TIMEOUT_MS = 8_000;
 type InsightStats = {
   revenue: string;
   avgCheck: string;
@@ -1207,6 +1208,22 @@ export function MenuEditor() {
       }, delay);
     }
 
+    async function fetchDashboardResource(url: string, init?: RequestInit) {
+      const controller = new AbortController();
+      const abortTimeoutId = window.setTimeout(() => {
+        controller.abort();
+      }, DASHBOARD_REQUEST_TIMEOUT_MS);
+
+      try {
+        return await fetch(url, {
+          ...init,
+          signal: controller.signal
+        });
+      } finally {
+        window.clearTimeout(abortTimeoutId);
+      }
+    }
+
     async function load() {
       if (cancelled || loadingInFlight) {
         return;
@@ -1217,18 +1234,21 @@ export function MenuEditor() {
       try {
         const [menuResult, settingsResult, analyticsResult] =
           await Promise.allSettled([
-          fetch(`/api/menu?restaurantSlug=${restaurantSlug}`, {
-            cache: "no-store",
-            headers: authHeaders
-          }),
-          fetch(`/api/menu-settings?restaurantSlug=${restaurantSlug}`, {
-            cache: "no-store"
-          }),
-          fetch(`/api/admin-analytics?restaurantSlug=${restaurantSlug}`, {
-            cache: "no-store",
-            headers: authHeaders
-          })
-        ]);
+            fetchDashboardResource(`/api/menu?restaurantSlug=${restaurantSlug}`, {
+              cache: "no-store",
+              headers: authHeaders
+            }),
+            fetchDashboardResource(`/api/menu-settings?restaurantSlug=${restaurantSlug}`, {
+              cache: "no-store"
+            }),
+            fetchDashboardResource(
+              `/api/admin-analytics?restaurantSlug=${restaurantSlug}`,
+              {
+                cache: "no-store",
+                headers: authHeaders
+              }
+            )
+          ]);
 
         if (cancelled) {
           return;
