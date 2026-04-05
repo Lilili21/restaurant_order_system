@@ -26,10 +26,87 @@ const DRINK_CATEGORIES = new Set<MenuCategory>([
   "absent",
   "ouzo",
   "likers",
+  "alcohol",
+  "cocktails",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"
 ]);
+const ANALYTICS_DEFAULT_TIME_ZONE = "Asia/Jerusalem";
+
+function getRequestTimeZone(request: NextRequest) {
+  const headerValue = request.headers.get("x-vercel-ip-timezone");
+  return headerValue?.trim() || ANALYTICS_DEFAULT_TIME_ZONE;
+}
+
+function getDatePartsInTimeZone(date: Date, timeZone: string) {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23"
+  });
+  const parts = formatter.formatToParts(date);
+
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day"),
+    hour: read("hour"),
+    minute: read("minute"),
+    second: read("second")
+  };
+}
+
+function zonedDateTimeToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hours: number,
+  minutes: number,
+  seconds: number,
+  timeZone: string
+) {
+  const utcGuess = Date.UTC(year, month - 1, day, hours, minutes, seconds, 0);
+  const observed = getDatePartsInTimeZone(new Date(utcGuess), timeZone);
+  const observedAsUtc = Date.UTC(
+    observed.year,
+    observed.month - 1,
+    observed.day,
+    observed.hour,
+    observed.minute,
+    observed.second,
+    0
+  );
+  const targetAsUtc = Date.UTC(year, month - 1, day, hours, minutes, seconds, 0);
+  const diffMs = targetAsUtc - observedAsUtc;
+
+  return new Date(utcGuess + diffMs);
+}
+
+function getStartOfDayInTimeZone(date: Date, timeZone: string) {
+  const parts = getDatePartsInTimeZone(date, timeZone);
+  return zonedDateTimeToUtc(parts.year, parts.month, parts.day, 0, 0, 0, timeZone);
+}
+
+function getDayOfWeekInTimeZone(date: Date, timeZone: string) {
+  const parts = getDatePartsInTimeZone(date, timeZone);
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+}
+
+function isFullDayWindow(from: string | null | undefined, until: string | null | undefined) {
+  const normalizedFrom = typeof from === "string" ? from.trim() : "";
+  const normalizedUntil = typeof until === "string" ? until.trim() : "";
+
+  return normalizedFrom === "00:00" && (normalizedUntil === "24:00" || normalizedUntil === "00:00");
+}
 
 function parseTime(value: string | null | undefined) {
   if (!value) {
@@ -49,9 +126,10 @@ function parseTime(value: string | null | undefined) {
     !Number.isFinite(hours) ||
     !Number.isFinite(minutes) ||
     hours < 0 ||
-    hours > 23 ||
+    hours > 24 ||
     minutes < 0 ||
-    minutes > 59
+    minutes > 59 ||
+    (hours === 24 && minutes !== 0)
   ) {
     return null;
   }
@@ -330,9 +408,17 @@ function buildHourlyLabels(start: Date, end: Date) {
   }
 
   const endLabel = formatHourLabel(end);
+  const endIsExactHour =
+    end.getMinutes() === 0 &&
+    end.getSeconds() === 0 &&
+    end.getMilliseconds() === 0;
 
-  if (labels[labels.length - 1] === endLabel) {
+  if (endIsExactHour && labels[labels.length - 1] === endLabel) {
     labels.pop();
+  }
+
+  if (!labels.length && end.getTime() > start.getTime()) {
+    labels.push(formatHourLabel(start));
   }
 
   return labels;
@@ -501,6 +587,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+    const analyticsTimeZone = getRequestTimeZone(request);
     const settings = await getMenuSettings(restaurantSlug ?? undefined);
     const analyticsDayBounds = getActiveShiftBounds(
       settings.workingHoursRules,
@@ -513,8 +600,18 @@ export async function GET(request: NextRequest) {
       settings.workingHoursUntil
     );
     const nowTs = Date.now();
-    const fallbackShiftStartDate = new Date(nowTs);
-    fallbackShiftStartDate.setHours(0, 0, 0, 0);
+    const fallbackShiftStartTs = getStartOfDayInTimeZone(
+      new Date(nowTs),
+      analyticsTimeZone
+    ).getTime();
+    const todayInTimeZone = getDayOfWeekInTimeZone(new Date(nowTs), analyticsTimeZone);
+    const fullDayWindowConfigured =
+      isFullDayWindow(settings.workingHoursFrom, settings.workingHoursUntil) ||
+      settings.workingHoursRules.some(
+        (rule) =>
+          rule.days.includes(todayInTimeZone) && isFullDayWindow(rule.from, rule.until)
+      );
+    const fullDayShiftStartTs = fullDayWindowConfigured ? fallbackShiftStartTs : null;
     const mostRecentCompletedShift = getMostRecentCompletedShiftBounds(
       settings.workingHoursRules,
       settings.workingHoursFrom,
@@ -522,10 +619,13 @@ export async function GET(request: NextRequest) {
       new Date(nowTs)
     );
     const effectiveShiftStartTs =
+      fullDayShiftStartTs ??
       currentShiftStartTs ??
       mostRecentCompletedShift?.start.getTime() ??
-      fallbackShiftStartDate.getTime();
-    const shiftSource = currentShiftStartTs
+      fallbackShiftStartTs;
+    const shiftSource = fullDayShiftStartTs !== null
+      ? "full_day_window"
+      : currentShiftStartTs
       ? "active_shift"
       : mostRecentCompletedShift
         ? "last_completed_shift"
@@ -549,11 +649,17 @@ export async function GET(request: NextRequest) {
       tablesResult.status === "rejected" ? "tables_source_failed" : null
     ].filter((value): value is string => Boolean(value));
 
-    const currentShiftWindow = getWindowBounds(
-      settings.workingHoursRules,
-      settings.workingHoursFrom,
-      settings.workingHoursUntil
-    );
+    const currentShiftWindow =
+      fullDayShiftStartTs !== null
+        ? {
+            start: new Date(Math.max(fullDayShiftStartTs, nowTs - 30 * 60 * 1000)),
+            end: new Date(nowTs)
+          }
+        : getWindowBounds(
+            settings.workingHoursRules,
+            settings.workingHoursFrom,
+            settings.workingHoursUntil
+          );
 
     const shiftOrdersToNow = allOrders.filter((order) => {
       if (
@@ -599,7 +705,12 @@ export async function GET(request: NextRequest) {
       return createdAt >= effectiveShiftStartTs && createdAt <= nowTs;
     }).length;
     const currentShiftStartDate = new Date(effectiveShiftStartTs);
-    const previousShiftStartTs = currentShiftStartTs
+    const previousShiftStartTs = fullDayShiftStartTs !== null
+      ? getStartOfDayInTimeZone(
+          new Date(fullDayShiftStartTs - 60 * 60 * 1000),
+          analyticsTimeZone
+        ).getTime()
+      : currentShiftStartTs
       ? getShiftStartTimestampForDate(
           new Date(currentShiftStartDate.getTime() - 24 * 60 * 60 * 1000),
           settings.workingHoursRules,
@@ -659,11 +770,22 @@ export async function GET(request: NextRequest) {
     const recentDishItems = currentShiftWindow
       ? getRecentDishItems(analyticsOrders, currentShiftWindow.start, currentShiftWindow.end)
       : [];
-    const hourlySeries = analyticsDayBounds
+    const fullDayBounds =
+      fullDayShiftStartTs !== null
+        ? {
+            start: new Date(fullDayShiftStartTs),
+            end: getStartOfDayInTimeZone(
+              new Date(fullDayShiftStartTs + 36 * 60 * 60 * 1000),
+              analyticsTimeZone
+            )
+          }
+        : null;
+    const effectiveDayBounds = fullDayBounds ?? analyticsDayBounds;
+    const hourlySeries = effectiveDayBounds
       ? buildHourlySeries(
           analyticsClosedSessions,
-          analyticsDayBounds.start,
-          new Date(Math.min(analyticsDayBounds.end.getTime(), Date.now()))
+          effectiveDayBounds.start,
+          new Date(Math.min(effectiveDayBounds.end.getTime(), nowTs))
         )
       : { labels: [], ordersByHour: [], revenueTrend: [] };
 
@@ -728,9 +850,11 @@ export async function GET(request: NextRequest) {
       },
       meta: {
         restaurantSlug: restaurantSlug ?? null,
+        timeZone: analyticsTimeZone,
         shiftSource,
         effectiveShiftStart: new Date(effectiveShiftStartTs).toISOString(),
         hasActiveShift: Boolean(currentShiftStartTs),
+        fullDayWindowConfigured,
         sourceWarnings
       }
     });

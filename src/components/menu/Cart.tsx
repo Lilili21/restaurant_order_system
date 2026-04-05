@@ -65,6 +65,8 @@ const categoryFlightIcons: Record<MenuCategory, string> = {
   absent: "🍸",
   ouzo: "🍸",
   likers: "🍷",
+  alcohol: "🍷",
+  cocktails: "🍸",
   two_component_mixture: "🧪",
   dot4: "🛢",
   non_alcoholic_drinks: "🥤",
@@ -86,6 +88,8 @@ const drinkCategories = new Set<MenuCategory>([
   "absent",
   "ouzo",
   "likers",
+  "alcohol",
+  "cocktails",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"
@@ -552,6 +556,8 @@ export function Cart({
       absent: language === "ru" ? "абсент" : "absent",
       ouzo: language === "ru" ? "узо" : "ouzo",
       likers: language === "ru" ? "ликёры" : "likers",
+      alcohol: language === "ru" ? "алкоголь" : "alcohol",
+      cocktails: language === "ru" ? "коктейли" : "cocktails",
       two_component_mixture:
         language === "ru" ? "2-компонентный микс" : "2 component mixture",
       dot4: "DOT 4",

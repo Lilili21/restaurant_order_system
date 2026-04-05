@@ -84,6 +84,8 @@ const DRINK_CATEGORIES = new Set<string>([
   "absent",
   "ouzo",
   "likers",
+  "alcohol",
+  "cocktails",
   "two_component_mixture",
   "dot4"
 ]);

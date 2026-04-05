@@ -682,6 +682,21 @@ function getCurrentAdminShiftWindow(
   return matched ?? null;
 }
 
+function getMostRecentCompletedAdminShiftWindow(
+  settings: MenuSettingsSnapshot,
+  now = new Date()
+): ShiftWindow | null {
+  const candidates = [
+    getShiftWindowForDate(settings, addDays(now, -2)),
+    getShiftWindowForDate(settings, addDays(now, -1)),
+    getShiftWindowForDate(settings, now)
+  ]
+    .filter((candidate) => candidate.end.getTime() <= now.getTime())
+    .sort((left, right) => right.end.getTime() - left.end.getTime());
+
+  return candidates[0] ?? null;
+}
+
 function isOrderWithinAdminShiftWindow(order: Order, shiftWindow: ShiftWindow | null) {
   if (!shiftWindow) {
     return false;
@@ -3740,10 +3755,34 @@ export async function moveTableOrders(
   };
 }
 
-export async function getClosedTableSummaries(restaurantSlug?: string) {
+export async function getClosedTableSummaries(
+  restaurantSlug?: string,
+  options?: { scope?: "all" | "current_shift" }
+) {
   const { closedTableSummaries } = await readRuntimeStateAsync();
-
-  return closedTableSummaries.filter((summary) =>
+  const restaurantFiltered = closedTableSummaries.filter((summary) =>
     restaurantSlug ? summary.restaurantSlug === restaurantSlug : true
   );
+
+  if (options?.scope !== "current_shift") {
+    return restaurantFiltered;
+  }
+
+  const settings = await getMenuSettings(restaurantSlug);
+  const shiftWindow =
+    getCurrentAdminShiftWindow(settings) ??
+    getMostRecentCompletedAdminShiftWindow(settings);
+
+  if (!shiftWindow) {
+    return [];
+  }
+
+  return restaurantFiltered.filter((summary) => {
+    const closedAtTs = new Date(summary.closedAt).getTime();
+    return (
+      Number.isFinite(closedAtTs) &&
+      closedAtTs >= shiftWindow.start.getTime() &&
+      closedAtTs < shiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS
+    );
+  });
 }

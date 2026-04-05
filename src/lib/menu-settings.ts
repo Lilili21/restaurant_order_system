@@ -22,6 +22,8 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "absent",
   "ouzo",
   "likers",
+  "alcohol",
+  "cocktails",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks",

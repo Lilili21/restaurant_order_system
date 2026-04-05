@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
   const [tables, closedSessions] = await Promise.all([
     getTableOverviews(restaurantSlug ?? undefined),
-    getClosedTableSummaries(restaurantSlug ?? undefined)
+    getClosedTableSummaries(restaurantSlug ?? undefined, {
+      scope: "current_shift"
+    })
   ]);
 
   logTablesApiDebug("GET", {
