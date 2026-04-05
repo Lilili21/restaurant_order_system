@@ -3149,30 +3149,25 @@ export async function createOrder(input: {
     sessionId,
     payloadSignature
   );
-
-  if (repeatedPayloadOrder) {
-    if (input.clientRequestId) {
-      rememberClientRequestOrder(
-        input.clientRequestId,
-        repeatedPayloadOrder,
-        input.restaurantSlug,
-        input.tableNumber
+  const now = Date.now();
+  const isMergeableRepeatedPayloadOrder =
+    repeatedPayloadOrder &&
+    repeatedPayloadOrder.kind !== "waiter_call" &&
+    repeatedPayloadOrder.kind !== "bill_request" &&
+    repeatedPayloadOrder.status === "new" &&
+    now - new Date(repeatedPayloadOrder.createdAt).getTime() < MERGE_ORDER_WINDOW_MS;
+  const existingNewOrder = isMergeableRepeatedPayloadOrder
+    ? repeatedPayloadOrder
+    : state.ordersStore.find(
+        (order) =>
+          order.restaurantSlug === restaurant.slug &&
+          order.tableNumber === input.tableNumber &&
+          order.sessionId === sessionId &&
+          order.kind !== "waiter_call" &&
+          order.kind !== "bill_request" &&
+          order.status === "new" &&
+          now - new Date(order.createdAt).getTime() < MERGE_ORDER_WINDOW_MS
       );
-    }
-
-    return normalizeOrderState(repeatedPayloadOrder, menuLookup);
-  }
-
-  const existingNewOrder = state.ordersStore.find(
-    (order) =>
-      order.restaurantSlug === restaurant.slug &&
-      order.tableNumber === input.tableNumber &&
-      order.sessionId === sessionId &&
-      order.kind !== "waiter_call" &&
-      order.kind !== "bill_request" &&
-      order.status === "new" &&
-      Date.now() - new Date(order.createdAt).getTime() < MERGE_ORDER_WINDOW_MS
-  );
 
   if (
     existingNewOrder &&

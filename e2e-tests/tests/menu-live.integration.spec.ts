@@ -1,6 +1,7 @@
 import { expect, Page, BrowserContext, test } from "@playwright/test";
 
 const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
+const ORDER_MERGE_WINDOW_MS = 3 * 60 * 1000;
 
 type IntegrationOrderItem = {
   id: string;
@@ -34,6 +35,7 @@ type IntegrationStore = {
   currentSessionId: number;
   ordersForGuest: IntegrationOrder[];
   activeOrdersForAdmin: IntegrationOrder[];
+  orderPayloadSignatures: Map<string, string>;
   nextOrderId: number;
   nextItemId: number;
 };
@@ -155,11 +157,69 @@ function getActiveServiceRequests(orders: IntegrationOrder[]) {
     .map((order) => order.kind);
 }
 
+function createOrderPayloadSignature(
+  items: Array<{
+    menuItemId: string;
+    quantity: number;
+    volumeOptionId?: string;
+    volumeLabel?: string;
+    priceOverride?: number;
+  }>,
+  serveMode?: "all_at_once" | "as_ready"
+) {
+  const normalizedItems = items
+    .map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+      volumeOptionId: item.volumeOptionId ?? "",
+      volumeLabel: item.volumeLabel ?? "",
+      priceOverride:
+        typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
+          ? item.priceOverride
+          : null
+    }))
+    .sort((left, right) =>
+      JSON.stringify(left).localeCompare(JSON.stringify(right))
+    );
+
+  return JSON.stringify({
+    serveMode: serveMode ?? "all_at_once",
+    items: normalizedItems
+  });
+}
+
+function mergeIntegrationItems(
+  currentItems: IntegrationOrderItem[],
+  nextItems: IntegrationOrderItem[]
+) {
+  const mergedItems = currentItems.map((item) => ({ ...item }));
+
+  for (const nextItem of nextItems) {
+    const existing = mergedItems.find(
+      (item) =>
+        item.menuItemId === nextItem.menuItemId &&
+        (item.volumeOptionId ?? "") === (nextItem.volumeOptionId ?? "") &&
+        (item.volumeLabel ?? "") === (nextItem.volumeLabel ?? "") &&
+        !item.served
+    );
+
+    if (existing) {
+      existing.quantity += nextItem.quantity;
+      continue;
+    }
+
+    mergedItems.push({ ...nextItem });
+  }
+
+  return mergedItems;
+}
+
 async function setupSharedMenuLiveBackend(context: BrowserContext) {
   const store: IntegrationStore = {
     currentSessionId: 1,
     ordersForGuest: [],
     activeOrdersForAdmin: [],
+    orderPayloadSignatures: new Map<string, string>(),
     nextOrderId: 1,
     nextItemId: 1
   };
@@ -231,7 +291,8 @@ async function setupSharedMenuLiveBackend(context: BrowserContext) {
         }>;
       };
 
-      const now = new Date().toISOString();
+      const nowTs = Date.now();
+      const now = new Date(nowTs).toISOString();
       const nextOrderId = `integration-order-${store.nextOrderId++}`;
       const tableNumber = body.tableNumber ?? 1;
       const kind = body.type ?? "order";
@@ -254,6 +315,57 @@ async function setupSharedMenuLiveBackend(context: BrowserContext) {
 
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+      const payloadSignature =
+        kind === "order"
+          ? createOrderPayloadSignature(body.items ?? [], body.serveMode)
+          : null;
+      const mergeTarget =
+        kind === "order" && payloadSignature
+          ? store.ordersForGuest.find((order) => {
+              if (
+                order.kind !== "order" ||
+                order.tableNumber !== tableNumber ||
+                order.sessionId !== store.currentSessionId ||
+                order.status !== "new"
+              ) {
+                return false;
+              }
+
+              const createdAt = new Date(order.createdAt).getTime();
+              if (!Number.isFinite(createdAt) || nowTs - createdAt >= ORDER_MERGE_WINDOW_MS) {
+                return false;
+              }
+
+              return store.orderPayloadSignatures.get(order.id) === payloadSignature;
+            })
+          : undefined;
+
+      if (mergeTarget && payloadSignature) {
+        const mergedItems = mergeIntegrationItems(mergeTarget.items, items);
+        const mergedOrder: IntegrationOrder = {
+          ...mergeTarget,
+          serveMode: body.serveMode ?? mergeTarget.serveMode,
+          items: mergedItems,
+          total: mergedItems.reduce((sum, item) => sum + item.price * item.quantity, 0),
+          updatedAt: now
+        };
+
+        store.ordersForGuest = store.ordersForGuest.map((order) =>
+          order.id === mergedOrder.id ? mergedOrder : order
+        );
+        store.activeOrdersForAdmin = store.activeOrdersForAdmin.map((order) =>
+          order.id === mergedOrder.id ? mergedOrder : order
+        );
+        store.orderPayloadSignatures.set(mergedOrder.id, payloadSignature);
+
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify(mergedOrder)
+        });
+        return;
+      }
+
       const order: IntegrationOrder = {
         id: nextOrderId,
         restaurantSlug,
@@ -271,6 +383,9 @@ async function setupSharedMenuLiveBackend(context: BrowserContext) {
 
       store.ordersForGuest = [order, ...store.ordersForGuest];
       store.activeOrdersForAdmin = [order, ...store.activeOrdersForAdmin];
+      if (payloadSignature) {
+        store.orderPayloadSignatures.set(order.id, payloadSignature);
+      }
 
       await route.fulfill({
         status: 201,
@@ -511,7 +626,7 @@ test.describe("Menu + Live Orders integration", () => {
     await adminPage.close();
   });
 
-  test("INT-06 quick repeat submit creates second order entry", async ({
+  test("INT-06 quick repeat submit merges into a single order entry", async ({
     page,
     context
   }) => {
@@ -533,10 +648,12 @@ test.describe("Menu + Live Orders integration", () => {
     await closeMessageDialogIfVisible(page);
 
     const activeGuestOrders = store.ordersForGuest.filter((order) => order.kind === "order");
-    expect(activeGuestOrders).toHaveLength(2);
+    expect(activeGuestOrders).toHaveLength(1);
+    expect(activeGuestOrders[0]?.items[0]?.quantity).toBe(2);
 
     await adminPage.goto("/admin/orders");
-    await expect(adminPage.locator("article.order-card")).toHaveCount(2);
+    await expect(adminPage.locator("article.order-card")).toHaveCount(1);
+    await expect(page.locator(".submitted-order-card")).toHaveCount(1);
 
     await adminPage.close();
   });

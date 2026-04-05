@@ -49,6 +49,126 @@ describe("orders", () => {
     expect(orders[0].updatedAt).toBeTruthy();
   });
 
+  it("merges quick identical payload submissions into one order", async () => {
+    const { createOrder, getTableSessionOrders } = await import("@/lib/orders");
+
+    const first = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 1,
+      items: [{ menuItemId: "m1", quantity: 1 }],
+      serveMode: "as_ready"
+    });
+    const merged = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 1,
+      items: [{ menuItemId: "m1", quantity: 1 }],
+      serveMode: "as_ready"
+    });
+
+    const orders = await getTableSessionOrders("olive-bistro", 1);
+
+    expect(merged.id).toBe(first.id);
+    expect(orders).toHaveLength(1);
+    expect(orders[0].items).toHaveLength(1);
+    expect(orders[0].items[0].quantity).toBe(2);
+  });
+
+  it("applies active promotion discount to order item price and total", async () => {
+    writeJson(workspace, "data/menu-settings.json", {
+      promotions: [
+        {
+          id: "promo-starters-20",
+          enabled: true,
+          text: "Starters promo",
+          categories: ["starters"],
+          days: [],
+          discountPercent: 20,
+          startsFrom: null,
+          until: null
+        }
+      ],
+      businessLunches: []
+    });
+
+    const { createOrder } = await import("@/lib/orders");
+    const order = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 1,
+      items: [{ menuItemId: "m1", quantity: 2 }]
+    });
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].price).toBe(19.2);
+    expect(order.total).toBe(38.4);
+  });
+
+  it("uses the maximum active promotion for category and keeps 2-decimal rounding", async () => {
+    writeJson(workspace, "data/menu-settings.json", {
+      promotions: [
+        {
+          id: "promo-starters-10",
+          enabled: true,
+          text: "Low promo",
+          categories: ["starters"],
+          days: [],
+          discountPercent: 10,
+          startsFrom: null,
+          until: null
+        },
+        {
+          id: "promo-starters-33",
+          enabled: true,
+          text: "High promo",
+          categories: ["starters"],
+          days: [],
+          discountPercent: 33,
+          startsFrom: null,
+          until: null
+        }
+      ],
+      businessLunches: []
+    });
+
+    const { createOrder } = await import("@/lib/orders");
+    const order = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 1,
+      items: [{ menuItemId: "m1", quantity: 1 }]
+    });
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].price).toBe(16.08);
+    expect(order.total).toBe(16.08);
+  });
+
+  it("does not change price when only business lunch is active (without promotions)", async () => {
+    writeJson(workspace, "data/menu-settings.json", {
+      promotions: [],
+      businessLunches: [
+        {
+          id: "bl-starters",
+          enabled: true,
+          text: "Business lunch",
+          categories: ["starters"],
+          days: [],
+          startsFrom: null,
+          until: null
+        }
+      ]
+    });
+
+    const { createOrder } = await import("@/lib/orders");
+    const order = await createOrder({
+      restaurantSlug: "olive-bistro",
+      tableNumber: 1,
+      items: [{ menuItemId: "m1", quantity: 1 }]
+    });
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].price).toBe(24);
+    expect(order.total).toBe(24);
+  });
+
   it("updates item served state and transitions order status", async () => {
     const { createOrder, updateOrderItemServed } = await import("@/lib/orders");
 

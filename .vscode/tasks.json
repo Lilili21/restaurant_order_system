@@ -32,6 +32,85 @@
           "endsPattern": ".*(Ready in|ready - started server on|Local:).*"
         }
       }
+    },
+    {
+      "label": "e2e: all tests",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm test -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: menu all",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-all -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: live-orders all",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright test \"tests/live-orders.*\\\\.spec\\\\.ts\" --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: menu-live integration",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:integration-menu-live -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests",
+        "env": {
+          "E2E_ORDERING_MENU_PATH": "/olive-bistro/menu/tbl_GkoFz28VwFqC"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: menu-live advanced integration",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:integration-advanced -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests",
+        "env": {
+          "E2E_ORDERING_MENU_PATH": "/olive-bistro/menu/tbl_GkoFz28VwFqC",
+          "E2E_PREVIEW_MENU_PATH": "/menu/olive-bistro/0"
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: menu banners",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: tables shift",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:tables-shift -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "e2e: show report",
+      "type": "shell",
+      "command": "NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report",
+      "options": {
+        "cwd": "${workspaceFolder}/e2e-tests"
+      },
+      "problemMatcher": []
     }
   ]
 }
