@@ -97,6 +97,12 @@ const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const DASHBOARD_ACTIVE_POLL_MS = 12_000;
 const DASHBOARD_HIDDEN_POLL_MS = 30_000;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 8_000;
+
+function toFiniteNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 type InsightStats = {
   revenue: string;
   avgCheck: string;
@@ -1385,9 +1391,12 @@ export function MenuEditor() {
               vsYesterday?: Partial<InsightStats["vsYesterday"]>;
             };
             charts?: Partial<DashboardCharts>;
+            meta?: {
+              sourceWarnings?: string[];
+              error?: string;
+            };
           };
-
-          setInsightStats({
+          const nextInsightStats: InsightStats = {
             revenue:
               typeof analytics.insights?.revenue === "number"
                 ? formatCurrency(analytics.insights.revenue)
@@ -1427,8 +1436,8 @@ export function MenuEditor() {
               activeOrders: analytics.insights?.vsYesterday?.activeOrders ?? null,
               waiterCalls: analytics.insights?.vsYesterday?.waiterCalls ?? null
             }
-          });
-          setDashboardCharts({
+          };
+          const nextDashboardCharts: DashboardCharts = {
             labels: Array.isArray(analytics.charts?.labels) ? analytics.charts.labels : [],
             ordersByHour: Array.isArray(analytics.charts?.ordersByHour)
               ? analytics.charts.ordersByHour
@@ -1436,7 +1445,33 @@ export function MenuEditor() {
             revenueTrend: Array.isArray(analytics.charts?.revenueTrend)
               ? analytics.charts.revenueTrend
               : []
-          });
+          };
+          const sourceWarnings = Array.isArray(analytics.meta?.sourceWarnings)
+            ? analytics.meta.sourceWarnings
+            : [];
+          const hasMetaError =
+            typeof analytics.meta?.error === "string" &&
+            analytics.meta.error.trim().length > 0;
+          const hasOnlyZeroCounters =
+            toFiniteNumber(analytics.insights?.revenue) === 0 &&
+            toFiniteNumber(analytics.insights?.avgCheck) === 0 &&
+            toFiniteNumber(analytics.insights?.orders) === 0 &&
+            toFiniteNumber(analytics.insights?.activeOrders) === 0 &&
+            toFiniteNumber(analytics.insights?.waiterCalls) === 0;
+          const hasEmptyCharts =
+            nextDashboardCharts.labels.length === 0 &&
+            nextDashboardCharts.ordersByHour.length === 0 &&
+            nextDashboardCharts.revenueTrend.length === 0;
+          const shouldKeepPreviousAnalytics =
+            (hasMetaError || sourceWarnings.length > 0) &&
+            hasOnlyZeroCounters &&
+            hasEmptyCharts;
+
+          if (!shouldKeepPreviousAnalytics) {
+            setInsightStats(nextInsightStats);
+            setDashboardCharts(nextDashboardCharts);
+          }
+
           hasSuccessfulResponse = true;
         }
 

@@ -377,6 +377,18 @@ type ClosedSessionSeriesEntry = {
   ordersCount: number;
 };
 
+function hasRenderableClosedSessionItems(session: {
+  orders?: Array<{
+    items?: Array<{
+      quantity?: number;
+    }>;
+  }>;
+}) {
+  return (session.orders ?? []).some((order) =>
+    (order.items ?? []).some((item) => Number(item.quantity) > 0)
+  );
+}
+
 function getPeakHourLabelFromClosedSessions(
   sessions: ClosedSessionSeriesEntry[],
   start: Date,
@@ -704,7 +716,7 @@ export async function GET(request: NextRequest) {
       return createdAt >= effectiveShiftStartTs && createdAt <= nowTs;
     });
     const analyticsOrders = shiftOrdersToNow;
-    const closedSessionsInCurrentShift = closedSessions.filter((session) => {
+    const closedSessionsInCurrentShiftRaw = closedSessions.filter((session) => {
       const closedAtTs = new Date(session.closedAt).getTime();
       return (
         Number.isFinite(closedAtTs) &&
@@ -712,6 +724,9 @@ export async function GET(request: NextRequest) {
         closedAtTs <= nowTs
       );
     });
+    const closedSessionsInCurrentShift = closedSessionsInCurrentShiftRaw.filter(
+      (session) => hasRenderableClosedSessionItems(session)
+    );
     const analyticsClosedSessions = closedSessionsInCurrentShift.map((session) => ({
       closedAt: session.closedAt,
       total: session.total,
@@ -901,6 +916,9 @@ export async function GET(request: NextRequest) {
         activeTablesCount,
         activeOrdersCount,
         closedOrdersCount,
+        closedOrdersRawCount: closedSessionsInCurrentShiftRaw.length,
+        filteredClosedOrdersWithoutItemsCount:
+          closedSessionsInCurrentShiftRaw.length - closedSessionsInCurrentShift.length,
         activeBillableOrdersCount: getActiveBillableOrdersCountAtTime(
           allOrders,
           effectiveShiftStartTs,

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatCurrency } from "@/lib/menu";
 
@@ -54,10 +54,16 @@ const analyticsBlocks = [
 const liveStatusDescriptions: Record<string, string> = {
   Revenue: "Shift total",
   "Avg Check": "Per order",
-  Orders: "Shift count",
+  Orders: "Active + closed tables",
   "Active Orders": "Open now",
   "Waiter Calls": "Calls this shift"
 };
+
+function parseNumberLikeValue(value: string) {
+  const normalized = value.replace(",", ".").replace(/[^0-9.-]+/g, "");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function buildSmoothLineChartPath(values: number[]) {
   if (!values.length) {
@@ -666,6 +672,84 @@ function ControlCenterDashboardComponent({
   dashboardCharts,
   currentShiftLabel
 }: Props) {
+  const liveStatTargets = useMemo(
+    () => ({
+      revenue: parseNumberLikeValue(insightStats.revenue || "0"),
+      avgCheck: parseNumberLikeValue(insightStats.avgCheck || "0"),
+      orders: parseNumberLikeValue(insightStats.orders || "0"),
+      activeOrders: parseNumberLikeValue(insightStats.activeOrders || "0"),
+      waiterCalls: parseNumberLikeValue(insightStats.waiterCalls || "0")
+    }),
+    [
+      insightStats.activeOrders,
+      insightStats.avgCheck,
+      insightStats.orders,
+      insightStats.revenue,
+      insightStats.waiterCalls
+    ]
+  );
+  const [animatedLiveStats, setAnimatedLiveStats] = useState(liveStatTargets);
+  const animationFrameRef = useRef<number | null>(null);
+  const animatedLiveStatsRef = useRef(liveStatTargets);
+
+  useEffect(() => {
+    animatedLiveStatsRef.current = animatedLiveStats;
+  }, [animatedLiveStats]);
+
+  useEffect(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    const startValues = { ...animatedLiveStatsRef.current };
+    const endValues = liveStatTargets;
+    const durationMs = 420;
+    const startAt = performance.now();
+    const hasDelta = Object.keys(endValues).some((key) => {
+      const typedKey = key as keyof typeof endValues;
+      return Math.abs((endValues[typedKey] ?? 0) - (startValues[typedKey] ?? 0)) > 0.001;
+    });
+
+    if (!hasDelta) {
+      return;
+    }
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - startAt) / durationMs);
+      const eased = 1 - (1 - progress) ** 3;
+
+      const nextValues = {
+        revenue: startValues.revenue + (endValues.revenue - startValues.revenue) * eased,
+        avgCheck: startValues.avgCheck + (endValues.avgCheck - startValues.avgCheck) * eased,
+        orders: startValues.orders + (endValues.orders - startValues.orders) * eased,
+        activeOrders:
+          startValues.activeOrders +
+          (endValues.activeOrders - startValues.activeOrders) * eased,
+        waiterCalls:
+          startValues.waiterCalls + (endValues.waiterCalls - startValues.waiterCalls) * eased
+      };
+      animatedLiveStatsRef.current = nextValues;
+      setAnimatedLiveStats(nextValues);
+
+      if (progress < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+
+      animationFrameRef.current = null;
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [liveStatTargets]);
+
   const orderChartSuggestions = buildOrderChartSuggestions(
     dashboardCharts.labels,
     dashboardCharts.ordersByHour
@@ -729,15 +813,15 @@ function ControlCenterDashboardComponent({
                       }
                     >
                       {stat.label === "Revenue"
-                        ? insightStats.revenue || "0"
+                        ? formatCurrency(Number(animatedLiveStats.revenue.toFixed(2)))
                         : stat.label === "Avg Check"
-                          ? insightStats.avgCheck || "0"
+                          ? formatCurrency(Number(animatedLiveStats.avgCheck.toFixed(2)))
                           : stat.label === "Orders"
-                            ? insightStats.orders || "0"
+                            ? String(Math.max(0, Math.round(animatedLiveStats.orders)))
                             : stat.label === "Active Orders"
-                              ? insightStats.activeOrders || "0"
+                              ? String(Math.max(0, Math.round(animatedLiveStats.activeOrders)))
                               : stat.label === "Waiter Calls"
-                                ? insightStats.waiterCalls
+                                ? String(Math.max(0, Math.round(animatedLiveStats.waiterCalls)))
                                 : "0"}
                     </strong>
                     <span className="control-center-analytics__stat-comparison">
