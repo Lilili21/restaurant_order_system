@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { menuItems as defaultMenuItems } from "@/lib/mock-data";
-import { getDefaultMenuImageByRestaurantSlug } from "@/lib/menu-images";
+import { resolveMenuImageForRestaurant } from "@/lib/menu-images";
 import { getRestaurantBySlug, invalidateRestaurantsCache } from "@/lib/restaurants";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
@@ -316,12 +316,7 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
   const nameRu = item.nameRu?.trim() || nameEn;
   const descriptionEn = item.descriptionEn?.trim() || descriptionHe;
   const descriptionRu = item.descriptionRu?.trim() || descriptionEn;
-  const defaultImage = getDefaultMenuImageByRestaurantSlug(item.restaurantSlug);
-  const rawImage = item.image?.trim() || "";
-  const image =
-    !rawImage || rawImage === "/images/default-menu-item.svg"
-      ? defaultImage
-      : rawImage;
+  const image = resolveMenuImageForRestaurant(item.image, item.restaurantSlug);
 
   return {
     ...item,

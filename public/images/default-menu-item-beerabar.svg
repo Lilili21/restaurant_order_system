@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">BeeraBar</title>
+  <desc id="desc">Default menu image placeholder for BeeraBar.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3efe8" />
+      <stop offset="50%" stop-color="#e6dccf" />
+      <stop offset="100%" stop-color="#d5c3ab" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)" rx="48" />
+  <circle cx="180" cy="190" r="130" fill="#9a3412" opacity="0.16" />
+  <circle cx="1020" cy="170" r="150" fill="#78350f" opacity="0.16" />
+  <circle cx="980" cy="760" r="170" fill="#a16207" opacity="0.14" />
+  <g fill="none" stroke="#78350f" stroke-opacity="0.24">
+    <path d="M150 710c145-82 293-103 452-69 88 18 176 19 262-3 76-19 145-51 206-96" stroke-width="10" stroke-linecap="round"/>
+    <path d="M200 770c105-49 221-67 351-52 59 7 117 20 177 22 105 3 207-21 304-73" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="600" y="392" text-anchor="middle" fill="#78350f" font-family="Georgia, 'Times New Roman', serif" font-size="58" letter-spacing="16">
+    BEERABAR
+  </text>
+  <text x="600" y="472" text-anchor="middle" fill="#1f140b" font-family="Georgia, 'Times New Roman', serif" font-size="118" font-weight="700">
+    BeeraBar
+  </text>
+</svg>
