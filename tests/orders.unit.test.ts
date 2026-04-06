@@ -314,4 +314,220 @@ describe("orders", () => {
     expect(closed.filter((summary) => summary.tableNumber === 6)).toHaveLength(1);
     expect(nextSessionId).toBe(served.sessionId + 1);
   });
+
+  it("recalculates active table totals from order items when stored order total is stale", async () => {
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [
+        {
+          id: "stale-total-order",
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 1,
+          status: "served",
+          createdAt: new Date().toISOString(),
+          items: [
+            {
+              id: "item-1",
+              menuItemId: "m2",
+              name: "Wrong total salad",
+              category: "salads",
+              price: 32,
+              quantity: 2,
+              served: true
+            }
+          ],
+          total: 164
+        }
+      ],
+      currentTableSessions: [["olive-bistro:4", 1]],
+      closedTableSummaries: []
+    });
+
+    const { getTableOverviews } = await import("@/lib/orders");
+    const tables = await getTableOverviews("olive-bistro");
+    const table = tables.find((entry) => entry.tableNumber === 4);
+
+    expect(table).toBeTruthy();
+    expect(table?.total).toBe(64);
+    expect(table?.orders).toHaveLength(1);
+    expect(table?.orders[0].total).toBe(64);
+  });
+
+  it("does not show active table cards for orders without items", async () => {
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [
+        {
+          id: "empty-order",
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 1,
+          status: "served",
+          createdAt: new Date().toISOString(),
+          items: [],
+          total: 164
+        }
+      ],
+      currentTableSessions: [["olive-bistro:4", 1]],
+      closedTableSummaries: []
+    });
+
+    const { getTableOverviews } = await import("@/lib/orders");
+    const tables = await getTableOverviews("olive-bistro");
+
+    expect(tables.find((table) => table.tableNumber === 4)).toBeUndefined();
+  });
+
+  it("keeps two consecutive closed sessions for the same table in current shift scope", async () => {
+    const now = new Date();
+    const firstClosedAt = new Date(now.getTime() - 20 * 60 * 1000).toISOString();
+    const secondClosedAt = new Date(now.getTime() - 5 * 60 * 1000).toISOString();
+
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [],
+      currentTableSessions: [["olive-bistro:4", 3]],
+      closedTableSummaries: [
+        {
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 1,
+          closedAt: firstClosedAt,
+          total: 61,
+          orderCount: 1,
+          orderIds: ["order-s1"],
+          orders: []
+        },
+        {
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 2,
+          closedAt: secondClosedAt,
+          total: 96,
+          orderCount: 1,
+          orderIds: ["order-s2"],
+          orders: []
+        }
+      ]
+    });
+
+    const { getClosedTableSummaries } = await import("@/lib/orders");
+    const summaries = await getClosedTableSummaries("olive-bistro", {
+      scope: "current_shift"
+    });
+
+    const table4 = summaries.filter((summary) => summary.tableNumber === 4);
+    expect(table4).toHaveLength(2);
+    expect(table4.map((summary) => summary.sessionId).sort((a, b) => a - b)).toEqual([1, 2]);
+  });
+
+  it("keeps just-ended shift and current shift closed sessions visible during grace overlap", async () => {
+    vi.useFakeTimers();
+    try {
+      const now = new Date(2026, 0, 10, 3, 30, 0, 0);
+      vi.setSystemTime(now);
+
+      writeJson(workspace, "data/menu-settings.json", {
+        workingHoursFrom: "03:00",
+        workingHoursUntil: "03:00",
+        workingHoursRules: []
+      });
+
+      writeJson(workspace, "data/orders-store.json", {
+        orders: [],
+        currentTableSessions: [["olive-bistro:4", 3]],
+        closedTableSummaries: [
+          {
+            restaurantSlug: "olive-bistro",
+            restaurantName: "Olive Bistro",
+            tableNumber: 4,
+            sessionId: 1,
+            closedAt: new Date(2026, 0, 10, 2, 55, 0, 0).toISOString(),
+            total: 61,
+            orderCount: 1,
+            orderIds: ["order-prev"],
+            orders: []
+          },
+          {
+            restaurantSlug: "olive-bistro",
+            restaurantName: "Olive Bistro",
+            tableNumber: 4,
+            sessionId: 2,
+            closedAt: new Date(2026, 0, 10, 3, 10, 0, 0).toISOString(),
+            total: 96,
+            orderCount: 1,
+            orderIds: ["order-current"],
+            orders: []
+          }
+        ]
+      });
+
+      const { getClosedTableSummaries } = await import("@/lib/orders");
+      const summaries = await getClosedTableSummaries("olive-bistro", {
+        scope: "current_shift"
+      });
+
+      const table4 = summaries.filter((summary) => summary.tableNumber === 4);
+      expect(table4).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("closeTable avoids overwriting when session id collides with existing closed summary", async () => {
+    const nowIso = new Date().toISOString();
+
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [
+        {
+          id: "order-collision",
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 1,
+          status: "served",
+          createdAt: nowIso,
+          items: [
+            {
+              id: "item-collision",
+              menuItemId: "m1",
+              name: "Test item",
+              category: "starters",
+              price: 24,
+              quantity: 1,
+              served: true
+            }
+          ],
+          total: 24
+        }
+      ],
+      currentTableSessions: [["olive-bistro:4", 1]],
+      closedTableSummaries: [
+        {
+          restaurantSlug: "olive-bistro",
+          restaurantName: "Olive Bistro",
+          tableNumber: 4,
+          sessionId: 1,
+          closedAt: new Date(Date.now() - 60_000).toISOString(),
+          total: 61,
+          orderCount: 1,
+          orderIds: ["already-closed-order"],
+          orders: []
+        }
+      ]
+    });
+
+    const { closeTable, getClosedTableSummaries } = await import("@/lib/orders");
+    const summary = await closeTable("olive-bistro", 4);
+    const allClosed = await getClosedTableSummaries("olive-bistro");
+    const table4 = allClosed
+      .filter((entry) => entry.tableNumber === 4)
+      .sort((left, right) => left.sessionId - right.sessionId);
+
+    expect(summary.sessionId).toBe(2);
+    expect(table4).toHaveLength(2);
+    expect(table4.map((entry) => entry.sessionId)).toEqual([1, 2]);
+  });
 });

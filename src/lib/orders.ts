@@ -900,6 +900,18 @@ function normalizeGuestContactValue(value: string | null | undefined) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function calculateOrderItemsTotal(items: OrderItem[]) {
+  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+}
+
+function getEffectiveOrderTotal(order: Pick<Order, "kind" | "items" | "total">) {
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
+    return 0;
+  }
+
+  return calculateOrderItemsTotal(order.items ?? []);
+}
+
 function hasGuestContactConflict(
   existingOrder: Order,
   incomingContact: {
@@ -1365,7 +1377,7 @@ async function normalizePersistedOrder(
   return {
     ...order,
     items,
-    total: items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    total: calculateOrderItemsTotal(items)
   };
 }
 
@@ -1650,7 +1662,10 @@ function rotateSessionsForNewShift(
         tableNumber: referenceOrder.tableNumber,
         sessionId,
         closedAt: closedAtIso,
-        total: billableOrders.reduce((sum, order) => sum + order.total, 0),
+        total: billableOrders.reduce(
+          (sum, order) => sum + getEffectiveOrderTotal(order),
+          0
+        ),
         orderCount: billableOrders.length,
         orderIds: billableOrders.map((order) => order.id),
         orders: billableOrders.map((order) => toClosedTableOrderSnapshot(order))
@@ -1983,25 +1998,30 @@ async function loadStateFromRowSupabase(
   const parsedMeta = (metaResult.data?.value ?? null) as
     | Partial<OrdersMetaPersistence>
     | null;
-  const currentTableSessions =
-    tableSessionRows.length > 0
-      ? tableSessionRows
-          .map((row) => {
-            const restaurant = restaurantLookup.get(row.restaurant_id);
+  const sessionsFromRows = (tableSessionRows
+    .map((row) => {
+      const restaurant = restaurantLookup.get(row.restaurant_id);
 
-            if (!restaurant) {
-              return null;
-            }
+      if (!restaurant) {
+        return null;
+      }
 
-            return [
-              createTableKey(restaurant.slug, Number(row.table_number)),
-              Number(row.current_session_id) || 1
-            ] as [string, number];
-          })
-          .filter(Boolean) as Array<[string, number]>
-      : Array.isArray(parsedMeta?.currentTableSessions)
-        ? parsedMeta.currentTableSessions
-        : defaultSessionsFromRows;
+      return [
+        createTableKey(restaurant.slug, Number(row.table_number)),
+        Number(row.current_session_id) || 1
+      ] as [string, number];
+    })
+    .filter(Boolean) as Array<[string, number]>);
+  const fallbackSessions = Array.isArray(parsedMeta?.currentTableSessions)
+    ? parsedMeta.currentTableSessions
+    : defaultSessionsFromRows;
+  const mergedCurrentSessions = new Map<string, number>(fallbackSessions);
+
+  for (const [tableKey, sessionId] of sessionsFromRows) {
+    mergedCurrentSessions.set(tableKey, sessionId);
+  }
+
+  const currentTableSessions = [...mergedCurrentSessions.entries()];
 
   const parsedMetaClosedSummaries = Array.isArray(parsedMeta?.closedTableSummaries)
     ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
@@ -2102,23 +2122,14 @@ async function persistStateToRowSupabase(
         throw new Error(deleteAllOrdersError.message);
       }
     } else {
-      const { error: deleteItemsError } = await supabase
-        .from("order_items")
-        .delete()
-        .in("order_id", orderIds);
+      if (activeOrderRows.length > 0) {
+        const { error: upsertOrdersError } = await supabase
+          .from("orders")
+          .upsert(activeOrderRows, { onConflict: "id" });
 
-      if (deleteItemsError) {
-        throw new Error(deleteItemsError.message);
-      }
-    }
-
-    if (activeOrderRows.length > 0) {
-      const { error: upsertOrdersError } = await supabase
-        .from("orders")
-        .upsert(activeOrderRows, { onConflict: "id" });
-
-      if (upsertOrdersError) {
-        throw new Error(upsertOrdersError.message);
+        if (upsertOrdersError) {
+          throw new Error(upsertOrdersError.message);
+        }
       }
 
       const { data: existingRows, error: existingRowsError } = await supabase
@@ -2143,15 +2154,40 @@ async function persistStateToRowSupabase(
           throw new Error(deleteStaleOrdersError.message);
         }
       }
-    }
 
-    if (activeOrderItemRows.length > 0) {
-      const { error: upsertItemsError } = await supabase
+      if (activeOrderItemRows.length > 0) {
+        const { error: upsertItemsError } = await supabase
+          .from("order_items")
+          .upsert(activeOrderItemRows, { onConflict: "id" });
+
+        if (upsertItemsError) {
+          throw new Error(upsertItemsError.message);
+        }
+      }
+
+      const { data: existingItemRows, error: existingItemRowsError } = await supabase
         .from("order_items")
-        .upsert(activeOrderItemRows, { onConflict: "id" });
+        .select("id, order_id")
+        .in("order_id", orderIds);
 
-      if (upsertItemsError) {
-        throw new Error(upsertItemsError.message);
+      if (existingItemRowsError) {
+        throw new Error(existingItemRowsError.message);
+      }
+
+      const currentItemIds = new Set(activeOrderItemRows.map((row) => row.id));
+      const staleItemIds = (existingItemRows ?? [])
+        .map((row) => String((row as { id: string }).id))
+        .filter((id) => !currentItemIds.has(id));
+
+      if (staleItemIds.length > 0) {
+        const { error: deleteStaleItemsError } = await supabase
+          .from("order_items")
+          .delete()
+          .in("id", staleItemIds);
+
+        if (deleteStaleItemsError) {
+          throw new Error(deleteStaleItemsError.message);
+        }
       }
     }
   } catch (error) {
@@ -2183,23 +2219,14 @@ async function persistStateToRowSupabase(
         throw new Error(deleteAllOrdersError.message);
       }
     } else {
-      const { error: deleteItemsError } = await supabase
-        .from("order_items_store")
-        .delete()
-        .in("order_id", orderIds);
+      if (legacyOrderRows.length > 0) {
+        const { error: upsertOrdersError } = await supabase
+          .from("orders_store")
+          .upsert(legacyOrderRows, { onConflict: "order_id" });
 
-      if (deleteItemsError) {
-        throw new Error(deleteItemsError.message);
-      }
-    }
-
-    if (legacyOrderRows.length > 0) {
-      const { error: upsertOrdersError } = await supabase
-        .from("orders_store")
-        .upsert(legacyOrderRows, { onConflict: "order_id" });
-
-      if (upsertOrdersError) {
-        throw new Error(upsertOrdersError.message);
+        if (upsertOrdersError) {
+          throw new Error(upsertOrdersError.message);
+        }
       }
 
       const { data: existingRows, error: existingRowsError } = await supabase
@@ -2224,15 +2251,40 @@ async function persistStateToRowSupabase(
           throw new Error(deleteStaleOrdersError.message);
         }
       }
-    }
 
-    if (legacyOrderItemRows.length > 0) {
-      const { error: upsertItemsError } = await supabase
+      if (legacyOrderItemRows.length > 0) {
+        const { error: upsertItemsError } = await supabase
+          .from("order_items_store")
+          .upsert(legacyOrderItemRows, { onConflict: "id" });
+
+        if (upsertItemsError) {
+          throw new Error(upsertItemsError.message);
+        }
+      }
+
+      const { data: existingItemRows, error: existingItemRowsError } = await supabase
         .from("order_items_store")
-        .upsert(legacyOrderItemRows, { onConflict: "id" });
+        .select("id, order_id")
+        .in("order_id", orderIds);
 
-      if (upsertItemsError) {
-        throw new Error(upsertItemsError.message);
+      if (existingItemRowsError) {
+        throw new Error(existingItemRowsError.message);
+      }
+
+      const currentItemIds = new Set(legacyOrderItemRows.map((row) => row.id));
+      const staleItemIds = (existingItemRows ?? [])
+        .map((row) => String((row as { id: string }).id))
+        .filter((id) => !currentItemIds.has(id));
+
+      if (staleItemIds.length > 0) {
+        const { error: deleteStaleItemsError } = await supabase
+          .from("order_items_store")
+          .delete()
+          .in("id", staleItemIds);
+
+        if (deleteStaleItemsError) {
+          throw new Error(deleteStaleItemsError.message);
+        }
       }
     }
   }
@@ -2443,12 +2495,9 @@ async function persistStateToRowSupabase(
   const { error: metaError } = await supabase.from("app_state").upsert(
     {
       key: ORDERS_META_KEY,
-      value: tableSessionsStoredInDedicatedTable
-        ? {
-            currentTableSessions: [],
-            closedTableSummaries: state.closedTableSummaries
-          }
-        : toOrdersMetaPersistence(state),
+      // Keep a full fallback copy even when dedicated tables are available,
+      // so session ids are not lost if dedicated rows are temporarily incomplete.
+      value: toOrdersMetaPersistence(state),
       updated_at: new Date().toISOString()
     },
     { onConflict: "key" }
@@ -2871,10 +2920,7 @@ async function normalizeOrderState(
     return order;
   }
 
-  order.total = order.items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  order.total = calculateOrderItemsTotal(order.items);
 
   if (order.items.length === 0) {
     order.status = "cancelled";
@@ -3152,10 +3198,7 @@ export async function createOrder(input: {
 
     return createOrderItem(cartItem, menuItem, menuSettings);
   });
-  const total = items.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
+  const total = calculateOrderItemsTotal(items);
 
   const repeatedPayloadOrder = findRecentOrderByPayload(
     state,
@@ -3518,13 +3561,51 @@ export async function getTableOverviews(
               order.sessionId === currentSessionId
           )
           .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-        const visibleOrders = sessionOrders.filter(
-          (order) =>
-            order.status !== "cancelled" &&
-            order.kind !== "waiter_call" &&
-            order.kind !== "bill_request" &&
-            isOrderWithinAdminShiftWindow(order, shiftWindow)
-        );
+        const visibleOrders = sessionOrders
+          .filter(
+            (order) =>
+              order.status !== "cancelled" &&
+              order.kind !== "waiter_call" &&
+              order.kind !== "bill_request" &&
+              isOrderWithinAdminShiftWindow(order, shiftWindow)
+          )
+          .flatMap((order) => {
+            if ((order.items ?? []).length === 0) {
+              if (order.total > 0) {
+                logOrdersDebug("getTableOverviews.skip_order_with_empty_items", {
+                  orderId: order.id,
+                  restaurantSlug: order.restaurantSlug,
+                  tableNumber: order.tableNumber,
+                  sessionId: order.sessionId,
+                  storedTotal: order.total
+                });
+              }
+
+              return [];
+            }
+
+            const effectiveTotal = getEffectiveOrderTotal(order);
+
+            if (Math.abs(order.total - effectiveTotal) < 0.009) {
+              return [order];
+            }
+
+            logOrdersDebug("getTableOverviews.adjust_order_total_from_items", {
+              orderId: order.id,
+              restaurantSlug: order.restaurantSlug,
+              tableNumber: order.tableNumber,
+              sessionId: order.sessionId,
+              storedTotal: order.total,
+              effectiveTotal
+            });
+
+            return [
+              {
+                ...order,
+                total: effectiveTotal
+              }
+            ];
+          });
 
         return {
           restaurantSlug: restaurant.slug,
@@ -3532,7 +3613,10 @@ export async function getTableOverviews(
           tableNumber: table.number,
           currentSessionId,
           orderCount: visibleOrders.length,
-          total: visibleOrders.reduce((sum, order) => sum + order.total, 0),
+          total: visibleOrders.reduce(
+            (sum, order) => sum + getEffectiveOrderTotal(order),
+            0
+          ),
           statuses: [...new Set(visibleOrders.map((order) => order.status))],
           orders: visibleOrders
         };
@@ -3644,13 +3728,41 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     );
   }
 
+  let closingSessionId = sessionId;
+
+  if (existingSummary && billableOrders.length > 0) {
+    const maxClosedSessionIdForTable = state.closedTableSummaries
+      .filter(
+        (summary) =>
+          summary.restaurantSlug === restaurantSlug &&
+          summary.tableNumber === tableNumber
+      )
+      .reduce((maxSessionId, summary) => Math.max(maxSessionId, summary.sessionId), 0);
+    closingSessionId = Math.max(sessionId, maxClosedSessionIdForTable + 1);
+
+    logOrdersDebug("closeTable.session_collision_bump", {
+      restaurantSlug,
+      tableNumber,
+      previousSessionId: sessionId,
+      nextSessionId: closingSessionId,
+      closedSummariesForTable: state.closedTableSummaries.filter(
+        (summary) =>
+          summary.restaurantSlug === restaurantSlug &&
+          summary.tableNumber === tableNumber
+      ).length
+    });
+  }
+
   const summary: ClosedTableSummary = {
     restaurantSlug,
     restaurantName: restaurant.name,
     tableNumber,
-    sessionId,
+    sessionId: closingSessionId,
     closedAt: new Date().toISOString(),
-    total: billableOrders.reduce((sum, order) => sum + order.total, 0),
+    total: billableOrders.reduce(
+      (sum, order) => sum + getEffectiveOrderTotal(order),
+      0
+    ),
     orderCount: billableOrders.length,
     orderIds: billableOrders.map((order) => order.id),
     orders: billableOrders.map((order) => toClosedTableOrderSnapshot(order))
@@ -3674,9 +3786,11 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
   });
   const sessionOrderIds = new Set(orders.map((order) => order.id));
   state.ordersStore = state.ordersStore.filter((order) => !sessionOrderIds.has(order.id));
+  const sessionKey = createTableKey(restaurantSlug, tableNumber);
+  const currentSession = state.currentTableSessions.get(sessionKey) ?? 1;
   state.currentTableSessions.set(
-    createTableKey(restaurantSlug, tableNumber),
-    sessionId + 1
+    sessionKey,
+    Math.max(currentSession, closingSessionId + 1)
   );
   await persistStateAsync(state);
 
@@ -3768,21 +3882,67 @@ export async function getClosedTableSummaries(
     return restaurantFiltered;
   }
 
-  const settings = await getMenuSettings(restaurantSlug);
-  const shiftWindow =
-    getCurrentAdminShiftWindow(settings) ??
-    getMostRecentCompletedAdminShiftWindow(settings);
+  const settingsByRestaurant = new Map<string, MenuSettingsSnapshot>();
+  const nowTs = Date.now();
+  const filteredOut: Array<{
+    restaurantSlug: string;
+    tableNumber: number;
+    sessionId: number;
+    closedAt: string;
+  }> = [];
 
-  if (!shiftWindow) {
-    return [];
-  }
+  const result = (
+    await Promise.all(
+      restaurantFiltered.map(async (summary) => {
+        const closedAtTs = new Date(summary.closedAt).getTime();
 
-  return restaurantFiltered.filter((summary) => {
-    const closedAtTs = new Date(summary.closedAt).getTime();
-    return (
-      Number.isFinite(closedAtTs) &&
-      closedAtTs >= shiftWindow.start.getTime() &&
-      closedAtTs < shiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS
-    );
+        if (!Number.isFinite(closedAtTs)) {
+          filteredOut.push({
+            restaurantSlug: summary.restaurantSlug,
+            tableNumber: summary.tableNumber,
+            sessionId: summary.sessionId,
+            closedAt: summary.closedAt
+          });
+          return null;
+        }
+
+        const summaryRestaurantSlug = summary.restaurantSlug;
+        let settings = settingsByRestaurant.get(summaryRestaurantSlug);
+
+        if (!settings) {
+          settings = await getMenuSettings(summaryRestaurantSlug);
+          settingsByRestaurant.set(summaryRestaurantSlug, settings);
+        }
+
+        const summaryShiftWindow = getShiftWindowForTimestamp(settings, closedAtTs);
+        const isInSummaryShiftWindow =
+          closedAtTs >= summaryShiftWindow.start.getTime() &&
+          closedAtTs < summaryShiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS;
+        const isSummaryShiftStillVisible =
+          nowTs < summaryShiftWindow.end.getTime() + SHIFT_CLOSE_GRACE_MS;
+
+        if (isInSummaryShiftWindow && isSummaryShiftStillVisible) {
+          return summary;
+        }
+
+        filteredOut.push({
+          restaurantSlug: summary.restaurantSlug,
+          tableNumber: summary.tableNumber,
+          sessionId: summary.sessionId,
+          closedAt: summary.closedAt
+        });
+        return null;
+      })
+    )
+  ).filter(Boolean) as ClosedTableSummary[];
+
+  logOrdersDebug("getClosedTableSummaries.current_shift", {
+    restaurantSlug: restaurantSlug ?? null,
+    sourceCount: restaurantFiltered.length,
+    returnedCount: result.length,
+    filteredOutCount: filteredOut.length,
+    filteredOut
   });
+
+  return result;
 }
