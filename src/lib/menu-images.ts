@@ -1,14 +1,8 @@
 export const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
 export const BIR_BAR_DEFAULT_MENU_IMAGE = "/images/default-menu-item-beerabar.svg";
-export const LEGACY_BIR_BAR_DEFAULT_MENU_IMAGE =
-  "/images/default-menu-item-bir-bar.svg";
 
 function isDefaultMenuImagePath(imagePath: string) {
-  return (
-    imagePath === DEFAULT_MENU_IMAGE ||
-    imagePath === BIR_BAR_DEFAULT_MENU_IMAGE ||
-    imagePath === LEGACY_BIR_BAR_DEFAULT_MENU_IMAGE
-  );
+  return imagePath === DEFAULT_MENU_IMAGE || imagePath === BIR_BAR_DEFAULT_MENU_IMAGE;
 }
 
 export function getDefaultMenuImageByRestaurantSlug(
@@ -16,7 +10,7 @@ export function getDefaultMenuImageByRestaurantSlug(
 ) {
   const normalizedSlug = (restaurantSlug ?? "").trim().toLowerCase();
 
-  if (normalizedSlug === "bir-bar") {
+  if (normalizedSlug === "beerabar") {
     return BIR_BAR_DEFAULT_MENU_IMAGE;
   }
 
