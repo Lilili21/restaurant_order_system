@@ -102,8 +102,10 @@ function getDayOfWeekInTimeZone(date: Date, timeZone: string) {
 }
 
 function isFullDayWindow(from: string | null | undefined, until: string | null | undefined) {
-  const normalizedFrom = typeof from === "string" ? from.trim() : "";
-  const normalizedUntil = typeof until === "string" ? until.trim() : "";
+  const normalizeForCompare = (value: string | null | undefined) =>
+    typeof value === "string" ? value.trim().replace(/^(\d{1,2}:\d{2}):00$/, "$1") : "";
+  const normalizedFrom = normalizeForCompare(from);
+  const normalizedUntil = normalizeForCompare(until);
 
   return normalizedFrom === "00:00" && (normalizedUntil === "24:00" || normalizedUntil === "00:00");
 }
@@ -113,7 +115,7 @@ function parseTime(value: string | null | undefined) {
     return null;
   }
 
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value.trim());
 
   if (!match) {
     return null;
@@ -121,15 +123,19 @@ function parseTime(value: string | null | undefined) {
 
   const hours = Number.parseInt(match[1], 10);
   const minutes = Number.parseInt(match[2], 10);
+  const seconds = match[3] ? Number.parseInt(match[3], 10) : 0;
 
   if (
     !Number.isFinite(hours) ||
     !Number.isFinite(minutes) ||
+    !Number.isFinite(seconds) ||
     hours < 0 ||
     hours > 24 ||
     minutes < 0 ||
     minutes > 59 ||
-    (hours === 24 && minutes !== 0)
+    seconds < 0 ||
+    seconds > 59 ||
+    (hours === 24 && (minutes !== 0 || seconds !== 0))
   ) {
     return null;
   }
@@ -368,6 +374,7 @@ function getPeakHourLabel(orders: Order[], start: Date, end: Date) {
 type ClosedSessionSeriesEntry = {
   closedAt: string;
   total: number;
+  ordersCount: number;
 };
 
 function getPeakHourLabelFromClosedSessions(
@@ -451,7 +458,10 @@ function buildHourlySeries(
       continue;
     }
 
-    orderCounts.set(bucketLabel, (orderCounts.get(bucketLabel) ?? 0) + 1);
+    orderCounts.set(
+      bucketLabel,
+      (orderCounts.get(bucketLabel) ?? 0) + Math.max(0, Math.trunc(session.ordersCount))
+    );
     revenueCounts.set(bucketLabel, (revenueCounts.get(bucketLabel) ?? 0) + session.total);
   }
 
@@ -511,6 +521,26 @@ function getActiveSessionCountAtTime(
   );
 
   return activeSessionKeys.size;
+}
+
+function getActiveBillableOrdersCountAtTime(
+  orders: Order[],
+  startTs: number,
+  endTs: number
+) {
+  return orders.filter((order) => {
+    if (
+      order.kind === "waiter_call" ||
+      order.kind === "bill_request" ||
+      order.status === "cancelled" ||
+      order.status === "served"
+    ) {
+      return false;
+    }
+
+    const createdAtTs = new Date(order.createdAt).getTime();
+    return Number.isFinite(createdAtTs) && createdAtTs >= startTs && createdAtTs <= endTs;
+  }).length;
 }
 
 function formatVsYesterday(current: number, previous: number, suffix = "") {
@@ -684,7 +714,13 @@ export async function GET(request: NextRequest) {
     });
     const analyticsClosedSessions = closedSessionsInCurrentShift.map((session) => ({
       closedAt: session.closedAt,
-      total: session.total
+      total: session.total,
+      ordersCount:
+        typeof session.orderCount === "number" && Number.isFinite(session.orderCount)
+          ? Math.max(0, Math.trunc(session.orderCount))
+          : Array.isArray(session.orderIds) && session.orderIds.length > 0
+            ? session.orderIds.length
+            : 1
     }));
     const closedSessionsInCurrentShiftRevenue = closedSessionsInCurrentShift.reduce(
       (sum, session) => sum + session.total,
@@ -695,7 +731,9 @@ export async function GET(request: NextRequest) {
         ? closedSessionsInCurrentShiftRevenue / closedSessionsInCurrentShift.length
         : 0;
     const activeTablesCount = tables.length;
-    const totalTablesOrdersCount = activeTablesCount + closedSessionsInCurrentShift.length;
+    const activeOrdersCount = activeTablesCount;
+    const closedOrdersCount = closedSessionsInCurrentShift.length;
+    const totalTablesOrdersCount = activeOrdersCount + closedOrdersCount;
     const waiterCallsCount = allOrders.filter((order) => {
       if (order.kind !== "waiter_call") {
         return false;
@@ -781,11 +819,16 @@ export async function GET(request: NextRequest) {
           }
         : null;
     const effectiveDayBounds = fullDayBounds ?? analyticsDayBounds;
-    const hourlySeries = effectiveDayBounds
+    const chartBounds = effectiveDayBounds ?? {
+      start: new Date(effectiveShiftStartTs),
+      end: new Date(nowTs)
+    };
+    const hourlySeries =
+      chartBounds.end.getTime() > chartBounds.start.getTime()
       ? buildHourlySeries(
           analyticsClosedSessions,
-          effectiveDayBounds.start,
-          new Date(Math.min(effectiveDayBounds.end.getTime(), nowTs))
+          chartBounds.start,
+          new Date(Math.min(chartBounds.end.getTime(), nowTs))
         )
       : { labels: [], ordersByHour: [], revenueTrend: [] };
 
@@ -812,7 +855,7 @@ export async function GET(request: NextRequest) {
           ? Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2))
           : 0,
         orders: totalTablesOrdersCount,
-        activeOrders: activeTablesCount,
+        activeOrders: activeOrdersCount,
         topDish: currentShiftWindow
           ? getUniqueDishNames(recentDishItems, "desc")
           : "—",
@@ -839,7 +882,7 @@ export async function GET(request: NextRequest) {
             Number(previousAvgCheck.toFixed(2))
           ),
           orders: formatVsYesterday(totalTablesOrdersCount, previousOrdersCount),
-          activeOrders: formatVsYesterday(activeTablesCount, previousActiveTablesCount),
+          activeOrders: formatVsYesterday(activeOrdersCount, previousActiveTablesCount),
           waiterCalls: formatVsYesterday(waiterCallsCount, previousWaiterCallsCount)
         }
       },
@@ -855,6 +898,14 @@ export async function GET(request: NextRequest) {
         effectiveShiftStart: new Date(effectiveShiftStartTs).toISOString(),
         hasActiveShift: Boolean(currentShiftStartTs),
         fullDayWindowConfigured,
+        activeTablesCount,
+        activeOrdersCount,
+        closedOrdersCount,
+        activeBillableOrdersCount: getActiveBillableOrdersCountAtTime(
+          allOrders,
+          effectiveShiftStartTs,
+          nowTs
+        ),
         sourceWarnings
       }
     });
