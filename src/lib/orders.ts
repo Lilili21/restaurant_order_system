@@ -5,6 +5,7 @@ import {
   ClosedTableOrderSnapshot,
   CartItem,
   ClosedTableSummary,
+  MenuCategory,
   MenuItem,
   OrderChannel,
   Order,
