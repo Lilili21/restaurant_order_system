@@ -105,6 +105,7 @@ export type OrderItem = {
 export type OrderStatus = "new" | "preparing" | "served" | "cancelled";
 
 export type ServeMode = "all_at_once" | "as_ready";
+export type OrderChannel = "table" | "counter";
 
 export type Order = {
   id: string;
@@ -112,6 +113,9 @@ export type Order = {
   restaurantName: string;
   tableNumber: number;
   sessionId: number;
+  orderChannel?: OrderChannel;
+  displayOrderNumber?: string;
+  guestTokenHash?: string;
   guestContactName?: string;
   guestContactPhone?: string;
   kind?: "order" | "waiter_call" | "bill_request";

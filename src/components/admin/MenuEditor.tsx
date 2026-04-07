@@ -12,7 +12,8 @@ import { formatCurrency } from "@/lib/menu";
 import type {
   BusinessLunchSettings,
   PromotionSettings,
-  RecommendationRuleSettings
+  RecommendationRuleSettings,
+  RestaurantOrderMode
 } from "@/lib/menu-settings";
 import {
   MenuBadge,
@@ -127,6 +128,12 @@ type DashboardCharts = {
   labels: string[];
   ordersByHour: number[];
   revenueTrend: number[];
+};
+
+type DashboardMeta = {
+  orderMode: "tables" | "counter";
+  ordersLabel: string;
+  activeOrdersLabel: string;
 };
 
 type WorkingHoursRule = {
@@ -628,9 +635,16 @@ export function MenuEditor() {
     ordersByHour: [],
     revenueTrend: []
   });
+  const [dashboardMeta, setDashboardMeta] = useState<DashboardMeta>({
+    orderMode: "tables",
+    ordersLabel: "Active tables + closed sessions",
+    activeOrdersLabel: "Open tables right now"
+  });
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
   const [workingHoursUntil, setWorkingHoursUntil] = useState<string | null>(null);
   const [workingHoursRules, setWorkingHoursRules] = useState<WorkingHoursRule[]>([]);
+  const [restaurantOrderMode, setRestaurantOrderMode] =
+    useState<RestaurantOrderMode>("tables");
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
   const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
@@ -1304,6 +1318,7 @@ export function MenuEditor() {
             kitchenOpenUntil?: string | null;
             barOpenEnabled?: boolean;
             barOpenUntil?: string | null;
+            orderMode?: RestaurantOrderMode;
           };
 
           setKitchenLoadWarningEnabled(Boolean(settings.kitchenLoadWarningEnabled));
@@ -1382,6 +1397,9 @@ export function MenuEditor() {
                 })
               : ""
           );
+          setRestaurantOrderMode(
+            settings.orderMode === "counter" ? "counter" : "tables"
+          );
           hasSuccessfulResponse = true;
         }
 
@@ -1394,6 +1412,9 @@ export function MenuEditor() {
             meta?: {
               sourceWarnings?: string[];
               error?: string;
+              orderMode?: "tables" | "counter";
+              ordersLabel?: string;
+              activeOrdersLabel?: string;
             };
           };
           const nextInsightStats: InsightStats = {
@@ -1470,6 +1491,20 @@ export function MenuEditor() {
           if (!shouldKeepPreviousAnalytics) {
             setInsightStats(nextInsightStats);
             setDashboardCharts(nextDashboardCharts);
+            setDashboardMeta({
+              orderMode:
+                analytics.meta?.orderMode === "counter" ? "counter" : "tables",
+              ordersLabel:
+                typeof analytics.meta?.ordersLabel === "string" &&
+                analytics.meta.ordersLabel.trim()
+                  ? analytics.meta.ordersLabel
+                  : "Active tables + closed sessions",
+              activeOrdersLabel:
+                typeof analytics.meta?.activeOrdersLabel === "string" &&
+                analytics.meta.activeOrdersLabel.trim()
+                  ? analytics.meta.activeOrdersLabel
+                  : "Open tables right now"
+            });
           }
 
           hasSuccessfulResponse = true;
@@ -3236,12 +3271,14 @@ export function MenuEditor() {
         selectedKind={selectedKind}
         onSelectDishes={selectDishes}
         onSelectDrinks={selectDrinks}
+        orderMode={restaurantOrderMode}
       />
       {dashboardOpen ? (
         <ControlCenterDashboard
           insightStats={insightStats}
           dashboardCharts={dashboardCharts}
           currentShiftLabel={currentShiftLabel}
+          dashboardMeta={dashboardMeta}
         />
       ) : null}
       {message ? <p className="status-message">{message}</p> : null}

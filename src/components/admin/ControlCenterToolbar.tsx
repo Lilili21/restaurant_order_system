@@ -4,6 +4,7 @@ import { memo } from "react";
 
 import { TableCountControl } from "@/components/admin/TableCountControl";
 import { WorkingHoursControl } from "@/components/admin/WorkingHoursControl";
+import type { RestaurantOrderMode } from "@/lib/menu-settings";
 
 type SecondaryCredentials = {
   login: string;
@@ -34,6 +35,7 @@ type Props = {
   selectedKind: "dishes" | "drinks";
   onSelectDishes: () => void;
   onSelectDrinks: () => void;
+  orderMode?: RestaurantOrderMode;
 };
 
 function ControlCenterToolbarComponent({
@@ -59,7 +61,8 @@ function ControlCenterToolbarComponent({
   onToggleSettingsRecommendations,
   selectedKind,
   onSelectDishes,
-  onSelectDrinks
+  onSelectDrinks,
+  orderMode = "tables"
 }: Props) {
   return (
     <div className="menu-editor__toolbar">
@@ -181,10 +184,12 @@ function ControlCenterToolbarComponent({
           </button>
           {settingsButtonsOpen ? (
             <div className="menu-editor__toolbar-subrow">
-              <TableCountControl
-                credentials={secondaryCredentials}
-                restaurantSlug={restaurantSlug}
-              />
+              {orderMode !== "counter" ? (
+                <TableCountControl
+                  credentials={secondaryCredentials}
+                  restaurantSlug={restaurantSlug}
+                />
+              ) : null}
               <WorkingHoursControl
                 credentials={secondaryCredentials}
                 restaurantSlug={restaurantSlug}

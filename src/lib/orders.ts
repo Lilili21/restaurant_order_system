@@ -1,3 +1,4 @@
+import { randomBytes, createHash } from "node:crypto";
 import { initialOrders } from "@/lib/mock-data";
 import { getMenuSettings, PromotionSettings } from "@/lib/menu-settings";
 import {
@@ -5,6 +6,7 @@ import {
   CartItem,
   ClosedTableSummary,
   MenuItem,
+  OrderChannel,
   Order,
   OrderItem,
   OrderStatus,
@@ -59,6 +61,9 @@ type ActiveOrderRow = {
   serve_mode: ServeMode | null;
   status: OrderStatus;
   restaurant_name: string;
+  order_channel?: string | null;
+  display_order_number?: string | null;
+  guest_token_hash?: string | null;
   guest_contact_name: string | null;
   guest_contact_phone: string | null;
   created_at: string;
@@ -236,6 +241,8 @@ declare global {
           orderId: string;
           restaurantSlug: string;
           tableNumber: number;
+          orderChannel: OrderChannel;
+          guestTokenHash?: string;
           expiresAt: number;
         }
       >
@@ -249,6 +256,8 @@ declare global {
           restaurantSlug: string;
           tableNumber: number;
           sessionId: number;
+          orderChannel: OrderChannel;
+          guestTokenHash?: string;
           payloadSignature: string;
           expiresAt: number;
         }
@@ -258,6 +267,25 @@ declare global {
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
+}
+
+function normalizeOrderChannelValue(
+  value: unknown,
+  fallbackTableNumber?: number
+): OrderChannel {
+  if (value === "counter") {
+    return "counter";
+  }
+
+  if (value === "table") {
+    return "table";
+  }
+
+  if (typeof fallbackTableNumber === "number" && fallbackTableNumber <= 0) {
+    return "counter";
+  }
+
+  return "table";
 }
 
 function normalizeOrderItemNoteValue(note: string | undefined) {
@@ -781,7 +809,9 @@ function findOrderByClientRequestId(
   state: RuntimeState,
   clientRequestId: string,
   restaurantSlug: string,
-  tableNumber: number
+  tableNumber: number,
+  orderChannel: OrderChannel,
+  guestTokenHash?: string
 ) {
   const cache = getOrderRequestCache();
   const entry = cache.get(clientRequestId);
@@ -792,7 +822,9 @@ function findOrderByClientRequestId(
 
   if (
     entry.restaurantSlug !== restaurantSlug ||
-    entry.tableNumber !== tableNumber
+    entry.tableNumber !== tableNumber ||
+    entry.orderChannel !== orderChannel ||
+    (entry.guestTokenHash ?? "") !== (guestTokenHash ?? "")
   ) {
     return null;
   }
@@ -811,12 +843,16 @@ function rememberClientRequestOrder(
   clientRequestId: string,
   order: Order,
   restaurantSlug: string,
-  tableNumber: number
+  tableNumber: number,
+  orderChannel: OrderChannel,
+  guestTokenHash?: string
 ) {
   getOrderRequestCache().set(clientRequestId, {
     orderId: order.id,
     restaurantSlug,
     tableNumber,
+    orderChannel,
+    guestTokenHash,
     expiresAt: Date.now() + ORDER_REQUEST_CACHE_TTL_MS
   });
 }
@@ -852,13 +888,17 @@ function findRecentOrderByPayload(
   restaurantSlug: string,
   tableNumber: number,
   sessionId: number,
-  payloadSignature: string
+  payloadSignature: string,
+  orderChannel: OrderChannel,
+  guestTokenHash?: string
 ) {
   for (const entry of getRecentOrderPayloadCache().values()) {
     if (
       entry.restaurantSlug !== restaurantSlug ||
       entry.tableNumber !== tableNumber ||
       entry.sessionId !== sessionId ||
+      entry.orderChannel !== orderChannel ||
+      (entry.guestTokenHash ?? "") !== (guestTokenHash ?? "") ||
       entry.payloadSignature !== payloadSignature
     ) {
       continue;
@@ -881,7 +921,9 @@ function rememberRecentOrderPayload(
   restaurantSlug: string,
   tableNumber: number,
   sessionId: number,
-  payloadSignature: string
+  payloadSignature: string,
+  orderChannel: OrderChannel,
+  guestTokenHash?: string
 ) {
   const cache = getRecentOrderPayloadCache();
   const cacheKey = `${restaurantSlug}:${tableNumber}:${sessionId}:${order.id}`;
@@ -891,6 +933,8 @@ function rememberRecentOrderPayload(
     restaurantSlug,
     tableNumber,
     sessionId,
+    orderChannel,
+    guestTokenHash,
     payloadSignature,
     expiresAt: Date.now() + ORDER_PAYLOAD_DEDUP_WINDOW_MS
   });
@@ -898,6 +942,38 @@ function rememberRecentOrderPayload(
 
 function normalizeGuestContactValue(value: string | null | undefined) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeGuestTokenValue(value: string | null | undefined) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 256)
+    : undefined;
+}
+
+function hashGuestToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function normalizeOrderNumberPrefix(value: string | null | undefined) {
+  const cleaned =
+    typeof value === "string"
+      ? value.trim().slice(0, 12).toUpperCase().replace(/[^A-Z0-9]/g, "")
+      : "";
+  return cleaned || "ORD";
+}
+
+function generateDisplayOrderNumber(prefix: string) {
+  const normalizedPrefix = normalizeOrderNumberPrefix(prefix);
+  const now = new Date();
+  const datePart = `${now.getFullYear().toString().slice(-2)}${String(
+    now.getMonth() + 1
+  ).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const timePart = `${String(now.getHours()).padStart(2, "0")}${String(
+    now.getMinutes()
+  ).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+  const entropyPart = randomBytes(2).toString("hex").toUpperCase();
+
+  return `${normalizedPrefix}-${datePart}-${timePart}${entropyPart}`;
 }
 
 function calculateOrderItemsTotal(items: OrderItem[]) {
@@ -964,6 +1040,8 @@ function mapOrderToLegacyRow(order: Order): LegacyOrderRow {
 }
 
 function mapOrderToActiveRow(order: Order, restaurantId: string): ActiveOrderRow {
+  const orderChannel = normalizeOrderChannelValue(order.orderChannel, order.tableNumber);
+
   return {
     id: order.id,
     restaurant_id: restaurantId,
@@ -973,6 +1051,15 @@ function mapOrderToActiveRow(order: Order, restaurantId: string): ActiveOrderRow
     serve_mode: order.serveMode ?? null,
     status: order.status,
     restaurant_name: order.restaurantName,
+    order_channel: orderChannel,
+    display_order_number:
+      typeof order.displayOrderNumber === "string" && order.displayOrderNumber.trim()
+        ? order.displayOrderNumber.trim()
+        : null,
+    guest_token_hash:
+      typeof order.guestTokenHash === "string" && order.guestTokenHash.trim()
+        ? order.guestTokenHash.trim()
+        : null,
     guest_contact_name: normalizeGuestContactValue(order.guestContactName) ?? null,
     guest_contact_phone: normalizeGuestContactValue(order.guestContactPhone) ?? null,
     created_at: order.createdAt,
@@ -1052,6 +1139,7 @@ function mapLegacyRowsToOrders(
     restaurantName: row.restaurant_name,
     tableNumber: Number(row.table_number),
     sessionId: Number(row.session_id),
+    orderChannel: normalizeOrderChannelValue(undefined, Number(row.table_number)),
     kind: row.kind === "order" ? undefined : row.kind,
     serveMode: row.serve_mode ?? undefined,
     status: row.status,
@@ -1104,6 +1192,19 @@ function mapActiveRowsToOrders(
         restaurantName: row.restaurant_name || restaurant.name,
         tableNumber: Number(row.table_number),
         sessionId: Number(row.session_id),
+        orderChannel: normalizeOrderChannelValue(
+          row.order_channel,
+          Number(row.table_number)
+        ),
+        displayOrderNumber:
+          typeof row.display_order_number === "string" &&
+          row.display_order_number.trim()
+            ? row.display_order_number.trim()
+            : undefined,
+        guestTokenHash:
+          typeof row.guest_token_hash === "string" && row.guest_token_hash.trim()
+            ? row.guest_token_hash.trim()
+            : undefined,
         kind: row.kind === "order" ? undefined : row.kind,
         serveMode: row.serve_mode ?? undefined,
         status: row.status,
@@ -1152,6 +1253,7 @@ function mapServiceRequestRowsToOrders(
         restaurantName: restaurant.name,
         tableNumber: Number(row.table_number),
         sessionId: Number(row.session_id),
+        orderChannel: "table",
         kind: row.kind,
         status: row.status,
         createdAt: row.created_at,
@@ -1319,6 +1421,36 @@ function isMissingTableError(error: unknown) {
       message.includes("service_requests")
     )
   );
+}
+
+function isMissingOrderAdvancedColumnError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  return (
+    message.includes("column") &&
+    (
+      message.includes("order_channel") ||
+      message.includes("display_order_number") ||
+      message.includes("guest_token_hash")
+    ) &&
+    message.includes("does not exist")
+  );
+}
+
+function toLegacyCompatibleActiveOrderRow(row: ActiveOrderRow) {
+  const {
+    order_channel: _orderChannel,
+    display_order_number: _displayOrderNumber,
+    guest_token_hash: _guestTokenHash,
+    ...legacyCompatibleRow
+  } = row;
+
+  return legacyCompatibleRow;
 }
 
 async function getMenuLookupForRestaurant(restaurantSlug: string) {
@@ -2094,7 +2226,7 @@ async function persistStateToRowSupabase(
       const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
       return restaurantId ? mapOrderToActiveRow(order, restaurantId) : null;
     })
-    .filter(Boolean);
+    .filter((row): row is ActiveOrderRow => Boolean(row));
   const activeOrderItemRows = standardOrders.flatMap((order) => {
     const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
     return restaurantId
@@ -2103,6 +2235,8 @@ async function persistStateToRowSupabase(
   });
 
   try {
+    let activeOrderRowsToPersist = [...activeOrderRows];
+
     if (orderIds.length === 0) {
       const { error: deleteAllItemsError } = await supabase
         .from("order_items")
@@ -2122,10 +2256,20 @@ async function persistStateToRowSupabase(
         throw new Error(deleteAllOrdersError.message);
       }
     } else {
-      if (activeOrderRows.length > 0) {
-        const { error: upsertOrdersError } = await supabase
+      if (activeOrderRowsToPersist.length > 0) {
+        let { error: upsertOrdersError } = await supabase
           .from("orders")
-          .upsert(activeOrderRows, { onConflict: "id" });
+          .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+
+        if (upsertOrdersError && isMissingOrderAdvancedColumnError(upsertOrdersError)) {
+          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+            toLegacyCompatibleActiveOrderRow
+          );
+          const retryUpsert = await supabase
+            .from("orders")
+            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+          upsertOrdersError = retryUpsert.error;
+        }
 
         if (upsertOrdersError) {
           throw new Error(upsertOrdersError.message);
@@ -2979,6 +3123,31 @@ export async function getAllStoredOrders(restaurantSlug?: string) {
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+export async function getOrdersByGuestToken(
+  restaurantSlug: string,
+  guestToken: string
+) {
+  const normalizedGuestToken = normalizeGuestTokenValue(guestToken);
+
+  if (!normalizedGuestToken) {
+    return [] as Order[];
+  }
+
+  const guestTokenHash = hashGuestToken(normalizedGuestToken);
+  const { ordersStore } = await readRuntimeStateAsync();
+
+  return ordersStore
+    .filter(
+      (order) =>
+        order.restaurantSlug === restaurantSlug &&
+        order.kind !== "waiter_call" &&
+        order.kind !== "bill_request" &&
+        order.status !== "cancelled" &&
+        (order.guestTokenHash ?? "").trim() === guestTokenHash
+    )
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 export async function createWaiterCall(input: {
   restaurantSlug: string;
   tableNumber: number;
@@ -3010,6 +3179,7 @@ export async function createWaiterCall(input: {
     restaurantName: restaurant.name,
     tableNumber: input.tableNumber,
     sessionId,
+    orderChannel: "table",
     kind: "waiter_call",
     status: "new",
     createdAt: new Date().toISOString(),
@@ -3069,6 +3239,7 @@ export async function createBillRequest(input: {
     restaurantName: restaurant.name,
     tableNumber: input.tableNumber,
     sessionId,
+    orderChannel: "table",
     kind: "bill_request",
     status: "new",
     createdAt: new Date().toISOString(),
@@ -3144,23 +3315,43 @@ export async function createOrder(input: {
   tableNumber: number;
   items: CartItem[];
   serveMode?: ServeMode;
+  orderChannel?: OrderChannel;
   clientRequestId?: string;
+  guestToken?: string;
   guestContactName?: string;
   guestContactPhone?: string;
 }) {
   const state = await readRuntimeStateAsync();
   const restaurant = await getRestaurantBySlug(input.restaurantSlug);
+  const menuSettings = await getMenuSettings(input.restaurantSlug);
+  const guestToken = normalizeGuestTokenValue(input.guestToken);
+  const guestTokenHash = guestToken ? hashGuestToken(guestToken) : undefined;
+  const requestedOrderChannel = normalizeOrderChannelValue(
+    input.orderChannel,
+    input.tableNumber
+  );
+  const orderChannel: OrderChannel =
+    menuSettings.orderMode === "counter" ? "counter" : requestedOrderChannel;
+  const resolvedTableNumber =
+    orderChannel === "counter"
+      ? Math.max(
+          0,
+          Number.isFinite(input.tableNumber) ? Math.trunc(input.tableNumber) : 0
+        )
+      : input.tableNumber;
 
   if (!restaurant) {
     throw new Error("Restaurant not found");
   }
 
-  const tableExists = restaurant.tables.some(
-    (table) => table.number === input.tableNumber
-  );
+  if (orderChannel === "table") {
+    const tableExists = restaurant.tables.some(
+      (table) => table.number === resolvedTableNumber
+    );
 
-  if (!tableExists) {
-    throw new Error("Table not found");
+    if (!tableExists) {
+      throw new Error("Table not found");
+    }
   }
 
   if (input.clientRequestId) {
@@ -3168,7 +3359,9 @@ export async function createOrder(input: {
       state,
       input.clientRequestId,
       input.restaurantSlug,
-      input.tableNumber
+      resolvedTableNumber,
+      orderChannel,
+      guestTokenHash
     );
 
     if (repeatedOrder) {
@@ -3183,12 +3376,11 @@ export async function createOrder(input: {
   const { sessionId } = ensureCurrentSessionId(
     state,
     input.restaurantSlug,
-    input.tableNumber
+    resolvedTableNumber
   );
   const payloadSignature = createOrderPayloadSignature(input.items, input.serveMode);
 
   const menuLookup = await getMenuLookupForRestaurant(input.restaurantSlug);
-  const menuSettings = await getMenuSettings();
   const items = input.items.map((cartItem) => {
     const menuItem = menuLookup.get(cartItem.menuItemId);
 
@@ -3203,15 +3395,23 @@ export async function createOrder(input: {
   const repeatedPayloadOrder = findRecentOrderByPayload(
     state,
     input.restaurantSlug,
-    input.tableNumber,
+    resolvedTableNumber,
     sessionId,
-    payloadSignature
+    payloadSignature,
+    orderChannel,
+    guestTokenHash
   );
   const now = Date.now();
   const isMergeableRepeatedPayloadOrder =
     repeatedPayloadOrder &&
     repeatedPayloadOrder.kind !== "waiter_call" &&
     repeatedPayloadOrder.kind !== "bill_request" &&
+    normalizeOrderChannelValue(
+      repeatedPayloadOrder.orderChannel,
+      repeatedPayloadOrder.tableNumber
+    ) === orderChannel &&
+    (orderChannel !== "counter" ||
+      Boolean(guestTokenHash && repeatedPayloadOrder.guestTokenHash === guestTokenHash)) &&
     repeatedPayloadOrder.status === "new" &&
     now - new Date(repeatedPayloadOrder.createdAt).getTime() < MERGE_ORDER_WINDOW_MS;
   const existingNewOrder = isMergeableRepeatedPayloadOrder
@@ -3219,10 +3419,14 @@ export async function createOrder(input: {
     : state.ordersStore.find(
         (order) =>
           order.restaurantSlug === restaurant.slug &&
-          order.tableNumber === input.tableNumber &&
+          order.tableNumber === resolvedTableNumber &&
           order.sessionId === sessionId &&
           order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
+          normalizeOrderChannelValue(order.orderChannel, order.tableNumber) ===
+            orderChannel &&
+          (orderChannel !== "counter" ||
+            Boolean(guestTokenHash && order.guestTokenHash === guestTokenHash)) &&
           order.status === "new" &&
           now - new Date(order.createdAt).getTime() < MERGE_ORDER_WINDOW_MS
       );
@@ -3248,12 +3452,24 @@ export async function createOrder(input: {
       mergedOrder.serveMode = input.serveMode;
     }
 
+    mergedOrder.orderChannel = orderChannel;
+    if (!mergedOrder.displayOrderNumber) {
+      mergedOrder.displayOrderNumber = generateDisplayOrderNumber(
+        menuSettings.orderNumberPrefix
+      );
+    }
+    if (!mergedOrder.guestTokenHash && guestTokenHash) {
+      mergedOrder.guestTokenHash = guestTokenHash;
+    }
+
     rememberRecentOrderPayload(
       mergedOrder,
       input.restaurantSlug,
-      input.tableNumber,
+      resolvedTableNumber,
       sessionId,
-      payloadSignature
+      payloadSignature,
+      orderChannel,
+      guestTokenHash
     );
 
     if (input.clientRequestId) {
@@ -3261,7 +3477,9 @@ export async function createOrder(input: {
         input.clientRequestId,
         mergedOrder,
         input.restaurantSlug,
-        input.tableNumber
+        resolvedTableNumber,
+        orderChannel,
+        guestTokenHash
       );
     }
 
@@ -3273,8 +3491,11 @@ export async function createOrder(input: {
     id: `ord_${Date.now()}`,
     restaurantSlug: restaurant.slug,
     restaurantName: restaurant.name,
-    tableNumber: input.tableNumber,
+    tableNumber: resolvedTableNumber,
     sessionId,
+    orderChannel,
+    displayOrderNumber: generateDisplayOrderNumber(menuSettings.orderNumberPrefix),
+    guestTokenHash,
     guestContactName: normalizeGuestContactValue(input.guestContactName),
     guestContactPhone: normalizeGuestContactValue(input.guestContactPhone),
     status: "new",
@@ -3290,9 +3511,11 @@ export async function createOrder(input: {
   rememberRecentOrderPayload(
     order,
     input.restaurantSlug,
-    input.tableNumber,
+    resolvedTableNumber,
     sessionId,
-    payloadSignature
+    payloadSignature,
+    orderChannel,
+    guestTokenHash
   );
 
   if (input.clientRequestId) {
@@ -3300,7 +3523,9 @@ export async function createOrder(input: {
       input.clientRequestId,
       order,
       input.restaurantSlug,
-      input.tableNumber
+      resolvedTableNumber,
+      orderChannel,
+      guestTokenHash
     );
   }
 

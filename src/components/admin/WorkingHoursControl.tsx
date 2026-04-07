@@ -11,6 +11,11 @@ type MenuSettingsResponse = {
   }>;
   workingHoursFrom?: string | null;
   workingHoursUntil?: string | null;
+  orderMode?: "tables" | "counter";
+  contactRequirement?: "none" | "name_or_phone" | "phone_only";
+  requireOtp?: boolean;
+  orderNumberPrefix?: string;
+  showGuestOrderHistory?: boolean;
 };
 
 type SecondaryCredentials = {
@@ -54,6 +59,22 @@ export function WorkingHoursControl({
   const [draftFrom, setDraftFrom] = useState("");
   const [draftUntil, setDraftUntil] = useState("");
   const [draftRules, setDraftRules] = useState<WorkingHoursRuleDraft[]>([]);
+  const [orderMode, setOrderMode] = useState<"tables" | "counter">("tables");
+  const [contactRequirement, setContactRequirement] = useState<
+    "none" | "name_or_phone" | "phone_only"
+  >("none");
+  const [requireOtp, setRequireOtp] = useState(false);
+  const [orderNumberPrefix, setOrderNumberPrefix] = useState("ORD");
+  const [showGuestOrderHistory, setShowGuestOrderHistory] = useState(false);
+  const [draftOrderMode, setDraftOrderMode] = useState<"tables" | "counter">(
+    "tables"
+  );
+  const [draftContactRequirement, setDraftContactRequirement] = useState<
+    "none" | "name_or_phone" | "phone_only"
+  >("none");
+  const [draftRequireOtp, setDraftRequireOtp] = useState(false);
+  const [draftOrderNumberPrefix, setDraftOrderNumberPrefix] = useState("ORD");
+  const [draftShowGuestOrderHistory, setDraftShowGuestOrderHistory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -75,6 +96,20 @@ export function WorkingHoursControl({
       const settings = (await response.json()) as MenuSettingsResponse;
       const nextFrom = settings.workingHoursFrom ?? "";
       const nextUntil = settings.workingHoursUntil ?? "";
+      const nextOrderMode =
+        settings.orderMode === "counter" ? "counter" : "tables";
+      const nextContactRequirement =
+        settings.contactRequirement === "name_or_phone" ||
+        settings.contactRequirement === "phone_only"
+          ? settings.contactRequirement
+          : "none";
+      const nextRequireOtp = Boolean(settings.requireOtp);
+      const nextOrderNumberPrefix =
+        typeof settings.orderNumberPrefix === "string" &&
+        settings.orderNumberPrefix.trim()
+          ? settings.orderNumberPrefix.trim().slice(0, 12).toUpperCase()
+          : "ORD";
+      const nextShowGuestOrderHistory = Boolean(settings.showGuestOrderHistory);
       const normalizedRules =
         Array.isArray(settings.workingHoursRules) &&
         settings.workingHoursRules.length > 0
@@ -126,6 +161,16 @@ export function WorkingHoursControl({
         setDraftFrom(nextFrom);
         setDraftUntil(nextUntil);
         setDraftRules(normalizedRules);
+        setOrderMode(nextOrderMode);
+        setContactRequirement(nextContactRequirement);
+        setRequireOtp(nextRequireOtp);
+        setOrderNumberPrefix(nextOrderNumberPrefix);
+        setShowGuestOrderHistory(nextShowGuestOrderHistory);
+        setDraftOrderMode(nextOrderMode);
+        setDraftContactRequirement(nextContactRequirement);
+        setDraftRequireOtp(nextRequireOtp);
+        setDraftOrderNumberPrefix(nextOrderNumberPrefix);
+        setDraftShowGuestOrderHistory(nextShowGuestOrderHistory);
       }
     }
 
@@ -163,7 +208,12 @@ export function WorkingHoursControl({
         restaurantSlug,
         workingHoursRules: normalizedRules,
         workingHoursFrom: (fallbackRule?.from ?? draftFrom) || null,
-        workingHoursUntil: (fallbackRule?.until ?? draftUntil) || null
+        workingHoursUntil: (fallbackRule?.until ?? draftUntil) || null,
+        orderMode: draftOrderMode,
+        contactRequirement: draftContactRequirement,
+        requireOtp: draftRequireOtp,
+        orderNumberPrefix: draftOrderNumberPrefix,
+        showGuestOrderHistory: draftShowGuestOrderHistory
       })
     });
 
@@ -175,6 +225,19 @@ export function WorkingHoursControl({
     const settings = (await response.json()) as MenuSettingsResponse;
     const nextFrom = settings.workingHoursFrom ?? "";
     const nextUntil = settings.workingHoursUntil ?? "";
+    const nextOrderMode = settings.orderMode === "counter" ? "counter" : "tables";
+    const nextContactRequirement =
+      settings.contactRequirement === "name_or_phone" ||
+      settings.contactRequirement === "phone_only"
+        ? settings.contactRequirement
+        : "none";
+    const nextRequireOtp = Boolean(settings.requireOtp);
+    const nextOrderNumberPrefix =
+      typeof settings.orderNumberPrefix === "string" &&
+      settings.orderNumberPrefix.trim()
+        ? settings.orderNumberPrefix.trim().slice(0, 12).toUpperCase()
+        : "ORD";
+    const nextShowGuestOrderHistory = Boolean(settings.showGuestOrderHistory);
     const nextRules = Array.isArray(settings.workingHoursRules)
       ? settings.workingHoursRules
           .map((rule) => {
@@ -214,6 +277,16 @@ export function WorkingHoursControl({
     setDraftFrom(nextFrom);
     setDraftUntil(nextUntil);
     setDraftRules(nextRules);
+    setOrderMode(nextOrderMode);
+    setContactRequirement(nextContactRequirement);
+    setRequireOtp(nextRequireOtp);
+    setOrderNumberPrefix(nextOrderNumberPrefix);
+    setShowGuestOrderHistory(nextShowGuestOrderHistory);
+    setDraftOrderMode(nextOrderMode);
+    setDraftContactRequirement(nextContactRequirement);
+    setDraftRequireOtp(nextRequireOtp);
+    setDraftOrderNumberPrefix(nextOrderNumberPrefix);
+    setDraftShowGuestOrderHistory(nextShowGuestOrderHistory);
     setSaving(false);
     setDialogOpen(false);
   }
@@ -363,6 +436,73 @@ export function WorkingHoursControl({
                 </button>
               </div>
             </div>
+            <div className="menu-editor__field">
+              <h3>Order flow</h3>
+              <label className="menu-editor__field menu-settings-panel__field--compact">
+                <span>Mode</span>
+                <select
+                  className="modal-input"
+                  value={draftOrderMode}
+                  onChange={(event) =>
+                    setDraftOrderMode(
+                      event.target.value === "counter" ? "counter" : "tables"
+                    )
+                  }
+                >
+                  <option value="tables">Tables</option>
+                  <option value="counter">Counter queue</option>
+                </select>
+              </label>
+              <label className="menu-editor__field menu-settings-panel__field--compact">
+                <span>Contact requirement</span>
+                <select
+                  className="modal-input"
+                  value={draftContactRequirement}
+                  onChange={(event) => {
+                    const nextValue =
+                      event.target.value === "phone_only" ||
+                      event.target.value === "name_or_phone"
+                        ? event.target.value
+                        : "none";
+                    setDraftContactRequirement(nextValue);
+                  }}
+                >
+                  <option value="none">None</option>
+                  <option value="name_or_phone">Name or phone</option>
+                  <option value="phone_only">Phone only</option>
+                </select>
+              </label>
+              <label className="menu-editor__field menu-settings-panel__field--compact">
+                <span>Order number prefix</span>
+                <input
+                  className="modal-input"
+                  type="text"
+                  value={draftOrderNumberPrefix}
+                  maxLength={12}
+                  onChange={(event) =>
+                    setDraftOrderNumberPrefix(event.target.value.toUpperCase())
+                  }
+                />
+              </label>
+              <label className="modal-card__status-toggle">
+                <input
+                  type="checkbox"
+                  checked={draftRequireOtp}
+                  onChange={(event) => setDraftRequireOtp(event.target.checked)}
+                />
+                <span>Require OTP for counter orders</span>
+              </label>
+              <label className="modal-card__status-toggle">
+                <input
+                  type="checkbox"
+                  checked={draftShowGuestOrderHistory}
+                  onChange={(event) =>
+                    setDraftShowGuestOrderHistory(event.target.checked)
+                  }
+                />
+                <span>Enable guest order history</span>
+              </label>
+            </div>
             <div className="modal-actions">
               <button
                 className="button-danger"
@@ -372,6 +512,11 @@ export function WorkingHoursControl({
                   setDraftRules(workingHoursRules);
                   setDraftFrom(workingHoursFrom);
                   setDraftUntil(workingHoursUntil);
+                  setDraftOrderMode(orderMode);
+                  setDraftContactRequirement(contactRequirement);
+                  setDraftRequireOtp(requireOtp);
+                  setDraftOrderNumberPrefix(orderNumberPrefix);
+                  setDraftShowGuestOrderHistory(showGuestOrderHistory);
                   setDialogOpen(false);
                 }}
               >
@@ -398,6 +543,11 @@ export function WorkingHoursControl({
           setDraftRules(workingHoursRules);
           setDraftFrom(workingHoursFrom);
           setDraftUntil(workingHoursUntil);
+          setDraftOrderMode(orderMode);
+          setDraftContactRequirement(contactRequirement);
+          setDraftRequireOtp(requireOtp);
+          setDraftOrderNumberPrefix(orderNumberPrefix);
+          setDraftShowGuestOrderHistory(showGuestOrderHistory);
           setDialogOpen(true);
         }}
       >

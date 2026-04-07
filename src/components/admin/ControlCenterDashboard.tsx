@@ -51,7 +51,7 @@ const analyticsBlocks = [
   { icon: "🟡", title: "Daily status" }
 ] as const;
 
-const liveStatusDescriptions: Record<string, string> = {
+const defaultLiveStatusDescriptions: Record<string, string> = {
   Revenue: "Shift total",
   "Avg Check": "Per order",
   Orders: "Active + closed tables",
@@ -665,13 +665,29 @@ type Props = {
   insightStats: InsightStats;
   dashboardCharts: DashboardCharts;
   currentShiftLabel: string;
+  dashboardMeta?: {
+    orderMode?: "tables" | "counter" | string;
+    ordersLabel?: string;
+    activeOrdersLabel?: string;
+  };
 };
 
 function ControlCenterDashboardComponent({
   insightStats,
   dashboardCharts,
-  currentShiftLabel
+  currentShiftLabel,
+  dashboardMeta
 }: Props) {
+  const liveStatusDescriptions = useMemo<Record<string, string>>(
+    () => ({
+      ...defaultLiveStatusDescriptions,
+      Orders: dashboardMeta?.ordersLabel || defaultLiveStatusDescriptions.Orders,
+      "Active Orders":
+        dashboardMeta?.activeOrdersLabel ||
+        defaultLiveStatusDescriptions["Active Orders"]
+    }),
+    [dashboardMeta?.activeOrdersLabel, dashboardMeta?.ordersLabel]
+  );
   const liveStatTargets = useMemo(
     () => ({
       revenue: parseNumberLikeValue(insightStats.revenue || "0"),
@@ -764,7 +780,10 @@ function ControlCenterDashboardComponent({
     <>
       <section className="control-center-shift" aria-label="Current shift">
         <div className="control-center-shift__label">Current shift</div>
-        <div className="control-center-shift__value">{currentShiftLabel}</div>
+        <div className="control-center-shift__value">
+          {currentShiftLabel}
+          {dashboardMeta?.orderMode === "counter" ? " · Counter mode" : ""}
+        </div>
       </section>
       <section
         className={`control-center-global-insight control-center-global-insight--${insightStats.globalInsightStatus}`}

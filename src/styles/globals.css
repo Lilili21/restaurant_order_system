@@ -2234,6 +2234,15 @@ button:disabled {
   text-align: left;
 }
 
+.counter-captcha {
+  display: grid;
+  gap: 8px;
+}
+
+.counter-captcha__widget {
+  min-height: 65px;
+}
+
 .modal-actions button {
   min-width: 56px;
 }

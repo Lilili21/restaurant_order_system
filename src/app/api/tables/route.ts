@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
+import { getMenuSettings } from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   closeTable,
@@ -95,6 +96,11 @@ export async function PATCH(request: NextRequest) {
 
     const restaurantSlug = body.restaurantSlug as string;
     const tableNumber = body.tableNumber as number;
+    const settings = await getMenuSettings(restaurantSlug);
+
+    if (settings.orderMode === "counter") {
+      throw new Error("Table actions are disabled in counter mode.");
+    }
 
     if (body.action === "move") {
       const isValidTargetTable =

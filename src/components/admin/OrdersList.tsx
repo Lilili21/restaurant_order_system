@@ -9,6 +9,7 @@ import {
   writeSessionCache
 } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
+import type { RestaurantOrderMode } from "@/lib/menu-settings";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
 const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
@@ -70,7 +71,11 @@ function getWhatsAppLink(order: Order) {
   }
 
   const normalizedPhone = phone.startsWith("+") ? phone.slice(1) : phone;
-  const message = `Hi ${order.guestContactName ?? ""}, your order for table ${order.tableNumber} at ${order.restaurantName} is ready.`;
+  const orderLabel =
+    order.orderChannel === "counter"
+      ? `order ${order.displayOrderNumber ?? order.id}`
+      : `table ${order.tableNumber}`;
+  const message = `Hi ${order.guestContactName ?? ""}, your ${orderLabel} at ${order.restaurantName} is ready.`;
 
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
 }
@@ -259,7 +264,12 @@ function readCachedFilters(): OrdersFiltersCache {
   };
 }
 
-export function OrdersList() {
+type OrdersListProps = {
+  orderMode?: RestaurantOrderMode;
+};
+
+export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
+  const isCounterMode = orderMode === "counter";
   const [orders, setOrders] = useState<Order[]>(() => readCachedOrders() ?? []);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
@@ -280,6 +290,15 @@ export function OrdersList() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isCounterMode) {
+      return;
+    }
+
+    setSelectedZone("hall");
+    setSelectedTables([]);
+  }, [isCounterMode]);
 
   function readStoredWaiterCalls() {
     try {
@@ -630,7 +649,8 @@ export function OrdersList() {
     () =>
       orders.filter(
         (order) =>
-          (selectedTablesSet.size === 0
+          (isCounterMode ||
+          selectedTablesSet.size === 0
             ? true
             : selectedTablesSet.has(order.tableNumber)) &&
           order.kind !== "waiter_call" &&
@@ -640,7 +660,7 @@ export function OrdersList() {
             item.category ? !barCategories.has(item.category) : true
           )
       ),
-    [orders, selectedTablesSet]
+    [isCounterMode, orders, selectedTablesSet]
   );
 
   const kitchenStatusCounts = useMemo(
@@ -665,10 +685,13 @@ export function OrdersList() {
     () =>
       orders
         .filter((order) =>
-          (selectedTablesSet.size === 0
+          (isCounterMode ||
+          selectedTablesSet.size === 0
             ? true
             : selectedTablesSet.has(order.tableNumber)) &&
-          (selectedZone === "hall"
+          (isCounterMode
+            ? true
+            : selectedZone === "hall"
             ? true
             : selectedZone === "bar"
               ? order.kind !== "waiter_call" &&
@@ -692,6 +715,7 @@ export function OrdersList() {
         ),
     [
       currentTimestamp,
+      isCounterMode,
       orders,
       selectedKitchenStatuses,
       selectedTablesSet,
@@ -990,6 +1014,7 @@ export function OrdersList() {
       ) : null}
 
       <div className="orders-layout">
+      {!isCounterMode ? (
       <div className="orders-filter orders-filter--stacked">
         <div className="orders-filter__row">
         <div className="orders-filter__chips orders-filter__chips--zone">
@@ -1121,9 +1146,14 @@ export function OrdersList() {
           </div>
         ) : null}
       </div>
+      ) : null}
 
       {!filteredOrders.length ? (
-        <p className="muted">No active orders for the selected table.</p>
+        <p className="muted">
+          {isCounterMode
+            ? "No active counter orders yet."
+            : "No active orders for the selected table."}
+        </p>
       ) : (
         <div
           className={
@@ -1176,25 +1206,36 @@ export function OrdersList() {
                 <div className="order-card__header">
                   <div>
                     <h3>
-                      Table {order.tableNumber}
-                      {isHallView && order.kind === "waiter_call"
+                      {isCounterMode || order.orderChannel === "counter"
+                        ? `Order ${order.displayOrderNumber ?? order.id}`
+                        : `Table ${order.tableNumber}`}
+                      {isHallView && !isCounterMode && order.kind === "waiter_call"
                         ? " · Waiter call"
-                        : isHallView && order.kind === "bill_request"
+                        : isHallView && !isCounterMode && order.kind === "bill_request"
                           ? " · Bill request"
                         : ""}
                     </h3>
                     {isBarView ? (
                       <p className="muted">Drinks {totalDrinksCount}</p>
                     ) : null}
+                    {(isCounterMode || order.orderChannel === "counter") &&
+                    (order.guestContactName || order.guestContactPhone) ? (
+                      <p className="muted">
+                        Contact: {order.guestContactName || "—"}
+                        {order.guestContactPhone ? ` · ${order.guestContactPhone}` : ""}
+                      </p>
+                    ) : null}
                     {order.kind !== "waiter_call" &&
                     order.kind !== "bill_request" &&
                     isHallView &&
+                    !isCounterMode &&
                     serveModeLabel ? (
                       <p className="muted">{serveModeLabel}</p>
                     ) : null}
                     {order.kind !== "waiter_call" &&
                     order.kind !== "bill_request" &&
                     isHallView &&
+                    !isCounterMode &&
                     (order.guestContactName || order.guestContactPhone) ? (
                       <div className="order-guest-contact">
                         <p className="muted">

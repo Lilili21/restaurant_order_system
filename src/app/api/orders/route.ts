@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
+import {
+  normalizeDeviceId,
+  normalizePhoneForSecurity,
+  verifyCounterCaptcha,
+  verifyCounterOtp
+} from "@/lib/counter-security";
+import type { ContactRequirement } from "@/lib/menu-settings";
+import { getMenuSettings } from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import {
   changeOrderItemQuantity,
@@ -13,6 +22,7 @@ import {
   updateOrderItemServed,
   updateOrderStatus
 } from "@/lib/orders";
+import { auditSecurityEvent } from "@/lib/security-audit";
 import { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +49,63 @@ function isValidTableNumber(value: unknown): value is number {
   );
 }
 
+function isValidCounterTableNumber(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 0 &&
+    value <= 200
+  );
+}
+
+function normalizeContactValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeClientRequestId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeIdempotencyKey(value: string | null) {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+
+  return value.trim().slice(0, 120);
+}
+
+function normalizeCaptchaToken(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getGuestOrdersCookieName(restaurantSlug: string) {
+  return `guest_orders_${restaurantSlug.replace(/[^a-z0-9]/gi, "_").toLowerCase()}`;
+}
+
+function generateGuestOrderToken() {
+  return `gst_${randomBytes(18).toString("base64url")}`;
+}
+
+function validateCounterContactRequirement(
+  requirement: ContactRequirement,
+  contact: {
+    name?: string;
+    phone?: string;
+  }
+) {
+  if (requirement === "none") {
+    return;
+  }
+
+  if (requirement === "phone_only" && !contact.phone) {
+    throw new Error("Phone number is required for this restaurant.");
+  }
+
+  if (requirement === "name_or_phone" && !contact.name && !contact.phone) {
+    throw new Error("Name or phone is required for this restaurant.");
+  }
+}
+
 function validateServiceRequestPayload(body: unknown) {
   if (!isPlainObject(body)) {
     throw new Error("Invalid payload");
@@ -53,7 +120,10 @@ function validateServiceRequestPayload(body: unknown) {
   }
 }
 
-function validateCreateOrderPayload(body: unknown) {
+function validateCreateOrderPayload(
+  body: unknown,
+  options?: { allowCounterTableNumber?: boolean }
+) {
   if (!isPlainObject(body)) {
     throw new Error("Invalid payload");
   }
@@ -62,7 +132,15 @@ function validateCreateOrderPayload(body: unknown) {
     throw new Error("restaurantSlug is required");
   }
 
-  if (!isValidTableNumber(body.tableNumber)) {
+  if (options?.allowCounterTableNumber) {
+    if (
+      body.tableNumber !== undefined &&
+      body.tableNumber !== null &&
+      !isValidCounterTableNumber(body.tableNumber)
+    ) {
+      throw new Error("tableNumber is invalid");
+    }
+  } else if (!isValidTableNumber(body.tableNumber)) {
     throw new Error("tableNumber is required");
   }
 
@@ -152,8 +230,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown>;
     const clientId = getRequestClientId(request);
+    const deviceId =
+      normalizeDeviceId(body.deviceId) ??
+      normalizeDeviceId(request.headers.get("x-device-id"));
+    const idempotencyKey = normalizeIdempotencyKey(
+      request.headers.get("idempotency-key") ?? request.headers.get("Idempotency-Key")
+    );
+    const clientRequestId =
+      normalizeClientRequestId(body.clientRequestId) ?? idempotencyKey;
     const action =
       body.type === "waiter_call"
         ? "waiter-call"
@@ -174,21 +260,199 @@ export async function POST(request: NextRequest) {
     });
 
     if (limited) {
+      auditSecurityEvent(
+        "orders.request_rate_limited",
+        {
+          action,
+          clientId,
+          deviceId: deviceId ?? null
+        },
+        { severity: "warn" }
+      );
       return limited;
     }
 
     if (body.type === "waiter_call" || body.type === "bill_request") {
       validateServiceRequestPayload(body);
     } else {
-      validateCreateOrderPayload(body);
+      if (!isValidSlug(body.restaurantSlug)) {
+        throw new Error("restaurantSlug is required");
+      }
+
+      const restaurantSlug = body.restaurantSlug;
+      const menuSettings = await getMenuSettings(restaurantSlug);
+      const counterModeEnabled = menuSettings.orderMode === "counter";
+      validateCreateOrderPayload(body, {
+        allowCounterTableNumber: counterModeEnabled
+      });
+      const guestContactName = normalizeContactValue(body.guestContactName);
+      const guestContactPhone = normalizeContactValue(body.guestContactPhone);
+      const normalizedGuestPhone = normalizePhoneForSecurity(guestContactPhone);
+
+      if (counterModeEnabled) {
+        const counterModeLimits = [
+          applyRateLimit({
+            id: `orders:counter:ip:${restaurantSlug}:${clientId}`,
+            maxRequests: 45,
+            windowMs: 10 * 60 * 1000,
+            message: "Too many counter orders. Please try again later."
+          }),
+          normalizedGuestPhone
+            ? applyRateLimit({
+                id: `orders:counter:phone:${restaurantSlug}:${normalizedGuestPhone}`,
+                maxRequests: 12,
+                windowMs: 10 * 60 * 1000,
+                message: "Too many orders from this phone. Please try again later."
+              })
+            : null,
+          deviceId
+            ? applyRateLimit({
+                id: `orders:counter:device:${restaurantSlug}:${deviceId}`,
+                maxRequests: 22,
+                windowMs: 10 * 60 * 1000,
+                message: "Too many orders from this device. Please try again later."
+              })
+            : null
+        ];
+        const counterLimited =
+          counterModeLimits.find((response) => response !== null) ?? null;
+
+        if (counterLimited) {
+          auditSecurityEvent(
+            "counter.order_rate_limited",
+            {
+              restaurantSlug,
+              clientId,
+              guestContactPhone: normalizedGuestPhone ?? null,
+              deviceId: deviceId ?? null
+            },
+            { severity: "warn" }
+          );
+          return counterLimited;
+        }
+
+        validateCounterContactRequirement(menuSettings.contactRequirement, {
+          name: guestContactName,
+          phone: guestContactPhone
+        });
+
+        if (
+          menuSettings.contactRequirement === "phone_only" &&
+          !normalizedGuestPhone
+        ) {
+          throw new Error("A valid phone number is required for this restaurant.");
+        }
+
+        const captchaResult = await verifyCounterCaptcha({
+          token: normalizeCaptchaToken(body.captchaToken),
+          ip: clientId
+        });
+
+        if (!captchaResult.ok) {
+          auditSecurityEvent(
+            "counter.order_captcha_failed",
+            {
+              restaurantSlug,
+              clientId,
+              guestContactPhone: normalizedGuestPhone ?? null,
+              deviceId: deviceId ?? null,
+              reason: captchaResult.reason
+            },
+            { severity: "warn" }
+          );
+          throw new Error("Captcha validation failed.");
+        }
+
+        if (menuSettings.requireOtp) {
+          if (!normalizedGuestPhone) {
+            throw new Error("Phone number is required to verify OTP.");
+          }
+
+          const otpCode = normalizeContactValue(body.otpCode);
+
+          if (!otpCode) {
+            throw new Error("OTP code is required.");
+          }
+
+          verifyCounterOtp({
+            restaurantSlug,
+            phone: normalizedGuestPhone,
+            code: otpCode,
+            ip: clientId,
+            deviceId
+          });
+        }
+      }
+
+      const tableNumber =
+        counterModeEnabled ? 0 : (body.tableNumber as number);
+      const guestCookieName = getGuestOrdersCookieName(restaurantSlug);
+      const cookieGuestToken = request.cookies.get(guestCookieName)?.value;
+      const shouldIssueGuestToken =
+        counterModeEnabled ||
+        menuSettings.showGuestOrderHistory ||
+        Boolean(guestContactName || guestContactPhone);
+      const guestToken = shouldIssueGuestToken
+        ? normalizeContactValue(cookieGuestToken) ?? generateGuestOrderToken()
+        : undefined;
+      const order = await createOrder({
+        restaurantSlug,
+        tableNumber,
+        orderChannel: counterModeEnabled ? "counter" : "table",
+        items: body.items as Array<{
+          menuItemId: string;
+          quantity: number;
+          note?: string;
+          volumeOptionId?: string;
+          volumeLabel?: string;
+          priceOverride?: number;
+        }>,
+        serveMode:
+          body.serveMode === "all_at_once" || body.serveMode === "as_ready"
+            ? body.serveMode
+            : undefined,
+        clientRequestId,
+        guestToken,
+        guestContactName,
+        guestContactPhone
+      });
+      if (counterModeEnabled) {
+        auditSecurityEvent("counter.order_created", {
+          restaurantSlug,
+          clientId,
+          deviceId: deviceId ?? null,
+          guestContactPhone: normalizedGuestPhone ?? null,
+          orderId: order.id,
+          displayOrderNumber: order.displayOrderNumber ?? null
+        });
+      }
+      const response = NextResponse.json(order, { status: 201 });
+
+      if (guestToken) {
+        response.cookies.set({
+          name: guestCookieName,
+          value: guestToken,
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 30
+        });
+      }
+
+      return response;
     }
 
     const order =
       body.type === "waiter_call"
-        ? await createWaiterCall(body)
-        : body.type === "bill_request"
-          ? await createBillRequest(body)
-        : await createOrder(body);
+        ? await createWaiterCall({
+            restaurantSlug: String(body.restaurantSlug),
+            tableNumber: Number(body.tableNumber)
+          })
+        : await createBillRequest({
+            restaurantSlug: String(body.restaurantSlug),
+            tableNumber: Number(body.tableNumber)
+          });
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
     return NextResponse.json(

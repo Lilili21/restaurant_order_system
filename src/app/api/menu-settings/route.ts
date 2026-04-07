@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
-import { getMenuSettings, updateMenuSettings } from "@/lib/menu-settings";
+import {
+  getMenuSettings,
+  isCounterModeAllowedForRestaurant,
+  updateMenuSettings
+} from "@/lib/menu-settings";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import type { MenuCategory } from "@/lib/types";
 import type {
   BusinessLunchSettings,
+  ContactRequirement,
   MenuSettings,
   PromotionSettings,
-  RecommendationRuleSettings
+  RecommendationRuleSettings,
+  RestaurantOrderMode
 } from "@/lib/menu-settings";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +44,20 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "desserts"
 ];
 
+function isValidOrderMode(value: unknown): value is RestaurantOrderMode {
+  return value === "tables" || value === "counter";
+}
+
+function isValidContactRequirement(value: unknown): value is ContactRequirement {
+  return (
+    value === "none" || value === "name_or_phone" || value === "phone_only"
+  );
+}
+
+function normalizeOrderNumberPrefix(value: string) {
+  return value.trim().slice(0, 12).toUpperCase();
+}
+
 export async function GET(request: NextRequest) {
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug") ?? undefined;
   const settings = await getMenuSettings(restaurantSlug);
@@ -61,6 +81,11 @@ export async function GET(request: NextRequest) {
     kitchenOpenUntil: settings.kitchenOpenUntil,
     barOpenEnabled: settings.barOpenEnabled,
     barOpenUntil: settings.barOpenUntil,
+    orderMode: settings.orderMode,
+    contactRequirement: settings.contactRequirement,
+    requireOtp: settings.requireOtp,
+    orderNumberPrefix: settings.orderNumberPrefix,
+    showGuestOrderHistory: settings.showGuestOrderHistory,
     tableCount: settings.tableCount,
     tableTokens: settings.tableTokens
   });
@@ -134,9 +159,18 @@ export async function PATCH(request: NextRequest) {
       kitchenOpenUntil?: string | null;
       barOpenEnabled?: boolean;
       barOpenUntil?: string | null;
+      orderMode?: RestaurantOrderMode;
+      contactRequirement?: ContactRequirement;
+      requireOtp?: boolean;
+      orderNumberPrefix?: string;
+      showGuestOrderHistory?: boolean;
       tableCount?: number;
       restaurantSlug?: string;
     };
+    const restaurantSlug =
+      typeof body.restaurantSlug === "string" && body.restaurantSlug.trim()
+        ? body.restaurantSlug.trim()
+        : undefined;
 
     if (
       Array.isArray(body.happyHourCategories) &&
@@ -457,6 +491,56 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (
+      body.orderMode !== undefined &&
+      !isValidOrderMode(body.orderMode)
+    ) {
+      throw new Error("orderMode is invalid");
+    }
+    if (
+      body.orderMode === "counter" &&
+      !isCounterModeAllowedForRestaurant(restaurantSlug)
+    ) {
+      throw new Error(
+        "Counter mode rollout is disabled for this restaurant."
+      );
+    }
+
+    if (
+      body.contactRequirement !== undefined &&
+      !isValidContactRequirement(body.contactRequirement)
+    ) {
+      throw new Error("contactRequirement is invalid");
+    }
+
+    if (
+      body.requireOtp !== undefined &&
+      typeof body.requireOtp !== "boolean"
+    ) {
+      throw new Error("requireOtp is invalid");
+    }
+
+    if (
+      body.showGuestOrderHistory !== undefined &&
+      typeof body.showGuestOrderHistory !== "boolean"
+    ) {
+      throw new Error("showGuestOrderHistory is invalid");
+    }
+
+    if (
+      body.orderNumberPrefix !== undefined &&
+      typeof body.orderNumberPrefix !== "string"
+    ) {
+      throw new Error("orderNumberPrefix is invalid");
+    }
+
+    if (
+      typeof body.orderNumberPrefix === "string" &&
+      !normalizeOrderNumberPrefix(body.orderNumberPrefix)
+    ) {
+      throw new Error("orderNumberPrefix cannot be empty");
+    }
+
     const updates: Partial<MenuSettings> = {};
 
     if (typeof body.kitchenLoadWarningEnabled === "boolean") {
@@ -642,14 +726,29 @@ export async function PATCH(request: NextRequest) {
       updates.barOpenUntil = body.barOpenUntil;
     }
 
+    if (isValidOrderMode(body.orderMode)) {
+      updates.orderMode = body.orderMode;
+    }
+
+    if (isValidContactRequirement(body.contactRequirement)) {
+      updates.contactRequirement = body.contactRequirement;
+    }
+
+    if (typeof body.requireOtp === "boolean") {
+      updates.requireOtp = body.requireOtp;
+    }
+
+    if (typeof body.orderNumberPrefix === "string") {
+      updates.orderNumberPrefix = normalizeOrderNumberPrefix(body.orderNumberPrefix);
+    }
+
+    if (typeof body.showGuestOrderHistory === "boolean") {
+      updates.showGuestOrderHistory = body.showGuestOrderHistory;
+    }
+
     if (typeof body.tableCount === "number") {
       updates.tableCount = body.tableCount;
     }
-
-    const restaurantSlug =
-      typeof body.restaurantSlug === "string" && body.restaurantSlug.trim()
-        ? body.restaurantSlug.trim()
-        : undefined;
 
     return NextResponse.json(await updateMenuSettings(restaurantSlug, updates));
   } catch (error) {

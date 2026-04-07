@@ -104,7 +104,13 @@ export default async function MenuPage({ params }: MenuPageProps) {
           restaurantName={restaurant.name}
           tableNumber={0}
           tableToken="0"
-          orderingEnabled={false}
+          orderingEnabled={
+            menuSettings.orderMode === "counter" && isShiftActiveNow(menuSettings)
+          }
+          orderMode={menuSettings.orderMode}
+          contactRequirement={menuSettings.contactRequirement}
+          requireOtp={menuSettings.requireOtp}
+          showGuestOrderHistory={menuSettings.showGuestOrderHistory}
           menu={menu}
           showKitchenLoadWarning={menuSettings.kitchenLoadWarningEnabled}
           promotions={menuSettings.promotions}
@@ -135,6 +141,10 @@ export default async function MenuPage({ params }: MenuPageProps) {
     <main>
       <Cart
         orderingEnabled={isShiftActiveNow(menuSettings)}
+        orderMode={menuSettings.orderMode}
+        contactRequirement={menuSettings.contactRequirement}
+        requireOtp={menuSettings.requireOtp}
+        showGuestOrderHistory={menuSettings.showGuestOrderHistory}
         restaurantSlug={session.restaurant.slug}
         restaurantName={session.restaurant.name}
         tableNumber={session.table.number}

@@ -311,6 +311,10 @@ function isDishCategory(category: MenuCategory | undefined) {
   return Boolean(category) && !DRINK_CATEGORIES.has(category as MenuCategory);
 }
 
+function isCounterOrder(order: Order) {
+  return order.orderChannel === "counter" || order.tableNumber <= 0;
+}
+
 function getRecentDishItems(orders: Order[], start: Date, end: Date) {
   return orders
     .filter((order) => {
@@ -715,7 +719,11 @@ export async function GET(request: NextRequest) {
       const createdAt = new Date(order.createdAt).getTime();
       return createdAt >= effectiveShiftStartTs && createdAt <= nowTs;
     });
-    const analyticsOrders = shiftOrdersToNow;
+    const counterModeEnabled = settings.orderMode === "counter";
+    const counterShiftOrders = shiftOrdersToNow.filter((order) =>
+      isCounterOrder(order)
+    );
+    const analyticsOrders = counterModeEnabled ? counterShiftOrders : shiftOrdersToNow;
     const closedSessionsInCurrentShiftRaw = closedSessions.filter((session) => {
       const closedAtTs = new Date(session.closedAt).getTime();
       return (
@@ -746,9 +754,19 @@ export async function GET(request: NextRequest) {
         ? closedSessionsInCurrentShiftRevenue / closedSessionsInCurrentShift.length
         : 0;
     const activeTablesCount = tables.length;
-    const activeOrdersCount = activeTablesCount;
+    const tableModeActiveOrdersCount = activeTablesCount;
     const closedOrdersCount = closedSessionsInCurrentShift.length;
-    const totalTablesOrdersCount = activeOrdersCount + closedOrdersCount;
+    const totalTablesOrdersCount = tableModeActiveOrdersCount + closedOrdersCount;
+    const counterRevenue = counterShiftOrders.reduce(
+      (sum, order) => sum + order.total,
+      0
+    );
+    const counterOrdersCount = counterShiftOrders.length;
+    const counterAvgCheck =
+      counterOrdersCount > 0 ? counterRevenue / counterOrdersCount : 0;
+    const counterActiveOrdersCount = counterShiftOrders.filter(
+      (order) => order.status !== "served" && order.status !== "cancelled"
+    ).length;
     const waiterCallsCount = allOrders.filter((order) => {
       if (order.kind !== "waiter_call") {
         return false;
@@ -804,6 +822,37 @@ export async function GET(request: NextRequest) {
         : 0;
     const previousOrdersCount =
       previousActiveTablesCount + previousClosedSessionsAtComparableTime.length;
+    const previousCounterOrders =
+      previousShiftStartTs && previousComparableEndTs
+        ? allOrders.filter((order) => {
+            if (
+              order.kind === "waiter_call" ||
+              order.kind === "bill_request" ||
+              order.status === "cancelled" ||
+              !isCounterOrder(order)
+            ) {
+              return false;
+            }
+
+            const createdAtTs = new Date(order.createdAt).getTime();
+            return (
+              Number.isFinite(createdAtTs) &&
+              createdAtTs >= previousShiftStartTs &&
+              createdAtTs <= previousComparableEndTs
+            );
+          })
+        : [];
+    const previousCounterRevenue = previousCounterOrders.reduce(
+      (sum, order) => sum + order.total,
+      0
+    );
+    const previousCounterAvgCheck =
+      previousCounterOrders.length > 0
+        ? previousCounterRevenue / previousCounterOrders.length
+        : 0;
+    const previousCounterActiveOrdersCount = previousCounterOrders.filter(
+      (order) => order.status !== "served" && order.status !== "cancelled"
+    ).length;
     const previousWaiterCallsCount =
       previousShiftStartTs && previousComparableEndTs
         ? allOrders.filter((order) => {
@@ -838,66 +887,89 @@ export async function GET(request: NextRequest) {
       start: new Date(effectiveShiftStartTs),
       end: new Date(nowTs)
     };
+    const counterHourlySessions = counterShiftOrders.map((order) => ({
+      closedAt: order.createdAt,
+      total: order.total,
+      ordersCount: 1
+    }));
     const hourlySeries =
       chartBounds.end.getTime() > chartBounds.start.getTime()
       ? buildHourlySeries(
-          analyticsClosedSessions,
+          counterModeEnabled ? counterHourlySessions : analyticsClosedSessions,
           chartBounds.start,
           new Date(Math.min(chartBounds.end.getTime(), nowTs))
         )
       : { labels: [], ordersByHour: [], revenueTrend: [] };
+    const effectiveRevenue = counterModeEnabled
+      ? counterRevenue
+      : closedSessionsInCurrentShiftRevenue;
+    const effectiveAvgCheck = counterModeEnabled
+      ? counterAvgCheck
+      : closedSessionsInCurrentShiftAvgCheck;
+    const effectiveOrdersCount = counterModeEnabled
+      ? counterOrdersCount
+      : totalTablesOrdersCount;
+    const effectiveActiveOrdersCount = counterModeEnabled
+      ? counterActiveOrdersCount
+      : tableModeActiveOrdersCount;
+    const effectivePreviousRevenue = counterModeEnabled
+      ? previousCounterRevenue
+      : previousRevenue;
+    const effectivePreviousAvgCheck = counterModeEnabled
+      ? previousCounterAvgCheck
+      : previousAvgCheck;
+    const effectivePreviousOrdersCount = counterModeEnabled
+      ? previousCounterOrders.length
+      : previousOrdersCount;
+    const effectivePreviousActiveOrdersCount = counterModeEnabled
+      ? previousCounterActiveOrdersCount
+      : previousActiveTablesCount;
+    const effectivePeakHour = currentShiftWindow
+      ? getPeakHourLabelFromClosedSessions(
+          counterModeEnabled ? counterHourlySessions : analyticsClosedSessions,
+          currentShiftWindow.start,
+          currentShiftWindow.end
+        )
+      : "—";
 
     const globalInsight = buildGlobalInsight({
-      currentRevenue: closedSessionsInCurrentShiftRevenue,
-      previousRevenue,
-      currentOrders: totalTablesOrdersCount,
-      previousOrders: previousOrdersCount,
-      peakHour: currentShiftWindow
-        ? getPeakHourLabelFromClosedSessions(
-            analyticsClosedSessions,
-            currentShiftWindow.start,
-            currentShiftWindow.end
-          )
-        : "the next busy hour"
+      currentRevenue: effectiveRevenue,
+      previousRevenue: effectivePreviousRevenue,
+      currentOrders: effectiveOrdersCount,
+      previousOrders: effectivePreviousOrdersCount,
+      peakHour: effectivePeakHour !== "—" ? effectivePeakHour : "the next busy hour"
     });
 
     return NextResponse.json({
       insights: {
-        revenue: closedSessionsInCurrentShift.length
-          ? Number(closedSessionsInCurrentShiftRevenue.toFixed(2))
-          : 0,
-        avgCheck: closedSessionsInCurrentShift.length
-          ? Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2))
-          : 0,
-        orders: totalTablesOrdersCount,
-        activeOrders: activeOrdersCount,
+        revenue: Number(effectiveRevenue.toFixed(2)),
+        avgCheck: Number(effectiveAvgCheck.toFixed(2)),
+        orders: effectiveOrdersCount,
+        activeOrders: effectiveActiveOrdersCount,
         topDish: currentShiftWindow
           ? getUniqueDishNames(recentDishItems, "desc")
           : "—",
         lowDish: currentShiftWindow
           ? getUniqueDishNames(recentDishItems, "asc")
           : "—",
-        peakHour: currentShiftWindow
-          ? getPeakHourLabelFromClosedSessions(
-              analyticsClosedSessions,
-              currentShiftWindow.start,
-              currentShiftWindow.end
-            )
-          : "—",
+        peakHour: effectivePeakHour,
         waiterCalls: String(waiterCallsCount),
         globalInsight: globalInsight.text,
         globalInsightStatus: globalInsight.status,
         vsYesterday: {
           revenue: formatVsYesterday(
-            Number(closedSessionsInCurrentShiftRevenue.toFixed(2)),
-            Number(previousRevenue.toFixed(2))
+            Number(effectiveRevenue.toFixed(2)),
+            Number(effectivePreviousRevenue.toFixed(2))
           ),
           avgCheck: formatVsYesterday(
-            Number(closedSessionsInCurrentShiftAvgCheck.toFixed(2)),
-            Number(previousAvgCheck.toFixed(2))
+            Number(effectiveAvgCheck.toFixed(2)),
+            Number(effectivePreviousAvgCheck.toFixed(2))
           ),
-          orders: formatVsYesterday(totalTablesOrdersCount, previousOrdersCount),
-          activeOrders: formatVsYesterday(activeOrdersCount, previousActiveTablesCount),
+          orders: formatVsYesterday(effectiveOrdersCount, effectivePreviousOrdersCount),
+          activeOrders: formatVsYesterday(
+            effectiveActiveOrdersCount,
+            effectivePreviousActiveOrdersCount
+          ),
           waiterCalls: formatVsYesterday(waiterCallsCount, previousWaiterCallsCount)
         }
       },
@@ -908,13 +980,22 @@ export async function GET(request: NextRequest) {
       },
       meta: {
         restaurantSlug: restaurantSlug ?? null,
+        orderMode: settings.orderMode,
+        ordersLabel:
+          settings.orderMode === "counter"
+            ? "Counter orders this shift"
+            : "Active tables + closed sessions",
+        activeOrdersLabel:
+          settings.orderMode === "counter"
+            ? "Queue orders not served"
+            : "Open tables right now",
         timeZone: analyticsTimeZone,
         shiftSource,
         effectiveShiftStart: new Date(effectiveShiftStartTs).toISOString(),
         hasActiveShift: Boolean(currentShiftStartTs),
         fullDayWindowConfigured,
         activeTablesCount,
-        activeOrdersCount,
+        activeOrdersCount: effectiveActiveOrdersCount,
         closedOrdersCount,
         closedOrdersRawCount: closedSessionsInCurrentShiftRaw.length,
         filteredClosedOrdersWithoutItemsCount:
@@ -957,6 +1038,9 @@ export async function GET(request: NextRequest) {
           revenueTrend: []
         },
         meta: {
+          orderMode: "tables",
+          ordersLabel: "Active tables + closed sessions",
+          activeOrdersLabel: "Open tables right now",
           error:
             error instanceof Error ? error.message : "Failed to build admin analytics",
           at: new Date().toISOString()

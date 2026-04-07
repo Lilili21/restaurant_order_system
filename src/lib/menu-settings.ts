@@ -60,6 +60,9 @@ export type RecommendationRuleSettings = {
   suggestedCategory: MenuCategory | null;
 };
 
+export type RestaurantOrderMode = "tables" | "counter";
+export type ContactRequirement = "none" | "name_or_phone" | "phone_only";
+
 export type MenuSettings = {
   workingHoursRules: Array<{
     id: string;
@@ -84,6 +87,11 @@ export type MenuSettings = {
   kitchenOpenUntil: string | null;
   barOpenEnabled: boolean;
   barOpenUntil: string | null;
+  orderMode: RestaurantOrderMode;
+  contactRequirement: ContactRequirement;
+  requireOtp: boolean;
+  orderNumberPrefix: string;
+  showGuestOrderHistory: boolean;
   tableCount: number;
   tableTokens: Record<string, string>;
 };
@@ -92,6 +100,21 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
 const MENU_SETTINGS_KEY = "menu-settings";
 const MENU_SETTINGS_CACHE_TTL_MS = 60_000;
+const COUNTER_MODE_FLAG_ENABLED = ["1", "true", "yes", "on"].includes(
+  (process.env.FEATURE_COUNTER_MODE_ENABLED ?? "").toLowerCase()
+);
+const COUNTER_MODE_ALLOWED_SLUGS_RAW =
+  process.env.COUNTER_MODE_ALLOWED_SLUGS ?? "";
+const COUNTER_MODE_ALLOW_ALL_SLUGS =
+  COUNTER_MODE_ALLOWED_SLUGS_RAW.trim() === "" ||
+  COUNTER_MODE_ALLOWED_SLUGS_RAW.trim() === "*" ||
+  COUNTER_MODE_ALLOWED_SLUGS_RAW.trim().toLowerCase() === "all";
+const COUNTER_MODE_ALLOWED_SLUGS = new Set(
+  COUNTER_MODE_ALLOWED_SLUGS_RAW
+    .split(",")
+    .map((slug) => slug.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 const DEFAULT_SETTINGS: MenuSettings = {
   workingHoursRules: [],
@@ -112,6 +135,11 @@ const DEFAULT_SETTINGS: MenuSettings = {
   kitchenOpenUntil: null,
   barOpenEnabled: false,
   barOpenUntil: null,
+  orderMode: "tables",
+  contactRequirement: "none",
+  requireOtp: false,
+  orderNumberPrefix: "ORD",
+  showGuestOrderHistory: false,
   tableCount: 8,
   tableTokens: {}
 };
@@ -146,6 +174,11 @@ type RestaurantSettingsRow = {
   kitchen_open_until: string | null;
   bar_open_enabled: boolean | null;
   bar_open_until: string | null;
+  order_mode?: string | null;
+  contact_requirement?: string | null;
+  require_otp?: boolean | null;
+  order_number_prefix?: string | null;
+  show_guest_order_history?: boolean | null;
   updated_at?: string | null;
 };
 
@@ -275,6 +308,20 @@ function normalizeSettings(
     typeof settings?.barOpenUntil === "string" && settings.barOpenUntil.trim()
       ? settings.barOpenUntil
       : null;
+  const orderMode =
+    settings?.orderMode === "counter" ? "counter" : DEFAULT_SETTINGS.orderMode;
+  const contactRequirement =
+    settings?.contactRequirement === "name_or_phone" ||
+    settings?.contactRequirement === "phone_only"
+      ? settings.contactRequirement
+      : DEFAULT_SETTINGS.contactRequirement;
+  const requireOtp = Boolean(settings?.requireOtp);
+  const orderNumberPrefix =
+    typeof settings?.orderNumberPrefix === "string" &&
+    settings.orderNumberPrefix.trim()
+      ? settings.orderNumberPrefix.trim().slice(0, 12).toUpperCase()
+      : DEFAULT_SETTINGS.orderNumberPrefix;
+  const showGuestOrderHistory = Boolean(settings?.showGuestOrderHistory);
   const happyHourCategories = Array.isArray(settings?.happyHourCategories)
     ? settings.happyHourCategories.filter((value): value is MenuCategory =>
         MENU_CATEGORIES.includes(value as MenuCategory)
@@ -492,9 +539,47 @@ function normalizeSettings(
     kitchenOpenUntil,
     barOpenEnabled: Boolean(settings?.barOpenEnabled),
     barOpenUntil,
+    orderMode,
+    contactRequirement,
+    requireOtp,
+    orderNumberPrefix,
+    showGuestOrderHistory,
     tableCount,
     tableTokens
   };
+}
+
+export function isCounterModeAllowedForRestaurant(restaurantSlug?: string) {
+  if (!COUNTER_MODE_FLAG_ENABLED) {
+    return false;
+  }
+
+  if (!restaurantSlug) {
+    return false;
+  }
+
+  if (COUNTER_MODE_ALLOW_ALL_SLUGS) {
+    return true;
+  }
+
+  return COUNTER_MODE_ALLOWED_SLUGS.has(restaurantSlug.trim().toLowerCase());
+}
+
+function applyOrderModePolicy(
+  settings: MenuSettings,
+  restaurantSlug?: string
+): MenuSettings {
+  if (
+    settings.orderMode === "counter" &&
+    !isCounterModeAllowedForRestaurant(restaurantSlug)
+  ) {
+    return {
+      ...settings,
+      orderMode: "tables"
+    };
+  }
+
+  return settings;
 }
 
 function mapRestaurantSettingsRowToSettings(
@@ -534,15 +619,31 @@ function mapRestaurantSettingsRowToSettings(
     kitchenOpenEnabled: Boolean(row.kitchen_open_enabled),
     kitchenOpenUntil: row.kitchen_open_until,
     barOpenEnabled: Boolean(row.bar_open_enabled),
-    barOpenUntil: row.bar_open_until
+    barOpenUntil: row.bar_open_until,
+    orderMode:
+      row.order_mode === "counter" ? "counter" : DEFAULT_SETTINGS.orderMode,
+    contactRequirement:
+      row.contact_requirement === "name_or_phone" ||
+      row.contact_requirement === "phone_only"
+        ? row.contact_requirement
+        : DEFAULT_SETTINGS.contactRequirement,
+    requireOtp: Boolean(row.require_otp),
+    orderNumberPrefix:
+      typeof row.order_number_prefix === "string" && row.order_number_prefix.trim()
+        ? row.order_number_prefix.trim().slice(0, 12).toUpperCase()
+        : DEFAULT_SETTINGS.orderNumberPrefix,
+    showGuestOrderHistory: Boolean(row.show_guest_order_history)
   };
 }
 
 function mapSettingsToRestaurantSettingsRow(
   restaurantId: string,
-  settings: MenuSettings
+  settings: MenuSettings,
+  options?: {
+    includeAdvancedOrderSettings?: boolean;
+  }
 ) {
-  return {
+  const row = {
     restaurant_id: restaurantId,
     working_hours_from: settings.workingHoursFrom,
     working_hours_until: settings.workingHoursUntil,
@@ -563,6 +664,19 @@ function mapSettingsToRestaurantSettingsRow(
     bar_open_enabled: settings.barOpenEnabled,
     bar_open_until: settings.barOpenUntil,
     updated_at: new Date().toISOString()
+  };
+
+  if (options?.includeAdvancedOrderSettings === false) {
+    return row;
+  }
+
+  return {
+    ...row,
+    order_mode: settings.orderMode,
+    contact_requirement: settings.contactRequirement,
+    require_otp: settings.requireOtp,
+    order_number_prefix: settings.orderNumberPrefix,
+    show_guest_order_history: settings.showGuestOrderHistory
   };
 }
 
@@ -621,6 +735,15 @@ function mergeRestaurantSettingsWithFallback(
     kitchenOpenUntil:
       restaurantSettings.kitchenOpenUntil ?? fallbackSettings.kitchenOpenUntil,
     barOpenUntil: restaurantSettings.barOpenUntil ?? fallbackSettings.barOpenUntil,
+    orderMode: restaurantSettings.orderMode ?? fallbackSettings.orderMode,
+    contactRequirement:
+      restaurantSettings.contactRequirement ?? fallbackSettings.contactRequirement,
+    requireOtp: restaurantSettings.requireOtp ?? fallbackSettings.requireOtp,
+    orderNumberPrefix:
+      restaurantSettings.orderNumberPrefix || fallbackSettings.orderNumberPrefix,
+    showGuestOrderHistory:
+      restaurantSettings.showGuestOrderHistory ??
+      fallbackSettings.showGuestOrderHistory,
     tableCount: restaurantSettings.tableCount,
     tableTokens: restaurantSettings.tableTokens
   });
@@ -808,14 +931,42 @@ async function persistRestaurantSettingsAsync(
     throw new Error(`Restaurant not found: ${restaurantSlug}`);
   }
 
-  const { error } = await supabase
+  const fullSettingsPayload = mapSettingsToRestaurantSettingsRow(restaurant.id, settings, {
+    includeAdvancedOrderSettings: true
+  });
+  const { error: upsertWithAdvancedSettingsError } = await supabase
     .from("restaurant_settings")
-    .upsert(mapSettingsToRestaurantSettingsRow(restaurant.id, settings), {
+    .upsert(fullSettingsPayload, {
       onConflict: "restaurant_id"
     });
+  if (upsertWithAdvancedSettingsError) {
+    const missingAdvancedColumns =
+      upsertWithAdvancedSettingsError.message.includes("column") &&
+      (
+        upsertWithAdvancedSettingsError.message.includes("order_mode") ||
+        upsertWithAdvancedSettingsError.message.includes("contact_requirement") ||
+        upsertWithAdvancedSettingsError.message.includes("require_otp") ||
+        upsertWithAdvancedSettingsError.message.includes("order_number_prefix") ||
+        upsertWithAdvancedSettingsError.message.includes("show_guest_order_history")
+      ) &&
+      upsertWithAdvancedSettingsError.message.includes("does not exist");
 
-  if (error) {
-    throw new Error(`Supabase persist failed: ${error.message}`);
+    if (!missingAdvancedColumns) {
+      throw new Error(`Supabase persist failed: ${upsertWithAdvancedSettingsError.message}`);
+    }
+
+    const legacySettingsPayload = mapSettingsToRestaurantSettingsRow(restaurant.id, settings, {
+      includeAdvancedOrderSettings: false
+    });
+    const { error: fallbackUpsertError } = await supabase
+      .from("restaurant_settings")
+      .upsert(legacySettingsPayload, {
+        onConflict: "restaurant_id"
+      });
+
+    if (fallbackUpsertError) {
+      throw new Error(`Supabase persist failed: ${fallbackUpsertError.message}`);
+    }
   }
 
   const { data: existingTableRows, error: existingTablesError } = await supabase
@@ -921,16 +1072,20 @@ export async function getMenuSettings(restaurantSlug?: string) {
   const cached = getSettingsCache(restaurantSlug);
 
   if (cached && cached.expiresAt > Date.now()) {
+    const nextSettings = applyOrderModePolicy(cached.settings, restaurantSlug);
     return {
-      ...cached.settings,
-      tableTokens: { ...cached.settings.tableTokens }
+      ...nextSettings,
+      tableTokens: { ...nextSettings.tableTokens }
     };
   }
 
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    const localSettings = getMenuSettingsSync();
+    const localSettings = applyOrderModePolicy(
+      getMenuSettingsSync(),
+      restaurantSlug
+    );
     setSettingsCache(localSettings, restaurantSlug);
     return {
       ...localSettings,
@@ -946,12 +1101,15 @@ export async function getMenuSettings(restaurantSlug?: string) {
       );
 
       if (restaurantSettings) {
-        const nextRestaurantSettings = hasWorkingHoursConfigured(restaurantSettings)
-          ? restaurantSettings
-          : mergeRestaurantSettingsWithFallback(
-              restaurantSettings,
-              (await getLegacyMenuSettingsFromSupabase(supabase)) ?? getMenuSettingsSync()
-            );
+        const nextRestaurantSettings = applyOrderModePolicy(
+          hasWorkingHoursConfigured(restaurantSettings)
+            ? restaurantSettings
+            : mergeRestaurantSettingsWithFallback(
+                restaurantSettings,
+                (await getLegacyMenuSettingsFromSupabase(supabase)) ?? getMenuSettingsSync()
+              ),
+          restaurantSlug
+        );
 
         setSettingsCache(nextRestaurantSettings, restaurantSlug);
         return {
@@ -972,7 +1130,10 @@ export async function getMenuSettings(restaurantSlug?: string) {
     }
 
     if (!data?.value) {
-      const normalized = normalizeSettings(DEFAULT_SETTINGS);
+      const normalized = applyOrderModePolicy(
+        normalizeSettings(DEFAULT_SETTINGS),
+        restaurantSlug
+      );
       if (restaurantSlug) {
         await persistRestaurantSettingsAsync(restaurantSlug, normalized);
       } else {
@@ -984,14 +1145,20 @@ export async function getMenuSettings(restaurantSlug?: string) {
       };
     }
 
-    const normalized = normalizeSettings(data.value as Partial<MenuSettings>);
+    const normalized = applyOrderModePolicy(
+      normalizeSettings(data.value as Partial<MenuSettings>),
+      restaurantSlug
+    );
     setSettingsCache(normalized, restaurantSlug);
     return {
       ...normalized,
       tableTokens: { ...normalized.tableTokens }
     };
   } catch {
-    const localSettings = getMenuSettingsSync();
+    const localSettings = applyOrderModePolicy(
+      getMenuSettingsSync(),
+      restaurantSlug
+    );
     setSettingsCache(localSettings, restaurantSlug);
     return {
       ...localSettings,
@@ -1011,13 +1178,22 @@ export async function updateMenuSettings(
       ? maybeUpdates ?? {}
       : restaurantSlugOrUpdates ?? {};
   const current = await getMenuSettings(restaurantSlug);
+  if (
+    updates.orderMode === "counter" &&
+    !isCounterModeAllowedForRestaurant(restaurantSlug)
+  ) {
+    throw new Error("Counter mode is not enabled for this restaurant.");
+  }
   const definedUpdates = Object.fromEntries(
     Object.entries(updates).filter(([, value]) => value !== undefined)
   ) as Partial<MenuSettings>;
-  const next = normalizeSettings({
-    ...current,
-    ...definedUpdates
-  });
+  const next = applyOrderModePolicy(
+    normalizeSettings({
+      ...current,
+      ...definedUpdates
+    }),
+    restaurantSlug
+  );
 
   if (restaurantSlug) {
     return persistRestaurantSettingsAsync(restaurantSlug, next);

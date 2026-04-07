@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
@@ -8,8 +9,10 @@ import type { MenuFilter } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
 import type {
   BusinessLunchSettings,
+  ContactRequirement,
   PromotionSettings,
-  RecommendationRuleSettings
+  RecommendationRuleSettings,
+  RestaurantOrderMode
 } from "@/lib/menu-settings";
 import {
   CartItem,
@@ -27,6 +30,10 @@ type CartProps = {
   tableNumber: number;
   tableToken: string;
   orderingEnabled?: boolean;
+  orderMode?: RestaurantOrderMode;
+  contactRequirement?: ContactRequirement;
+  requireOtp?: boolean;
+  showGuestOrderHistory?: boolean;
   menu: MenuItem[];
   showKitchenLoadWarning: boolean;
   promotions?: PromotionSettings[];
@@ -47,6 +54,26 @@ type FlyingOrderItem = {
   deltaX: number;
   deltaY: number;
 };
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  theme?: "auto" | "light" | "dark";
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+};
+
+type TurnstileApi = {
+  render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
+  reset: (widgetId: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi;
+  }
+}
 
 const categoryFlightIcons: Record<MenuCategory, string> = {
   starters: "🥗",
@@ -99,6 +126,14 @@ const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 const ORDER_SUBMIT_THROTTLE_MS = 3 * 1000;
 const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
+const COUNTER_CAPTCHA_SITE_KEY =
+  process.env.NEXT_PUBLIC_COUNTER_CAPTCHA_SITE_KEY?.trim() ?? "";
+const COUNTER_CAPTCHA_PUBLIC_ENABLED = ["1", "true", "yes", "on"].includes(
+  (process.env.NEXT_PUBLIC_COUNTER_CAPTCHA_ENABLED ?? "").toLowerCase()
+);
+const COUNTER_CAPTCHA_MISSING_MESSAGE = "Please complete the captcha check.";
+const COUNTER_CAPTCHA_INIT_FAILED_MESSAGE =
+  "Captcha could not be initialized. Please refresh and try again.";
 
 const uiText = {
   he: {
@@ -389,6 +424,10 @@ export function Cart({
   tableNumber,
   tableToken,
   orderingEnabled = true,
+  orderMode = "tables",
+  contactRequirement = "none",
+  requireOtp = false,
+  showGuestOrderHistory = false,
   menu,
   showKitchenLoadWarning,
   promotions = [],
@@ -429,6 +468,15 @@ export function Cart({
   const [wantsOrderStatusUpdates, setWantsOrderStatusUpdates] = useState(false);
   const [guestContactName, setGuestContactName] = useState("");
   const [guestContactPhone, setGuestContactPhone] = useState("");
+  const [counterOtpCode, setCounterOtpCode] = useState("");
+  const [counterOtpSending, setCounterOtpSending] = useState(false);
+  const [counterOtpDebugCode, setCounterOtpDebugCode] = useState<string | null>(null);
+  const [counterCaptchaToken, setCounterCaptchaToken] = useState<string | null>(
+    null
+  );
+  const [counterCaptchaScriptReady, setCounterCaptchaScriptReady] = useState(false);
+  const [counterCaptchaError, setCounterCaptchaError] = useState<string | null>(null);
+  const [counterDeviceId, setCounterDeviceId] = useState<string | null>(null);
   const [latestSubmittedOrderId, setLatestSubmittedOrderId] = useState<string | null>(
     null
   );
@@ -436,12 +484,23 @@ export function Cart({
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const orderPanelRef = useRef<HTMLElement | null>(null);
   const menuSectionRef = useRef<HTMLDivElement | null>(null);
+  const counterCaptchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const counterCaptchaWidgetIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
   const lastSuccessfulOrderSignatureRef = useRef<{
     signature: string;
     submittedAt: number;
   } | null>(null);
+  const isCounterMode = orderMode === "counter";
+  const counterRequiresPhone =
+    isCounterMode && (contactRequirement === "phone_only" || requireOtp);
+  const counterRequiresNameOrPhone =
+    isCounterMode && contactRequirement === "name_or_phone";
+  const shouldRenderCounterCaptcha =
+    isCounterMode &&
+    COUNTER_CAPTCHA_PUBLIC_ENABLED &&
+    COUNTER_CAPTCHA_SITE_KEY.length > 0;
 
   useEffect(() => {
     setLiveMenu(menu);
@@ -476,6 +535,43 @@ export function Cart({
   const hasDishesInOrder = detailedItems.some(
     ({ menuItem }) => !drinkCategories.has(menuItem.category)
   );
+  const normalizedGuestPhone = useMemo(() => {
+    const normalized = guestContactPhone.replace(/[^\d+]/g, "").trim();
+
+    if (!normalized) {
+      return "";
+    }
+
+    return normalized.startsWith("+") ? normalized : `+${normalized}`;
+  }, [guestContactPhone]);
+  const hasValidGuestPhone = useMemo(() => {
+    const withoutPlus = normalizedGuestPhone.startsWith("+")
+      ? normalizedGuestPhone.slice(1)
+      : normalizedGuestPhone;
+
+    return withoutPlus.length >= 7 && withoutPlus.length <= 15;
+  }, [normalizedGuestPhone]);
+  const hasCounterContactReady = useMemo(() => {
+    if (!isCounterMode) {
+      return true;
+    }
+
+    if (counterRequiresPhone) {
+      return hasValidGuestPhone;
+    }
+
+    if (counterRequiresNameOrPhone) {
+      return Boolean(guestContactName.trim() || hasValidGuestPhone);
+    }
+
+    return true;
+  }, [
+    counterRequiresNameOrPhone,
+    counterRequiresPhone,
+    guestContactName,
+    hasValidGuestPhone,
+    isCounterMode
+  ]);
 
   const quantities = items.reduce<Record<string, number>>((acc, item) => {
     acc[`${item.menuItemId}:${item.volumeOptionId ?? "base"}`] = item.quantity;
@@ -1093,6 +1189,86 @@ export function Cart({
   }, [pendingOrderStorageKey]);
 
   useEffect(() => {
+    const storageKey = `menu-device-id:${restaurantSlug}`;
+    const stored = window.localStorage.getItem(storageKey);
+
+    if (stored && stored.trim()) {
+      setCounterDeviceId(stored.trim());
+      return;
+    }
+
+    const nextId =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `dev_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    window.localStorage.setItem(storageKey, nextId);
+    setCounterDeviceId(nextId);
+  }, [restaurantSlug]);
+
+  useEffect(() => {
+    if (!shouldRenderCounterCaptcha) {
+      return;
+    }
+
+    if (!showReviewDialog) {
+      setCounterCaptchaToken(null);
+      setCounterCaptchaError(null);
+      return;
+    }
+
+    if (!counterCaptchaScriptReady || !window.turnstile) {
+      return;
+    }
+
+    const container = counterCaptchaContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const previousWidgetId = counterCaptchaWidgetIdRef.current;
+
+    if (previousWidgetId) {
+      window.turnstile.remove(previousWidgetId);
+      counterCaptchaWidgetIdRef.current = null;
+    }
+
+    setCounterCaptchaToken(null);
+    setCounterCaptchaError(null);
+
+    try {
+      const widgetId = window.turnstile.render(container, {
+        sitekey: COUNTER_CAPTCHA_SITE_KEY,
+        theme: "light",
+        callback: (token: string) => {
+          setCounterCaptchaToken(token);
+          setCounterCaptchaError(null);
+        },
+        "expired-callback": () => {
+          setCounterCaptchaToken(null);
+        },
+        "error-callback": () => {
+          setCounterCaptchaToken(null);
+          setCounterCaptchaError(COUNTER_CAPTCHA_INIT_FAILED_MESSAGE);
+        }
+      });
+
+      counterCaptchaWidgetIdRef.current = widgetId;
+    } catch {
+      setCounterCaptchaError(COUNTER_CAPTCHA_INIT_FAILED_MESSAGE);
+    }
+
+    return () => {
+      const currentWidgetId = counterCaptchaWidgetIdRef.current;
+
+      if (currentWidgetId && window.turnstile) {
+        window.turnstile.remove(currentWidgetId);
+        counterCaptchaWidgetIdRef.current = null;
+      }
+    };
+  }, [counterCaptchaScriptReady, shouldRenderCounterCaptcha, showReviewDialog]);
+
+  useEffect(() => {
     const savedCart = window.localStorage.getItem(cartStorageKey);
 
     if (!savedCart) {
@@ -1240,10 +1416,15 @@ export function Cart({
       let response: Response;
 
       try {
-        response = await fetch(`/api/tables/${restaurantSlug}/${tableToken}`, {
-          cache: "no-store",
-          signal: inFlightAbortController.signal
-        });
+        response = await fetch(
+          isCounterMode
+            ? `/api/orders/my?restaurantSlug=${restaurantSlug}`
+            : `/api/tables/${restaurantSlug}/${tableToken}`,
+          {
+            cache: "no-store",
+            signal: inFlightAbortController.signal
+          }
+        );
       } catch {
         scheduleNextSync();
         return;
@@ -1254,50 +1435,65 @@ export function Cart({
         return;
       }
 
-      const data = (await response.json()) as {
-        currentSessionId?: number;
-        submittedOrders?: Order[];
-        activeServiceRequests?: Array<Order["kind"]>;
-        menu?: MenuItem[];
-      };
-
       if (!cancelled) {
-        const previousSessionId = currentSessionIdRef.current;
-        const nextSessionId = data.currentSessionId ?? previousSessionId;
-        const nextOrders = data.submittedOrders ?? [];
-        const hasActiveServiceRequests = (data.activeServiceRequests ?? []).some(
-          (kind) => kind === "waiter_call" || kind === "bill_request"
-        );
-
-        setCurrentSessionId(nextSessionId);
-        if (Array.isArray(data.menu)) {
-          setLiveMenu(data.menu);
-        }
-        setHasActiveServiceRequest(hasActiveServiceRequests);
-        if (!hasActiveServiceRequests) {
-          setServiceRequestBlockedUntil(0);
-        }
-        setSubmittedOrders((current) => {
-          if (nextSessionId !== previousSessionId) {
-            return nextOrders;
-          }
-
-          if (nextOrders.length === 0) {
-            return current;
-          }
-
-          const mergedById = new Map<string, Order>();
-
-          [...current, ...nextOrders].forEach((order) => {
-            if (order.sessionId === nextSessionId) {
-              mergedById.set(order.id, order);
-            }
-          });
-
-          return [...mergedById.values()].sort((left, right) =>
-            right.createdAt.localeCompare(left.createdAt)
+        if (isCounterMode) {
+          const data = (await response.json()) as {
+            orders?: Order[];
+          };
+          const nextOrders = (data.orders ?? []).filter(
+            (order) => order.status !== "cancelled"
           );
-        });
+          setSubmittedOrders(
+            [...nextOrders].sort((left, right) =>
+              right.createdAt.localeCompare(left.createdAt)
+            )
+          );
+          setHasActiveServiceRequest(false);
+          setServiceRequestBlockedUntil(0);
+        } else {
+          const data = (await response.json()) as {
+            currentSessionId?: number;
+            submittedOrders?: Order[];
+            activeServiceRequests?: Array<Order["kind"]>;
+            menu?: MenuItem[];
+          };
+          const previousSessionId = currentSessionIdRef.current;
+          const nextSessionId = data.currentSessionId ?? previousSessionId;
+          const nextOrders = data.submittedOrders ?? [];
+          const hasActiveServiceRequests = (data.activeServiceRequests ?? []).some(
+            (kind) => kind === "waiter_call" || kind === "bill_request"
+          );
+
+          setCurrentSessionId(nextSessionId);
+          if (Array.isArray(data.menu)) {
+            setLiveMenu(data.menu);
+          }
+          setHasActiveServiceRequest(hasActiveServiceRequests);
+          if (!hasActiveServiceRequests) {
+            setServiceRequestBlockedUntil(0);
+          }
+          setSubmittedOrders((current) => {
+            if (nextSessionId !== previousSessionId) {
+              return nextOrders;
+            }
+
+            if (nextOrders.length === 0) {
+              return current;
+            }
+
+            const mergedById = new Map<string, Order>();
+
+            [...current, ...nextOrders].forEach((order) => {
+              if (order.sessionId === nextSessionId) {
+                mergedById.set(order.id, order);
+              }
+            });
+
+            return [...mergedById.values()].sort((left, right) =>
+              right.createdAt.localeCompare(left.createdAt)
+            );
+          });
+        }
       }
 
       scheduleNextSync();
@@ -1313,10 +1509,10 @@ export function Cart({
         window.clearTimeout(pollTimeoutId);
       }
     };
-  }, [restaurantSlug, tableToken, orderingEnabled]);
+  }, [isCounterMode, orderingEnabled, restaurantSlug, tableToken]);
 
   useEffect(() => {
-    if (!orderingEnabled) {
+    if (!orderingEnabled || isCounterMode) {
       return;
     }
 
@@ -1327,7 +1523,7 @@ export function Cart({
     if (savedTimestamp > Date.now()) {
       setServiceRequestBlockedUntil(savedTimestamp);
     }
-  }, [restaurantSlug, tableToken]);
+  }, [isCounterMode, orderingEnabled, restaurantSlug, tableToken]);
 
   useEffect(() => {
     if (!serviceRequestBlockedUntil || serviceRequestBlockedUntil <= Date.now()) {
@@ -1476,6 +1672,111 @@ export function Cart({
     changeQuantity(menuItemId, -1, volumeOptionId);
   }
 
+  function consumeCounterCaptchaToken() {
+    if (!shouldRenderCounterCaptcha) {
+      return undefined;
+    }
+
+    const token = counterCaptchaToken?.trim();
+
+    if (!token) {
+      return null;
+    }
+
+    return token;
+  }
+
+  function refreshCounterCaptchaToken() {
+    if (!shouldRenderCounterCaptcha) {
+      return;
+    }
+
+    setCounterCaptchaToken(null);
+    const widgetId = counterCaptchaWidgetIdRef.current;
+
+    if (!widgetId || !window.turnstile) {
+      return;
+    }
+
+    window.turnstile.reset(widgetId);
+  }
+
+  function getCounterContactValidationMessage() {
+    if (!isCounterMode) {
+      return null;
+    }
+
+    if (counterRequiresPhone && !hasValidGuestPhone) {
+      return "Please enter a valid phone number.";
+    }
+
+    if (counterRequiresNameOrPhone && !hasCounterContactReady) {
+      return "Please enter your name or phone number.";
+    }
+
+    if (requireOtp && !counterOtpCode.trim()) {
+      return "Please enter the OTP code.";
+    }
+
+    if (shouldRenderCounterCaptcha && !counterCaptchaToken?.trim()) {
+      return COUNTER_CAPTCHA_MISSING_MESSAGE;
+    }
+
+    return null;
+  }
+
+  async function requestCounterOtp() {
+    if (!isCounterMode) {
+      return;
+    }
+
+    if (!hasValidGuestPhone) {
+      setMessage("Please enter a valid phone number first.");
+      return;
+    }
+
+    const captchaToken = consumeCounterCaptchaToken();
+
+    if (captchaToken === null) {
+      setMessage(COUNTER_CAPTCHA_MISSING_MESSAGE);
+      return;
+    }
+
+    setCounterOtpSending(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/orders/otp/request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(counterDeviceId ? { "x-device-id": counterDeviceId } : {})
+        },
+        body: JSON.stringify({
+          restaurantSlug,
+          phone: normalizedGuestPhone,
+          captchaToken,
+          deviceId: counterDeviceId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response, "Failed to send OTP"));
+      }
+
+      const data = (await response.json()) as { debugCode?: string };
+      setCounterOtpDebugCode(
+        typeof data.debugCode === "string" ? data.debugCode : null
+      );
+      setDialogMessage("Verification code sent.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to send OTP");
+    } finally {
+      refreshCounterCaptchaToken();
+      setCounterOtpSending(false);
+    }
+  }
+
   async function submitOrder(serveMode: ServeMode) {
     const now = Date.now();
 
@@ -1493,6 +1794,22 @@ export function Cart({
     if (isBarClosed && hasDrinksInOrder) {
       setShowReviewDialog(true);
       setMessage(text.barClosedOrderCheck);
+      return;
+    }
+
+    const counterValidationMessage = getCounterContactValidationMessage();
+
+    if (counterValidationMessage) {
+      setMessage(counterValidationMessage);
+      setShowReviewDialog(true);
+      return;
+    }
+
+    const captchaToken = consumeCounterCaptchaToken();
+
+    if (captchaToken === null) {
+      setMessage(COUNTER_CAPTCHA_MISSING_MESSAGE);
+      setShowReviewDialog(true);
       return;
     }
 
@@ -1524,7 +1841,8 @@ export function Cart({
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(counterDeviceId ? { "x-device-id": counterDeviceId } : {})
         },
         body: JSON.stringify({
           restaurantSlug,
@@ -1532,12 +1850,15 @@ export function Cart({
           items,
           serveMode,
           clientRequestId,
+          deviceId: counterDeviceId,
+          captchaToken,
+          otpCode: isCounterMode && requireOtp ? counterOtpCode.trim() : undefined,
           guestContactName:
-            wantsOrderStatusUpdates && guestContactName.trim()
+            (isCounterMode || wantsOrderStatusUpdates) && guestContactName.trim()
               ? guestContactName.trim()
               : undefined,
           guestContactPhone:
-            wantsOrderStatusUpdates && guestContactPhone.trim()
+            (isCounterMode || wantsOrderStatusUpdates) && guestContactPhone.trim()
               ? guestContactPhone.trim()
               : undefined
         })
@@ -1566,7 +1887,14 @@ export function Cart({
 
         return current.map((item) => (item.id === order.id ? order : item));
       });
-      setDialogMessage(text.orderSent);
+      setDialogMessage(
+        isCounterMode && order.displayOrderNumber
+          ? `${text.orderSent}\nOrder number: ${order.displayOrderNumber}`
+          : text.orderSent
+      );
+      if (isCounterMode) {
+        setCounterOtpCode("");
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : text.submitError;
@@ -1576,6 +1904,7 @@ export function Cart({
           : errorMessage
       );
     } finally {
+      refreshCounterCaptchaToken();
       setSubmitting(false);
     }
   }
@@ -1705,6 +2034,7 @@ export function Cart({
 
   async function closeDialogMessage() {
     if (
+      !isCounterMode &&
       dialogMessage === text.orderSent &&
       latestSubmittedOrderId &&
       wantsOrderStatusUpdates &&
@@ -1783,6 +2113,20 @@ export function Cart({
 
   return (
     <>
+      {shouldRenderCounterCaptcha ? (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          onLoad={() => {
+            setCounterCaptchaScriptReady(true);
+            setCounterCaptchaError(null);
+          }}
+          onError={() => {
+            setCounterCaptchaScriptReady(false);
+            setCounterCaptchaError(COUNTER_CAPTCHA_INIT_FAILED_MESSAGE);
+          }}
+        />
+      ) : null}
       {dialogMessage ? (
         <div className="modal-backdrop" role="presentation">
           <div
@@ -1911,6 +2255,63 @@ export function Cart({
               <p className="muted">
                 {text.happyHourDiscount}: -{formatCurrency(currentOrderDiscountAmount)}
               </p>
+            ) : null}
+            {isCounterMode ? (
+              <div className="modal-card__status-fields">
+                <input
+                  className="modal-input"
+                  type="text"
+                  placeholder={text.orderStatusName}
+                  value={guestContactName}
+                  onChange={(event) => setGuestContactName(event.target.value)}
+                />
+                <input
+                  className="modal-input"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder={text.orderStatusPhone}
+                  value={guestContactPhone}
+                  onChange={(event) => setGuestContactPhone(event.target.value)}
+                />
+                {requireOtp ? (
+                  <div className="modal-actions">
+                    <input
+                      className="modal-input"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="OTP code"
+                      value={counterOtpCode}
+                      onChange={(event) => setCounterOtpCode(event.target.value)}
+                    />
+                    <button
+                      className="button-neutral"
+                      type="button"
+                      onClick={() => void requestCounterOtp()}
+                      disabled={counterOtpSending || !hasValidGuestPhone}
+                    >
+                      {counterOtpSending ? "Sending OTP..." : "Send OTP"}
+                    </button>
+                  </div>
+                ) : null}
+                {counterOtpDebugCode ? (
+                  <p className="muted">Debug OTP: {counterOtpDebugCode}</p>
+                ) : null}
+                {shouldRenderCounterCaptcha ? (
+                  <div className="counter-captcha">
+                    <div
+                      ref={counterCaptchaContainerRef}
+                      className="counter-captcha__widget"
+                    />
+                    {counterCaptchaError ? (
+                      <p className="muted">{counterCaptchaError}</p>
+                    ) : (
+                      <p className="muted">Complete captcha before submitting.</p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
             <div className="modal-actions">
               <button
@@ -2064,10 +2465,12 @@ export function Cart({
             </div>
             <p className="lead">
               {orderingEnabled
-                ? `${text.tableOrderingHint} ${tableNumber}`
+                ? isCounterMode
+                  ? "Counter order mode"
+                  : `${text.tableOrderingHint} ${tableNumber}`
                 : "Menu"}
             </p>
-            {orderingEnabled && serviceRequestDisabled ? (
+            {orderingEnabled && !isCounterMode && serviceRequestDisabled ? (
               <p className="menu-service-note">{text.waiterServiceNote}</p>
             ) : null}
             {showKitchenOpenBanner ? (
@@ -2123,7 +2526,7 @@ export function Cart({
               </div>
             ) : null}
           </div>
-          {orderingEnabled ? (
+          {orderingEnabled && !isCounterMode ? (
             <div
               className={
                 language === "he"
