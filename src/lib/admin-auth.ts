@@ -234,10 +234,10 @@ export async function requireAdminAccess(
   }
 
   if (scope === "secondary") {
-    const hasCookieAccess = verifyCookieValue(
-      "admin",
-      request.cookies.get(getCookieName("admin"))?.value
-    );
+    const cookieValue = request.cookies.get(getCookieName("admin"))?.value;
+    const hasCookieAccess =
+      verifyCookieValue("admin", cookieValue) ||
+      verifyCookieValue("secondary", cookieValue);
 
     if (hasCookieAccess) {
       return null;

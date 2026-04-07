@@ -51,6 +51,12 @@
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: Dashboard Live Status",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:dashboard -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Tables Shift",
       "type": "node-terminal",
       "request": "launch",
