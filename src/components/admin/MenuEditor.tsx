@@ -371,6 +371,86 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
   };
 }
 
+function formatVolumeOptionsText(volumeOptions: MenuVolumeOption[] | undefined) {
+  return (volumeOptions ?? [])
+    .map((option) => `${option.label} | ${option.price}`)
+    .join("\n");
+}
+
+function areBadgesEqual(left: MenuBadge[] | undefined, right: MenuBadge[] | undefined) {
+  const leftList = left ?? [];
+  const rightList = right ?? [];
+
+  return (
+    leftList.length === rightList.length &&
+    leftList.every((value, index) => value === rightList[index])
+  );
+}
+
+function hasUnsavedItemDraft(item: EditableMenuItem) {
+  const baseNameHe = item.nameHe || item.name;
+  const baseNameEn = item.nameEn || item.nameHe || item.name;
+  const baseNameRu = item.nameRu || item.nameEn || item.nameHe || item.name;
+  const baseDescriptionHe = item.descriptionHe || item.description;
+  const baseDescriptionEn = item.descriptionEn || item.descriptionHe || item.description;
+  const baseDescriptionRu =
+    item.descriptionRu || item.descriptionEn || item.descriptionHe || item.description;
+  const baseShowImage = item.showImage ?? true;
+  const baseVolumeOptionsText = formatVolumeOptionsText(item.volumeOptions);
+
+  return (
+    item.draftNameHe !== baseNameHe ||
+    item.draftNameEn !== baseNameEn ||
+    item.draftNameRu !== baseNameRu ||
+    item.draftDescriptionHe !== baseDescriptionHe ||
+    item.draftDescriptionEn !== baseDescriptionEn ||
+    item.draftDescriptionRu !== baseDescriptionRu ||
+    item.draftCategory !== item.category ||
+    item.draftPrice !== String(item.price) ||
+    item.draftVolumeOptionsText !== baseVolumeOptionsText ||
+    item.draftImage !== item.image ||
+    item.draftShowImage !== baseShowImage ||
+    !areBadgesEqual(item.draftBadges, item.badges)
+  );
+}
+
+function mergeMenuItemsWithLocalDrafts(
+  localItems: EditableMenuItem[],
+  remoteItems: MenuItem[]
+) {
+  const localById = new Map(localItems.map((item) => [item.id, item]));
+  const remoteById = new Map(remoteItems.map((item) => [item.id, item]));
+  const merged: EditableMenuItem[] = [];
+
+  for (const localItem of localItems) {
+    const remoteItem = remoteById.get(localItem.id);
+
+    if (!remoteItem) {
+      continue;
+    }
+
+    const shouldKeepLocalDraft =
+      Boolean(localItem.saving) ||
+      hasUnsavedItemDraft(localItem) ||
+      localItem.available !== remoteItem.available;
+
+    if (shouldKeepLocalDraft) {
+      merged.push(localItem);
+      continue;
+    }
+
+    merged.push(toEditableItem(remoteItem));
+  }
+
+  for (const remoteItem of remoteItems) {
+    if (!localById.has(remoteItem.id)) {
+      merged.push(toEditableItem(remoteItem));
+    }
+  }
+
+  return merged;
+}
+
 function getPreferredDraftName(input: {
   nameHe?: string;
   nameEn?: string;
@@ -685,6 +765,19 @@ export function MenuEditor() {
     available: true,
     saving: false
   });
+  const preferredNewItemCategory = useMemo<MenuCategory>(() => {
+    const filteredCategory = selectedCategories.find((category) =>
+      selectedKind === "drinks"
+        ? drinkCategories.includes(category)
+        : !drinkCategories.includes(category)
+    );
+
+    if (filteredCategory) {
+      return filteredCategory;
+    }
+
+    return selectedKind === "drinks" ? drinkCategories[0] : dishCategories[0];
+  }, [selectedCategories, selectedKind]);
   const pathSegments = useMemo(
     () => pathname.split("/").filter(Boolean),
     [pathname]
@@ -1287,7 +1380,7 @@ export function MenuEditor() {
 
         if (menuResponse?.ok) {
           const data = (await menuResponse.json()) as MenuItem[];
-          setItems(data.map(toEditableItem));
+          setItems((current) => mergeMenuItemsWithLocalDrafts(current, data));
           hasSuccessfulResponse = true;
           setMessage((current) => (current === "Failed to load menu." ? null : current));
         } else if (menuResult.status === "fulfilled" && !menuResponse?.ok) {
@@ -1769,54 +1862,18 @@ export function MenuEditor() {
         item.id === itemId
           ? {
               ...item,
-              available: nextAvailable,
-              saving: true
+              available: nextAvailable
             }
           : item
       )
     );
 
-    const response = await fetch("/api/menu", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        id: itemId,
-        available: nextAvailable
-      })
-    });
-
-    if (!response.ok) {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === itemId
-            ? {
-                ...item,
-                available: targetItem.available,
-                saving: false
-              }
-            : item
-        )
-      );
-      setMessage("Failed to update availability.");
-      return;
-    }
-
-    setItems((current) =>
-      current.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              saving: false
-            }
-          : item
-      )
+    setMessage(
+      nextAvailable
+        ? "Availability changed to Available. Press Save to apply."
+        : "Availability changed to Unavailable. Press Save to apply."
     );
-    setMessage(nextAvailable ? "Item is now available." : "Item is now unavailable.");
-  }, [items, secondaryCredentials]);
+  }, [items]);
 
   async function toggleKitchenLoadWarning(nextValue: boolean) {
     setKitchenLoadWarningEnabled(nextValue);
@@ -2807,7 +2864,7 @@ export function MenuEditor() {
       image: "",
       showImage: true,
       badges: [],
-      category: selectedKind === "drinks" ? drinkCategories[0] : "starters",
+      category: preferredNewItemCategory,
       available: true,
       saving: false
     });
@@ -3098,10 +3155,20 @@ export function MenuEditor() {
     setSettingsRecommendationsOpen((current) => !current);
   }, []);
 
-  const toggleCreateForm = useCallback(
-    () => setShowCreateForm((current) => !current),
-    []
-  );
+  const toggleCreateForm = useCallback(() => {
+    setShowCreateForm((current) => {
+      const next = !current;
+
+      if (next) {
+        setNewItem((draft) => ({
+          ...draft,
+          category: preferredNewItemCategory
+        }));
+      }
+
+      return next;
+    });
+  }, [preferredNewItemCategory]);
 
   const clearSelectedCategories = useCallback(() => {
     setRecommendationFocusItemIds(null);

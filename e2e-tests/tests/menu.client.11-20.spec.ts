@@ -32,8 +32,37 @@ async function dismissWelcomeDialogIfVisible(page: Page) {
     return;
   }
 
-  await welcomeDialog.locator("button.button-success").first().click();
-  await expect(welcomeDialog).toBeHidden({ timeout: 5000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const stillVisible = await welcomeDialog
+      .isVisible()
+      .catch(() => false);
+
+    if (!stillVisible) {
+      return;
+    }
+
+    const confirmButton = welcomeDialog.locator("button.button-success").first();
+
+    try {
+      await confirmButton.click({ timeout: 3000, force: true });
+    } catch {
+      await confirmButton.evaluate((button: HTMLButtonElement) => button.click());
+    }
+
+    const hidden = await welcomeDialog
+      .waitFor({ state: "hidden", timeout: 2500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (hidden) {
+      return;
+    }
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(150);
+  }
+
+  await expect(welcomeDialog).toBeHidden({ timeout: 7000 });
 }
 
 async function clickLanguageButtonWithRetry(page: Page, language: "EN" | "RU" | "HE") {

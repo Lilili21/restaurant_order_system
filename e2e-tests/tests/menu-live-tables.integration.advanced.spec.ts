@@ -232,21 +232,36 @@ async function dismissWelcomeDialogIfVisible(page: Page) {
   }
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const visible = await welcomeDialog
-      .waitFor({ state: "visible", timeout: 800 })
-      .then(() => true)
+    const stillVisible = await welcomeDialog
+      .isVisible()
       .catch(() => false);
 
-    if (!visible) {
+    if (!stillVisible) {
       return;
     }
 
-    await welcomeDialog
-      .locator("button.button-success")
-      .first()
-      .click({ force: true, timeout: 2000 });
-    await page.waitForTimeout(120);
+    const confirmButton = welcomeDialog.locator("button.button-success").first();
+
+    try {
+      await confirmButton.click({ timeout: 3000, force: true });
+    } catch {
+      await confirmButton.evaluate((button: HTMLButtonElement) => button.click());
+    }
+
+    const hidden = await welcomeDialog
+      .waitFor({ state: "hidden", timeout: 2500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (hidden) {
+      return;
+    }
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(150);
   }
+
+  await expect(welcomeDialog).toBeHidden({ timeout: 7000 });
 }
 
 async function clickLanguageButtonWithRetry(page: Page, language: "EN" | "RU" | "HE") {

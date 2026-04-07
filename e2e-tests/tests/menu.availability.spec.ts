@@ -7,6 +7,7 @@ const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
 async function dismissWelcomeDialogIfVisible(page: Page) {
   const welcomeTitle = page.locator("#welcome-dialog-title");
   const welcomeDialog = page.locator(".modal-backdrop").filter({ has: welcomeTitle }).first();
+
   const appeared = await welcomeDialog
     .waitFor({ state: "visible", timeout: 1500 })
     .then(() => true)
@@ -16,8 +17,37 @@ async function dismissWelcomeDialogIfVisible(page: Page) {
     return;
   }
 
-  await welcomeDialog.locator("button.button-success").first().click();
-  await expect(welcomeDialog).toBeHidden({ timeout: 5000 });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const stillVisible = await welcomeDialog
+      .isVisible()
+      .catch(() => false);
+
+    if (!stillVisible) {
+      return;
+    }
+
+    const confirmButton = welcomeDialog.locator("button.button-success").first();
+
+    try {
+      await confirmButton.click({ timeout: 3000, force: true });
+    } catch {
+      await confirmButton.evaluate((button: HTMLButtonElement) => button.click());
+    }
+
+    const hidden = await welcomeDialog
+      .waitFor({ state: "hidden", timeout: 2500 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (hidden) {
+      return;
+    }
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(150);
+  }
+
+  await expect(welcomeDialog).toBeHidden({ timeout: 7000 });
 }
 
 async function clickLanguageButtonWithRetry(
@@ -111,21 +141,47 @@ test("admin menu availability toggle updates item state", async ({ page }) => {
       return;
     }
 
-    const rawBody = request.postData() ?? "{}";
-    const payload = JSON.parse(rawBody) as { id?: string; available?: boolean };
+    const payload = (() => {
+      try {
+        const parsed = request.postDataJSON() as Record<string, unknown>;
+        return parsed ?? {};
+      } catch {
+        return {};
+      }
+    })() as { id?: string; available?: boolean };
     lastPatchPayload = payload;
 
-    if (payload.id && typeof payload.available === "boolean") {
-      const nextAvailable = payload.available;
+    if (payload.id) {
+      const currentItem = menuItems.find((item) => item.id === payload.id);
+
+      if (!currentItem) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Item not found" })
+        });
+        return;
+      }
+
+      const nextAvailable =
+        typeof payload.available === "boolean" ? payload.available : currentItem.available;
+      const updatedItem = { ...currentItem, available: nextAvailable };
       menuItems = menuItems.map((item) =>
-        item.id === payload.id ? { ...item, available: nextAvailable } : item
+        item.id === payload.id ? updatedItem : item
       );
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(updatedItem)
+      });
+      return;
     }
 
     await route.fulfill({
-      status: 200,
+      status: 400,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true })
+      body: JSON.stringify({ message: "Bad request" })
     });
   });
 
@@ -151,10 +207,187 @@ test("admin menu availability toggle updates item state", async ({ page }) => {
   await availabilityToggle.click();
 
   await expect(availabilityPill).toHaveText("Unavailable");
-  await expect(page.locator(".status-message")).toContainText("Item is now unavailable.");
+  await expect(page.locator(".status-message")).toContainText(
+    "Availability changed to Unavailable. Press Save to apply."
+  );
+  await expect
+    .poll(() => lastPatchPayload)
+    .toBeNull();
+
+  await firstCard.getByRole("button", { name: "Save" }).click();
+
+  await expect(page.locator(".status-message")).toContainText("Saved:");
   await expect
     .poll(() => lastPatchPayload as { available?: boolean } | null)
     .toMatchObject({ available: false });
+});
+
+test("admin menu description draft keeps multiline text until Save", async ({ page }) => {
+  const targetItemId = "menu-item-qa-he";
+  const persistedDescription = "תיאור ישן";
+  const draftDescription = "שורה ראשונה\nשורה שניה";
+  let menuGetCalls = 0;
+  let menuItems = [
+    createMockMenuItem({
+      id: targetItemId,
+      name: "QA Hebrew Dish",
+      nameHe: "QA Hebrew Dish",
+      nameEn: "QA Hebrew Dish",
+      nameRu: "QA Hebrew Dish",
+      description: persistedDescription,
+      descriptionHe: persistedDescription,
+      descriptionEn: "old en",
+      descriptionRu: "old ru",
+      available: true
+    })
+  ];
+  let lastPatchPayload: unknown = null;
+
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await page.route("**/api/menu-settings?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({})
+    });
+  });
+
+  await page.route("**/api/admin-analytics?**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({})
+    });
+  });
+
+  await page.route("**/api/menu?**", async (route, request) => {
+    if (request.method() === "GET") {
+      menuGetCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(menuItems)
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.route("**/api/menu", async (route, request) => {
+    if (request.method() !== "PATCH") {
+      await route.continue();
+      return;
+    }
+
+    const payload = (() => {
+      try {
+        const parsed = request.postDataJSON() as Record<string, unknown>;
+        return parsed ?? {};
+      } catch {
+        return {};
+      }
+    })() as Record<string, unknown> & { id?: string };
+
+    lastPatchPayload = payload;
+
+    if (!payload.id) {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Bad request" })
+      });
+      return;
+    }
+
+    const currentItem = menuItems.find((item) => item.id === payload.id);
+
+    if (!currentItem) {
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Item not found" })
+      });
+      return;
+    }
+
+    const updatedItem = {
+      ...currentItem,
+      ...payload
+    };
+    menuItems = menuItems.map((item) =>
+      item.id === payload.id ? updatedItem : item
+    );
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(updatedItem)
+    });
+  });
+
+  await page.goto("/admin/menu");
+  await page.getByRole("button", { name: /^Menu$/ }).click();
+  await page.getByRole("button", { name: "Edit" }).click();
+
+  const firstCard = page.locator("article.order-card").first();
+  await expect(firstCard).toBeVisible();
+
+  const descriptionTextarea = firstCard.locator(".menu-editor__textarea").first();
+  const textareaVisibleBeforeToggle = await descriptionTextarea
+    .isVisible()
+    .catch(() => false);
+
+  if (!textareaVisibleBeforeToggle) {
+    await firstCard.getByRole("button", { name: "Show description" }).click();
+  }
+
+  await expect(descriptionTextarea).toBeVisible();
+  await descriptionTextarea.fill(draftDescription);
+  await expect(descriptionTextarea).toHaveValue(draftDescription);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  await expect
+    .poll(() => menuGetCalls)
+    .toBeGreaterThan(1);
+
+  await expect(descriptionTextarea).toHaveValue(draftDescription);
+  await expect
+    .poll(() => lastPatchPayload)
+    .toBeNull();
+
+  await firstCard.getByRole("button", { name: "Save" }).click();
+
+  await expect
+    .poll(
+      () =>
+        lastPatchPayload as
+          | {
+              id?: string;
+              descriptionHe?: string;
+            }
+          | null
+    )
+    .toMatchObject({ id: targetItemId, descriptionHe: draftDescription });
 });
 
 test("item switched to unavailable in admin disappears from guest menu", async ({ page }) => {
@@ -237,23 +470,50 @@ test("item switched to unavailable in admin disappears from guest menu", async (
       return;
     }
 
-    const payload = JSON.parse(request.postData() ?? "{}") as {
+    const payload = (() => {
+      try {
+        const parsed = request.postDataJSON() as Record<string, unknown>;
+        return parsed ?? {};
+      } catch {
+        return {};
+      }
+    })() as {
       id?: string;
       available?: boolean;
     };
     lastPatchPayload = payload;
 
-    if (payload.id && typeof payload.available === "boolean") {
-      const nextAvailable = payload.available;
+    if (payload.id) {
+      const currentItem = menuItems.find((item) => item.id === payload.id);
+
+      if (!currentItem) {
+        await route.fulfill({
+          status: 404,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Item not found" })
+        });
+        return;
+      }
+
+      const nextAvailable =
+        typeof payload.available === "boolean" ? payload.available : currentItem.available;
+      const updatedItem = { ...currentItem, available: nextAvailable };
       menuItems = menuItems.map((item) =>
-        item.id === payload.id ? { ...item, available: nextAvailable } : item
+        item.id === payload.id ? updatedItem : item
       );
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(updatedItem)
+      });
+      return;
     }
 
     await route.fulfill({
-      status: 200,
+      status: 400,
       contentType: "application/json",
-      body: JSON.stringify({ ok: true })
+      body: JSON.stringify({ message: "Bad request" })
     });
   });
 
@@ -294,6 +554,12 @@ test("item switched to unavailable in admin disappears from guest menu", async (
     ".menu-editor__availability-toggle input[type='checkbox']"
   );
   await availabilityToggle.click();
+
+  await expect
+    .poll(() => lastPatchPayload)
+    .toBeNull();
+
+  await firstCard.getByRole("button", { name: "Save" }).click();
 
   await expect
     .poll(() => lastPatchPayload as { id?: string; available?: boolean } | null)
