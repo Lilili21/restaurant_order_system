@@ -64,6 +64,17 @@ function ControlCenterToolbarComponent({
   onSelectDrinks,
   orderMode = "tables"
 }: Props) {
+  const normalizedRestaurantSlug = restaurantSlug.trim().toLowerCase();
+  const isBeerBarRestaurant =
+    normalizedRestaurantSlug === "beerabar" ||
+    normalizedRestaurantSlug === "beerbar";
+  const showLinkToOrderButton = orderMode === "counter" || isBeerBarRestaurant;
+  const linkToOrderHref = `/${restaurantSlug}/menu/0`;
+
+  function openLinkToOrder() {
+    window.open(linkToOrderHref, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="menu-editor__toolbar">
       <div className="menu-editor__toolbar-row">
@@ -184,6 +195,15 @@ function ControlCenterToolbarComponent({
           </button>
           {settingsButtonsOpen ? (
             <div className="menu-editor__toolbar-subrow">
+              {showLinkToOrderButton ? (
+                <button
+                  className="admin-menu-bubble"
+                  type="button"
+                  onClick={openLinkToOrder}
+                >
+                  Link 2Order
+                </button>
+              ) : null}
               {orderMode !== "counter" ? (
                 <TableCountControl
                   credentials={secondaryCredentials}

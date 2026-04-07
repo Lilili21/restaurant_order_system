@@ -88,6 +88,11 @@
   "kitchenOpenUntil": null,
   "barOpenEnabled": false,
   "barOpenUntil": null,
+  "orderMode": "tables",
+  "contactRequirement": "none",
+  "requireOtp": false,
+  "orderNumberPrefix": "ORD",
+  "showGuestOrderHistory": false,
   "tableCount": 6,
   "tableTokens": {
     "1": "tbl_3oBYi40Rklr4",

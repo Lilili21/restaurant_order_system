@@ -124,6 +124,17 @@ async function setupOrdersApi(
   const patchPayloads: Array<Record<string, unknown>> = [];
   let getOrdersCallCount = 0;
 
+  const readJsonPayload = (request: { postDataJSON: () => unknown }) => {
+    try {
+      const parsed = request.postDataJSON();
+      return parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
   await page.route("**/api/orders", async (route, request) => {
     if (request.method() === "GET") {
       const snapshotIndex = Math.min(
@@ -142,7 +153,7 @@ async function setupOrdersApi(
     }
 
     if (request.method() === "PATCH") {
-      const payload = JSON.parse(request.postData() ?? "{}") as Record<string, unknown>;
+      const payload = readJsonPayload(request);
       patchPayloads.push(payload);
 
       const result = options.onPatch
@@ -916,5 +927,149 @@ test.describe("Live Orders expanded 26-45", () => {
 
     await expect(page.locator(".modal-error")).toContainText("Invalid secondary credentials");
     expect(tracker.tablePatchPayloads.length).toBe(0);
+  });
+
+  test("LIVE-46 bar Ready removes card only from bar and keeps it in kitchen", async ({
+    page
+  }) => {
+    await setupAdminAuth(page);
+
+    const order = createMockOrder({
+      id: "live-46-station-bar",
+      tableNumber: 115,
+      items: [
+        {
+          id: "live-46-kitchen-item",
+          menuItemId: "live-46-kitchen-item",
+          name: "Kitchen item",
+          category: "mains",
+          price: 35,
+          quantity: 1,
+          served: false
+        },
+        {
+          id: "live-46-bar-item",
+          menuItemId: "live-46-bar-item",
+          name: "Bar item",
+          category: "cocktails",
+          price: 25,
+          quantity: 1,
+          served: false
+        }
+      ]
+    });
+
+    const tracker = await setupOrdersApi(page, {
+      snapshots: [[order]],
+      onPatch: (payload) => ({
+        status: 200,
+        body: {
+          ...order,
+          items: order.items.map((item) => {
+            if (item.category === "cocktails") {
+              return {
+                ...item,
+                note:
+                  payload.cooked === true && payload.station === "bar"
+                    ? "__menu_order_bar_ready__"
+                    : item.note
+              };
+            }
+
+            return item;
+          }),
+          updatedAt: new Date().toISOString()
+        }
+      })
+    });
+
+    await page.goto("/admin/orders");
+    await page.getByRole("button", { name: "Bar" }).click();
+    await expect(page.getByRole("heading", { name: "Table 115" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Ready" }).click();
+    await expect
+      .poll(() =>
+        tracker.patchPayloads.some(
+          (payload) => payload.cooked === true && payload.station === "bar"
+        )
+      )
+      .toBe(true);
+
+    await expect(page.getByRole("heading", { name: "Table 115" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Kitchen" }).click();
+    await expect(page.getByRole("heading", { name: "Table 115" })).toBeVisible();
+  });
+
+  test("LIVE-47 kitchen Ready removes card only from kitchen and keeps it in bar", async ({
+    page
+  }) => {
+    await setupAdminAuth(page);
+
+    const order = createMockOrder({
+      id: "live-47-station-kitchen",
+      tableNumber: 116,
+      items: [
+        {
+          id: "live-47-kitchen-item",
+          menuItemId: "live-47-kitchen-item",
+          name: "Kitchen item",
+          category: "mains",
+          price: 31,
+          quantity: 1,
+          served: false
+        },
+        {
+          id: "live-47-bar-item",
+          menuItemId: "live-47-bar-item",
+          name: "Bar item",
+          category: "cocktails",
+          price: 21,
+          quantity: 1,
+          served: false
+        }
+      ]
+    });
+
+    const tracker = await setupOrdersApi(page, {
+      snapshots: [[order]],
+      onPatch: (payload) => ({
+        status: 200,
+        body: {
+          ...order,
+          items: order.items.map((item) => {
+            if (item.category !== "cocktails") {
+              return {
+                ...item,
+                note:
+                  payload.cooked === true && payload.station === "kitchen"
+                    ? "__menu_order_kitchen_ready__"
+                    : item.note
+              };
+            }
+
+            return item;
+          }),
+          updatedAt: new Date().toISOString()
+        }
+      })
+    });
+
+    await page.goto("/admin/orders");
+    await page.getByRole("button", { name: "Kitchen" }).click();
+    await expect(page.getByRole("heading", { name: "Table 116" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Ready" }).click();
+    await expect
+      .poll(() =>
+        tracker.patchPayloads.some(
+          (payload) => payload.cooked === true && payload.station === "kitchen"
+        )
+      )
+      .toBe(true);
+
+    await expect(page.getByRole("heading", { name: "Table 116" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Bar" }).click();
+    await expect(page.getByRole("heading", { name: "Table 116" })).toBeVisible();
   });
 });

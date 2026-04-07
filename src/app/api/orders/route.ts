@@ -471,6 +471,7 @@ export async function PATCH(request: NextRequest) {
     orderItemId?: string;
     served?: boolean;
     cooked?: boolean;
+    station?: "kitchen" | "bar";
     quantityDelta?: number;
     guestContactName?: string;
     guestContactPhone?: string;
@@ -535,7 +536,11 @@ export async function PATCH(request: NextRequest) {
         : typeof body.orderItemId === "string" && typeof body.served === "boolean"
         ? await updateOrderItemServed(body.orderId, body.orderItemId, body.served)
         : typeof body.cooked === "boolean"
-          ? await updateOrderCooked(body.orderId, body.cooked)
+          ? await updateOrderCooked(
+              body.orderId,
+              body.cooked,
+              body.station === "bar" ? "bar" : "kitchen"
+            )
         : body.status
           ? await updateOrderStatus(body.orderId, body.status)
           : (() => {

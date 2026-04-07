@@ -180,11 +180,34 @@ const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
 const MERGE_ORDER_WINDOW_MS = 3 * 60 * 1000;
 const SHIFT_CLOSE_GRACE_MS = 60 * 60 * 1000;
-const COOKED_MARKER = "__menu_order_cooked__";
+const LEGACY_COOKED_MARKER = "__menu_order_cooked__";
+const KITCHEN_READY_MARKER = "__menu_order_kitchen_ready__";
+const BAR_READY_MARKER = "__menu_order_bar_ready__";
 const MAX_WEEKLY_ARCHIVE_FILES = 4;
 const ORDERS_DEBUG_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.DEBUG_ORDERS_STATE ?? "").toLowerCase()
 );
+const BAR_CATEGORIES = new Set<MenuCategory>([
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "alcohol",
+  "cocktails",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+]);
 
 type WeeklyOrdersArchive = {
   weekKey: string;
@@ -292,21 +315,77 @@ function normalizeOrderItemNoteValue(note: string | undefined) {
   return typeof note === "string" && note.trim() ? note.trim() : "";
 }
 
-function noteHasCookedMarker(note: string | undefined) {
-  return normalizeOrderItemNoteValue(note).includes(COOKED_MARKER);
-}
-
-function setCookedMarkerOnNote(note: string | undefined, cooked: boolean) {
-  const base = normalizeOrderItemNoteValue(note)
-    .replaceAll(COOKED_MARKER, "")
+function parseReadyMarkersFromNote(note: string | undefined) {
+  const normalized = normalizeOrderItemNoteValue(note);
+  const hasKitchenReady =
+    normalized.includes(KITCHEN_READY_MARKER) ||
+    normalized.includes(LEGACY_COOKED_MARKER);
+  const hasBarReady = normalized.includes(BAR_READY_MARKER);
+  const base = normalized
+    .replaceAll(KITCHEN_READY_MARKER, "")
+    .replaceAll(LEGACY_COOKED_MARKER, "")
+    .replaceAll(BAR_READY_MARKER, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  if (!cooked) {
-    return base || undefined;
-  }
+  return {
+    base,
+    hasKitchenReady,
+    hasBarReady
+  };
+}
 
-  return base ? `${base} ${COOKED_MARKER}` : COOKED_MARKER;
+function composeNoteWithReadyMarkers(input: {
+  base: string;
+  hasKitchenReady: boolean;
+  hasBarReady: boolean;
+}) {
+  const markers = [
+    input.hasKitchenReady ? KITCHEN_READY_MARKER : null,
+    input.hasBarReady ? BAR_READY_MARKER : null
+  ].filter(Boolean);
+  const next = [input.base, ...markers].filter(Boolean).join(" ").trim();
+  return next || undefined;
+}
+
+function isBarCategory(category: MenuCategory | undefined) {
+  return category ? BAR_CATEGORIES.has(category) : false;
+}
+
+function isItemInReadyStation(
+  item: Pick<OrderItem, "category">,
+  station: "kitchen" | "bar"
+) {
+  return station === "bar" ? isBarCategory(item.category) : !isBarCategory(item.category);
+}
+
+function noteHasBarReadyMarker(note: string | undefined) {
+  return parseReadyMarkersFromNote(note).hasBarReady;
+}
+
+function noteHasCookedMarker(note: string | undefined) {
+  return parseReadyMarkersFromNote(note).hasKitchenReady;
+}
+
+function setCookedMarkerOnNote(note: string | undefined, cooked: boolean) {
+  return setStationReadyMarkerOnNote(note, "kitchen", cooked);
+}
+
+function setStationReadyMarkerOnNote(
+  note: string | undefined,
+  station: "kitchen" | "bar",
+  ready: boolean
+) {
+  const parsed = parseReadyMarkersFromNote(note);
+  const hasKitchenReady =
+    station === "kitchen" ? ready : parsed.hasKitchenReady;
+  const hasBarReady = station === "bar" ? ready : parsed.hasBarReady;
+
+  return composeNoteWithReadyMarkers({
+    base: parsed.base,
+    hasKitchenReady,
+    hasBarReady
+  });
 }
 
 function isOrderCooked(order: Order) {
@@ -3631,7 +3710,11 @@ export async function updateOrderItemServed(
   return normalizedOrder;
 }
 
-export async function updateOrderCooked(orderId: string, cooked: boolean) {
+export async function updateOrderCooked(
+  orderId: string,
+  cooked: boolean,
+  station: "kitchen" | "bar" = "kitchen"
+) {
   const state = await readRuntimeStateAsync();
   const order = state.ordersStore.find((item) => item.id === orderId);
 
@@ -3647,12 +3730,20 @@ export async function updateOrderCooked(orderId: string, cooked: boolean) {
     throw new Error("Closed order cannot be updated");
   }
 
-  order.items = order.items.map((item) => ({
-    ...item,
-    note: setCookedMarkerOnNote(item.note, cooked)
-  }));
+  let touchedItems = 0;
+  order.items = order.items.map((item) => {
+    if (!isItemInReadyStation(item, station)) {
+      return item;
+    }
 
-  if (cooked && order.status === "new") {
+    touchedItems += 1;
+    return {
+      ...item,
+      note: setStationReadyMarkerOnNote(item.note, station, cooked)
+    };
+  });
+
+  if (cooked && touchedItems > 0 && order.status === "new") {
     order.status = "preparing";
   }
 

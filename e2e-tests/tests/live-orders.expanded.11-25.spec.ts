@@ -115,6 +115,17 @@ async function setupOrdersApi(
   let getOrdersCallCount = 0;
   const patchPayloads: Array<Record<string, unknown>> = [];
 
+  const readJsonPayload = (request: { postDataJSON: () => unknown }) => {
+    try {
+      const parsed = request.postDataJSON();
+      return parsed && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
   await page.route("**/api/orders", async (route, request) => {
     if (request.method() === "GET") {
       const snapshotIndex = Math.min(
@@ -133,7 +144,7 @@ async function setupOrdersApi(
     }
 
     if (request.method() === "PATCH") {
-      const payload = JSON.parse(request.postData() ?? "{}") as Record<string, unknown>;
+      const payload = readJsonPayload(request);
       patchPayloads.push(payload);
       const result = options.onPatch
         ? options.onPatch(payload)
@@ -510,7 +521,7 @@ test.describe("Live Orders expanded 11-25", () => {
     await expect(page.getByRole("heading", { name: "Table 28" })).toHaveCount(0);
   });
 
-  test("LIVE-16 kitchen Ready action sends cooked=true and removes card", async ({
+  test("LIVE-16 kitchen Ready action sends cooked=true with station=kitchen and removes card", async ({
     page
   }) => {
     await setupAdminAuth(page);
@@ -540,8 +551,8 @@ test.describe("Live Orders expanded 11-25", () => {
           items: order.items.map((item) => ({
             ...item,
             note:
-              payload.cooked === true
-                ? "__menu_order_cooked__"
+              payload.cooked === true && payload.station === "kitchen"
+                ? "__menu_order_kitchen_ready__"
                 : item.note
           })),
           updatedAt: new Date().toISOString()
@@ -556,7 +567,11 @@ test.describe("Live Orders expanded 11-25", () => {
     await page.getByRole("button", { name: "Ready" }).click();
 
     await expect
-      .poll(() => tracker.patchPayloads.some((payload) => payload.cooked === true))
+      .poll(() =>
+        tracker.patchPayloads.some(
+          (payload) => payload.cooked === true && payload.station === "kitchen"
+        )
+      )
       .toBe(true);
     await expect(page.getByRole("heading", { name: "Table 29" })).toHaveCount(0);
     await expect(page.getByText("No active orders for the selected table.")).toBeVisible();

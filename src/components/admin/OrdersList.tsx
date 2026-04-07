@@ -36,6 +36,9 @@ const serveModeLabels = {
   all_at_once: "Serve everything together",
   as_ready: "Serve as ready"
 } as const;
+const LEGACY_COOKED_MARKER = "__menu_order_cooked__";
+const KITCHEN_READY_MARKER = "__menu_order_kitchen_ready__";
+const BAR_READY_MARKER = "__menu_order_bar_ready__";
 
 const barCategories = new Set<MenuCategory>([
   "drinks",
@@ -59,6 +62,45 @@ const barCategories = new Set<MenuCategory>([
   "non_alcoholic_drinks"
 ]);
 
+function isBarCategory(category: MenuCategory | undefined) {
+  return category ? barCategories.has(category) : false;
+}
+
+function getStationItems(order: Order, station: "kitchen" | "bar") {
+  return order.items.filter((item) =>
+    station === "bar" ? isBarCategory(item.category) : !isBarCategory(item.category)
+  );
+}
+
+function noteHasKitchenReadyMarker(note: string | undefined) {
+  return (
+    typeof note === "string" &&
+    (note.includes(KITCHEN_READY_MARKER) || note.includes(LEGACY_COOKED_MARKER))
+  );
+}
+
+function noteHasBarReadyMarker(note: string | undefined) {
+  return typeof note === "string" && note.includes(BAR_READY_MARKER);
+}
+
+function isOrderReadyForStation(order: Order, station: "kitchen" | "bar") {
+  if (order.kind === "waiter_call" || order.kind === "bill_request") {
+    return false;
+  }
+
+  const stationItems = getStationItems(order, station);
+
+  if (stationItems.length === 0) {
+    return false;
+  }
+
+  return stationItems.every((item) =>
+    station === "bar"
+      ? noteHasBarReadyMarker(item.note)
+      : noteHasKitchenReadyMarker(item.note)
+  );
+}
+
 function getOrderItemDisplayName(item: { name: string; volumeLabel?: string }) {
   return item.volumeLabel?.trim() ? `${item.name} · ${item.volumeLabel}` : item.name;
 }
@@ -80,15 +122,8 @@ function getWhatsAppLink(order: Order) {
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
 }
 
-function isCookedOrder(order: Order) {
-  return (
-    order.kind !== "waiter_call" &&
-    order.kind !== "bill_request" &&
-    order.items.length > 0 &&
-    order.items.some((item) =>
-      typeof item.note === "string" ? item.note.includes("__menu_order_cooked__") : false
-    )
-  );
+function isKitchenReadyOrder(order: Order) {
+  return isOrderReadyForStation(order, "kitchen");
 }
 
 function getHallKitchenIndicator(order: Order, now: number) {
@@ -96,7 +131,7 @@ function getHallKitchenIndicator(order: Order, now: number) {
     return null;
   }
 
-  if (isCookedOrder(order)) {
+  if (isKitchenReadyOrder(order)) {
     return {
       label: "Cooked",
       className: "status-pill status-pill--kitchen-cooked"
@@ -508,13 +543,17 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
     });
   }
 
-  async function toggleOrderCooked(orderId: string, cooked: boolean) {
+  async function toggleOrderCooked(
+    orderId: string,
+    cooked: boolean,
+    station: "kitchen" | "bar"
+  ) {
     const response = await fetch("/api/orders", {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ orderId, cooked })
+      body: JSON.stringify({ orderId, cooked, station })
     });
 
     if (!response.ok) {
@@ -655,9 +694,9 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
             : selectedTablesSet.has(order.tableNumber)) &&
           order.kind !== "waiter_call" &&
           order.kind !== "bill_request" &&
-          !isCookedOrder(order) &&
+          !isKitchenReadyOrder(order) &&
           order.items.some((item) =>
-            item.category ? !barCategories.has(item.category) : true
+            !isBarCategory(item.category)
           )
       ),
     [isCounterMode, orders, selectedTablesSet]
@@ -696,17 +735,18 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
             : selectedZone === "bar"
               ? order.kind !== "waiter_call" &&
                 order.kind !== "bill_request" &&
+                !isOrderReadyForStation(order, "bar") &&
                 order.items.some((item) =>
-                  item.category ? barCategories.has(item.category) : false
+                  isBarCategory(item.category)
                 )
               : order.kind !== "waiter_call" &&
                 order.kind !== "bill_request" &&
-                !isCookedOrder(order) &&
+                !isKitchenReadyOrder(order) &&
                 selectedKitchenStatuses.includes(
                   getKitchenStage(getOrderAgeMs(order.createdAt, currentTimestamp))
                 ) &&
                 order.items.some((item) =>
-                  item.category ? !barCategories.has(item.category) : true
+                  !isBarCategory(item.category)
                 ))
         )
         .sort(
@@ -743,10 +783,10 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
           ? order.items
           : isBarView
             ? order.items.filter((item) =>
-                item.category ? barCategories.has(item.category) : false
+                isBarCategory(item.category)
               )
             : order.items.filter((item) =>
-                item.category ? !barCategories.has(item.category) : true
+                !isBarCategory(item.category)
               );
         const visibleTotal = visibleItems.reduce(
           (sum, item) => sum + item.price * item.quantity,
@@ -771,7 +811,9 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
         const orderAgeTone = getOrderAgeTone(orderAgeMs);
         const isTimedOrder =
           order.kind !== "waiter_call" && order.kind !== "bill_request";
-        const isCooked = isCookedOrder(order);
+        const isKitchenReady = isKitchenReadyOrder(order);
+        const isBarReady = isOrderReadyForStation(order, "bar");
+        const isStationReady = isBarView ? isBarReady : isKitchenReady;
         const hallKitchenIndicator = isHallView
           ? getHallKitchenIndicator(order, currentTimestamp)
           : null;
@@ -780,7 +822,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
           : null;
         const isCookedFreshHighlight =
           isHallView &&
-          isCooked &&
+          isKitchenReady &&
           !order.items.some((item) => item.served) &&
           currentTimestamp - new Date(order.updatedAt || order.createdAt).getTime() <
             COOKED_HIGHLIGHT_MS;
@@ -790,7 +832,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
           groupedBarItems,
           hallKitchenIndicator,
           isBarView,
-          isCooked,
+          isStationReady,
           isCookedFreshHighlight,
           isFreshNewOrder,
           isHallView,
@@ -1168,7 +1210,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
               groupedBarItems,
               hallKitchenIndicator,
               isBarView,
-              isCooked,
+              isStationReady,
               isCookedFreshHighlight,
               isFreshNewOrder,
               isHallView,
@@ -1395,10 +1437,14 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
                     <button
                       className="button-success order-action-ready"
                       type="button"
-                      aria-disabled={isCooked}
+                      aria-disabled={isStationReady}
                       onClick={() => {
-                        if (!isCooked) {
-                          void toggleOrderCooked(order.id, true);
+                        if (!isStationReady) {
+                          void toggleOrderCooked(
+                            order.id,
+                            true,
+                            isBarView ? "bar" : "kitchen"
+                          );
                         }
                       }}
                     >
