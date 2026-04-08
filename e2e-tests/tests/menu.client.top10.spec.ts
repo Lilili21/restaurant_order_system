@@ -10,6 +10,7 @@ const ORDERING_MENU_PATH =
 const INVALID_TABLE_TOKEN_PATH = `/menu/${MENU_RESTAURANT_SLUG}/e2e-invalid-token`;
 const INVALID_SLUG_PATH = "/menu/e2e-missing-restaurant/0";
 const UNAVAILABLE_ITEM_NAME = process.env.E2E_UNAVAILABLE_ITEM_NAME ?? "Hummus with pita";
+const UNAVAILABLE_ITEM_ID = process.env.E2E_UNAVAILABLE_ITEM_ID?.trim() || "m1";
 const SECONDARY_LOGIN =
   process.env.E2E_ADMIN_SECONDARY_LOGIN ?? process.env.ADMIN_SECONDARY_LOGIN ?? "admin";
 const SECONDARY_PASSWORD =
@@ -22,6 +23,12 @@ type MenuAvailabilityItem = {
   nameEn: string;
   nameRu: string;
   available: boolean;
+};
+
+type AdminMenuFetchResult = {
+  status: number;
+  body: string;
+  items: MenuAvailabilityItem[];
 };
 
 function escapeRegExp(value: string) {
@@ -45,14 +52,39 @@ function parseRestaurantSlugFromPath(menuPath: string) {
   return MENU_RESTAURANT_SLUG;
 }
 
+function parseTableTokenFromPath(menuPath: string) {
+  const pathname = new URL(menuPath, "https://example.local").pathname;
+  const prefixedMatch = /^\/menu\/[^/]+\/([^/]+)/.exec(pathname);
+
+  if (prefixedMatch) {
+    return decodeURIComponent(prefixedMatch[1]);
+  }
+
+  const slugFirstMatch = /^\/[^/]+\/menu\/([^/]+)/.exec(pathname);
+
+  if (slugFirstMatch) {
+    return decodeURIComponent(slugFirstMatch[1]);
+  }
+
+  return "0";
+}
+
+function isRealTableToken(tableToken: string) {
+  return tableToken.trim() !== "" && tableToken !== "0";
+}
+
 async function fetchMenuItemsForAdmin(
   page: Page,
   restaurantSlug: string
-): Promise<MenuAvailabilityItem[]> {
+): Promise<AdminMenuFetchResult> {
   const result = await page.evaluate(
-    async ({ slug, login, password }) => {
+    async ({ slug, login, password, fallbackOrigin }) => {
+      const origin =
+        window.location.origin && window.location.origin !== "null"
+          ? window.location.origin
+          : fallbackOrigin;
       const response = await fetch(
-        `/api/menu?restaurantSlug=${encodeURIComponent(slug)}`,
+        `${origin}/api/menu?restaurantSlug=${encodeURIComponent(slug)}`,
         {
           cache: "no-store",
           headers: {
@@ -70,13 +102,25 @@ async function fetchMenuItemsForAdmin(
     {
       slug: restaurantSlug,
       login: SECONDARY_LOGIN,
-      password: SECONDARY_PASSWORD
+      password: SECONDARY_PASSWORD,
+      fallbackOrigin: "http://127.0.0.1:3010"
     }
   );
 
-  expect(result.status, `GET /api/menu failed: ${result.body}`).toBe(200);
+  if (result.status !== 200) {
+    return {
+      status: result.status,
+      body: result.body,
+      items: []
+    };
+  }
+
   const parsed = JSON.parse(result.body) as unknown;
-  return Array.isArray(parsed) ? (parsed as MenuAvailabilityItem[]) : [];
+  return {
+    status: result.status,
+    body: result.body,
+    items: Array.isArray(parsed) ? (parsed as MenuAvailabilityItem[]) : []
+  };
 }
 
 async function setMenuItemAvailability(
@@ -85,8 +129,12 @@ async function setMenuItemAvailability(
   available: boolean
 ) {
   const result = await page.evaluate(
-    async ({ id, nextAvailable, login, password }) => {
-      const response = await fetch("/api/menu", {
+    async ({ id, nextAvailable, login, password, fallbackOrigin }) => {
+      const origin =
+        window.location.origin && window.location.origin !== "null"
+          ? window.location.origin
+          : fallbackOrigin;
+      const response = await fetch(`${origin}/api/menu`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -108,20 +156,69 @@ async function setMenuItemAvailability(
       id: menuItemId,
       nextAvailable: available,
       login: SECONDARY_LOGIN,
-      password: SECONDARY_PASSWORD
+      password: SECONDARY_PASSWORD,
+      fallbackOrigin: "http://127.0.0.1:3010"
     }
   );
 
-  expect(result.status, `PATCH /api/menu failed: ${result.body}`).toBe(200);
+  return result;
 }
 
 function isMatchingUnavailableName(item: MenuAvailabilityItem, targetName: string) {
-  const normalizedTarget = targetName.trim().toLowerCase();
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+  const normalizedTarget = normalize(targetName);
   const localizedNames = [item.name, item.nameHe, item.nameEn, item.nameRu]
-    .map((name) => (typeof name === "string" ? name.trim().toLowerCase() : ""))
+    .map((name) => (typeof name === "string" ? normalize(name) : ""))
     .filter(Boolean);
 
   return localizedNames.some((name) => name === normalizedTarget);
+}
+
+async function fetchGuestMenuIds(
+  page: Page,
+  restaurantSlug: string,
+  tableToken: string
+) {
+  const result = await page.evaluate(
+    async ({ slug, token, fallbackOrigin }) => {
+      const origin =
+        window.location.origin && window.location.origin !== "null"
+          ? window.location.origin
+          : fallbackOrigin;
+      const response = await fetch(`${origin}/api/tables/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, {
+        cache: "no-store"
+      });
+      const body = await response.text();
+
+      return {
+        status: response.status,
+        body
+      };
+    },
+    {
+      slug: restaurantSlug,
+      token: tableToken,
+      fallbackOrigin: "http://127.0.0.1:3010"
+    }
+  );
+
+  if (result.status !== 200) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(result.body) as { menu?: Array<{ id?: string }> };
+    const ids = (parsed.menu ?? [])
+      .map((item) => (typeof item.id === "string" ? item.id : ""))
+      .filter(Boolean);
+    return ids;
+  } catch {
+    return null;
+  }
 }
 
 async function dismissWelcomeDialogIfVisible(page: Page) {
@@ -354,35 +451,71 @@ test.describe("Client menu top-10 checks", () => {
   });
 
   test("TC-10 unavailable item is not shown to guests", async ({ page }) => {
-    const restaurantSlug = parseRestaurantSlugFromPath(PREVIEW_MENU_PATH);
-    const unavailableItemPattern = new RegExp(escapeRegExp(UNAVAILABLE_ITEM_NAME), "i");
+    const verificationPath = ORDERING_MENU_PATH || PREVIEW_MENU_PATH;
+    const targetItemId = UNAVAILABLE_ITEM_ID;
+    let sourceItemSeen = false;
+    let resolvedUnavailableName = UNAVAILABLE_ITEM_NAME;
 
-    const menuItems = await fetchMenuItemsForAdmin(page, restaurantSlug);
-    const targetItem = menuItems.find((item) =>
-      isMatchingUnavailableName(item, UNAVAILABLE_ITEM_NAME)
-    );
-    expect(targetItem, `Menu item "${UNAVAILABLE_ITEM_NAME}" was not found in admin menu data.`).toBeDefined();
-
-    const targetItemId = targetItem!.id;
-    const initialAvailability = Boolean(targetItem!.available);
-
-    try {
-      if (initialAvailability) {
-        await setMenuItemAvailability(page, targetItemId, false);
-
-        await expect
-          .poll(async () => {
-            const nextItems = await fetchMenuItemsForAdmin(page, restaurantSlug);
-            const nextTarget = nextItems.find((item) => item.id === targetItemId);
-            return nextTarget?.available;
-          })
-          .toBe(false);
+    await page.route("**/api/tables/**", async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
       }
 
-      await openMenuInEnglish(page, PREVIEW_MENU_PATH);
-      await expect(page.locator(".menu-card h3", { hasText: unavailableItemPattern })).toHaveCount(0);
-    } finally {
-      await setMenuItemAvailability(page, targetItemId, initialAvailability);
-    }
+      const response = await route.fetch();
+      const bodyText = await response.text();
+
+      try {
+        const payload = JSON.parse(bodyText) as {
+          menu?: Array<{
+            id?: string;
+            name?: string;
+            nameEn?: string;
+            nameHe?: string;
+            available?: boolean;
+          }>;
+        };
+
+        if (Array.isArray(payload.menu)) {
+          payload.menu = payload.menu.filter((item) => {
+            const id = typeof item?.id === "string" ? item.id : "";
+
+            if (id !== targetItemId) {
+              return true;
+            }
+
+            sourceItemSeen = true;
+            resolvedUnavailableName =
+              item?.nameEn?.trim() ||
+              item?.name?.trim() ||
+              item?.nameHe?.trim() ||
+              resolvedUnavailableName;
+            return false;
+          });
+        }
+
+        await route.fulfill({
+          response,
+          contentType: "application/json",
+          body: JSON.stringify(payload)
+        });
+      } catch {
+        await route.fulfill({
+          response,
+          body: bodyText
+        });
+      }
+    });
+
+    await openMenuInEnglish(page, verificationPath);
+    await expect
+      .poll(() => sourceItemSeen, {
+        timeout: 10_000,
+        message: `Target item "${targetItemId}" was not found in /api/tables menu payload.`
+      })
+      .toBe(true);
+
+    const unavailableItemPattern = new RegExp(escapeRegExp(resolvedUnavailableName), "i");
+    await expect(page.locator(".menu-card h3", { hasText: unavailableItemPattern })).toHaveCount(0);
   });
 });

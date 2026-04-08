@@ -27,6 +27,12 @@
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-all -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: Menu TC-10 Unavailable (Isolated)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC E2E_UNAVAILABLE_ITEM_ID=m1 npm run test:menu-top10-unavailable -- --reporter=list,html --workers=1; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Menu Preview (Top10+11-20)",
       "type": "node-terminal",
       "request": "launch",

@@ -452,6 +452,10 @@ export function Cart({
   );
   const [language, setLanguage] = useState<MenuLanguage>("he");
   const [liveMenu, setLiveMenu] = useState<MenuItem[]>(menu);
+  const [livePromotions, setLivePromotions] = useState<PromotionSettings[]>(promotions);
+  const [liveBusinessLunches, setLiveBusinessLunches] = useState<BusinessLunchSettings[]>(
+    businessLunches
+  );
   const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
     initialSubmittedOrders
@@ -500,6 +504,93 @@ export function Cart({
   useEffect(() => {
     setLiveMenu(menu);
   }, [menu]);
+
+  useEffect(() => {
+    setLivePromotions(promotions);
+  }, [promotions]);
+
+  useEffect(() => {
+    setLiveBusinessLunches(businessLunches);
+  }, [businessLunches]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let inFlightAbortController: AbortController | null = null;
+    let pollTimeoutId: number | null = null;
+    const POLL_INTERVAL_MS = 12_000;
+
+    function scheduleNextSync() {
+      if (cancelled) {
+        return;
+      }
+
+      pollTimeoutId = window.setTimeout(() => {
+        void syncMenuSettings();
+      }, POLL_INTERVAL_MS);
+    }
+
+    async function syncMenuSettings() {
+      if (cancelled) {
+        return;
+      }
+
+      if (document.visibilityState === "hidden") {
+        scheduleNextSync();
+        return;
+      }
+
+      inFlightAbortController?.abort();
+      inFlightAbortController = new AbortController();
+
+      let response: Response;
+
+      try {
+        response = await fetch(
+          `/api/menu-settings?restaurantSlug=${encodeURIComponent(restaurantSlug)}`,
+          {
+            cache: "no-store",
+            signal: inFlightAbortController.signal
+          }
+        );
+      } catch {
+        scheduleNextSync();
+        return;
+      }
+
+      if (!response.ok) {
+        scheduleNextSync();
+        return;
+      }
+
+      const data = (await response.json()) as {
+        promotions?: PromotionSettings[];
+        businessLunches?: BusinessLunchSettings[];
+      };
+
+      if (!cancelled) {
+        if (Array.isArray(data.promotions)) {
+          setLivePromotions(data.promotions);
+        }
+
+        if (Array.isArray(data.businessLunches)) {
+          setLiveBusinessLunches(data.businessLunches);
+        }
+      }
+
+      scheduleNextSync();
+    }
+
+    void syncMenuSettings();
+
+    return () => {
+      cancelled = true;
+      inFlightAbortController?.abort();
+
+      if (pollTimeoutId !== null) {
+        window.clearTimeout(pollTimeoutId);
+      }
+    };
+  }, [restaurantSlug]);
 
   const detailedItems = useMemo(() => {
     return items
@@ -660,17 +751,17 @@ export function Cart({
   );
   const hasTimedMenuWindows = useMemo(
     () =>
-      promotions.some(
+      livePromotions.some(
         (promotion) =>
           promotion.enabled &&
           Boolean(promotion.startsFrom || promotion.until)
       ) ||
-      businessLunches.some(
+      liveBusinessLunches.some(
         (businessLunch) =>
           businessLunch.enabled &&
           Boolean(businessLunch.startsFrom || businessLunch.until)
       ),
-    [businessLunches, promotions]
+    [liveBusinessLunches, livePromotions]
   );
 
   function isScheduledWindowActive(
@@ -707,18 +798,19 @@ export function Cart({
   }
 
   const activePromotions = useMemo(() => {
-    return promotions.filter(
+    return livePromotions.filter(
       (promotion) =>
         promotion.discountPercent > 0 && isScheduledWindowActive(promotion)
     );
-  }, [countdownNow, promotions]);
+  }, [countdownNow, livePromotions]);
   const activeBusinessLunches = useMemo(
-    () => businessLunches.filter((businessLunch) => isScheduledWindowActive(businessLunch)),
-    [businessLunches, countdownNow]
+    () =>
+      liveBusinessLunches.filter((businessLunch) => isScheduledWindowActive(businessLunch)),
+    [countdownNow, liveBusinessLunches]
   );
   const visibleMenu = useMemo(() => {
     const restrictedCategories = new Set<MenuCategory>(
-      businessLunches.flatMap((businessLunch) =>
+      liveBusinessLunches.flatMap((businessLunch) =>
         businessLunch.enabled ? businessLunch.categories : []
       )
     );
@@ -735,7 +827,7 @@ export function Cart({
         !restrictedCategories.has(item.category) ||
         activeBusinessLunchCategories.has(item.category)
     );
-  }, [activeBusinessLunches, businessLunches, liveMenu]);
+  }, [activeBusinessLunches, liveBusinessLunches, liveMenu]);
 
   const effectiveSelectedFilter =
     selectedMenuFilter &&

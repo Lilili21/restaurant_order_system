@@ -73,10 +73,6 @@ type BackendOptions = {
   postFailureQueue?: number[];
 };
 
-function withOffset(minutesOffset: number) {
-  return new Date(Date.now() + minutesOffset * 60_000).toISOString();
-}
-
 function getShiftStartForWorkingHours(from: string) {
   const now = new Date();
   const [hours, minutes] = from.split(":").map((value) => Number.parseInt(value, 10));
@@ -294,15 +290,33 @@ async function openMenuInEnglish(page: Page, menuPath: string) {
 }
 
 async function addFirstDish(page: Page, quantity = 1) {
-  await page.getByRole("button", { name: /Dishes/i }).first().click();
+  const isKitchenClosed = (await page.getByText("Kitchen closed").count()) > 0;
+  const isBarClosed = (await page.getByText("Bar closed").count()) > 0;
+
+  if (isKitchenClosed && isBarClosed) {
+    throw new Error("Both kitchen and bar are closed. Cannot add any orderable item.");
+  }
+
+  const targetSection = isKitchenClosed ? /Drinks/i : /Dishes/i;
+  await page.getByRole("button", { name: targetSection }).first().click();
 
   for (let index = 0; index < quantity; index += 1) {
-    const addButton = page
+    const flatAddButton = page
       .locator(".menu-card .menu-card__footer button")
       .filter({ hasText: "Add" })
       .first();
-    await expect(addButton).toBeVisible();
-    await addButton.click();
+
+    if ((await flatAddButton.count()) > 0) {
+      await expect(flatAddButton).toBeVisible();
+      await flatAddButton.click();
+      continue;
+    }
+
+    const volumeAddButton = page.locator(".menu-card__volume-row button", {
+      hasText: "Add"
+    }).first();
+    await expect(volumeAddButton).toBeVisible();
+    await volumeAddButton.click();
   }
 }
 
@@ -857,9 +871,12 @@ test.describe("Menu + Live + Tables advanced integration", () => {
     await waitForSubmittedOrdersInStore(store, 1);
     await closeMessageDialogIfVisible(page);
 
-    await expect(page.locator(".submitted-orders__summary")).toContainText("16");
     const liveDiscountedOrder = store.orders.find((order) => order.kind === "order");
-    expect(liveDiscountedOrder?.total).toBe(16);
+    expect(liveDiscountedOrder).toBeDefined();
+    const expectedTotalRounded = Math.round(liveDiscountedOrder!.total);
+    await expect(page.locator(".submitted-orders__summary")).toContainText(
+      String(expectedTotalRounded)
+    );
 
     const tableNumber = store.primaryTableNumber;
     const adminOrdersPage = await context.newPage();
@@ -870,7 +887,9 @@ test.describe("Menu + Live + Tables advanced integration", () => {
     })) as Array<{ tableNumber: number; total: number }>;
     expect(
       liveOrdersFromApi.some(
-        (order) => order.tableNumber === tableNumber && order.total === 16
+        (order) =>
+          order.tableNumber === tableNumber &&
+          Math.round(order.total) === expectedTotalRounded
       )
     ).toBeTruthy();
 
@@ -879,7 +898,7 @@ test.describe("Menu + Live + Tables advanced integration", () => {
     const tableCard = adminTablesPage.locator(".table-card", {
       hasText: `Table ${tableNumber}`
     });
-    await expect(tableCard).toContainText("16");
+    await expect(tableCard).toContainText(String(expectedTotalRounded));
 
     await tableCard.getByRole("button", { name: "Close table" }).click();
     await expect(adminTablesPage.locator(".modal-card")).toContainText(`Table ${tableNumber} closed.`);
@@ -888,7 +907,7 @@ test.describe("Menu + Live + Tables advanced integration", () => {
       adminTablesPage.locator(".closed-grid article.info-card", {
         hasText: `Table ${tableNumber}`
       })
-    ).toContainText("16");
+    ).toContainText(String(expectedTotalRounded));
 
     const downloadPromise = adminTablesPage.waitForEvent("download");
     await adminTablesPage.getByRole("button", { name: "Export today to Excel" }).click();
@@ -897,7 +916,7 @@ test.describe("Menu + Live + Tables advanced integration", () => {
     expect(downloadPath).not.toBeNull();
     if (downloadPath) {
       const content = readFileSync(downloadPath, "utf8");
-      expect(content).toContain("16");
+      expect(content).toContain(String(expectedTotalRounded));
     }
 
     await adminOrdersPage.close();

@@ -116,15 +116,34 @@ async function openMenuInEnglish(page: Page, menuPath: string) {
 }
 
 async function addFirstDish(page: Page, quantity = 1) {
-  await page.getByRole("button", { name: /Dishes/i }).first().click();
+  const isKitchenClosed = (await page.getByText("Kitchen closed").count()) > 0;
+  const isBarClosed = (await page.getByText("Bar closed").count()) > 0;
 
-  for (let attempt = 0; attempt < quantity; attempt += 1) {
-    const addButton = page
+  if (isKitchenClosed && isBarClosed) {
+    throw new Error("Both kitchen and bar are closed. Cannot add any orderable item.");
+  }
+
+  const targetSection = isKitchenClosed ? /Drinks/i : /Dishes/i;
+  await page.getByRole("button", { name: targetSection }).first().click();
+
+  for (let index = 0; index < quantity; index += 1) {
+    const flatAddButton = page
       .locator(".menu-card .menu-card__footer button")
       .filter({ hasText: "Add" })
       .first();
-    await expect(addButton).toBeVisible();
-    await addButton.click();
+
+    if ((await flatAddButton.count()) > 0) {
+      await expect(flatAddButton).toBeVisible();
+      await flatAddButton.click();
+      continue;
+    }
+
+    const volumeAddButton = page
+      .locator(".menu-card__volume-row button")
+      .filter({ hasText: "Add" })
+      .first();
+    await expect(volumeAddButton).toBeVisible();
+    await volumeAddButton.click();
   }
 }
 

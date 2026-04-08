@@ -307,6 +307,75 @@ async function patchOperationSettings(
   expect(result.status, `menu-settings PATCH failed: ${result.body}`).toBe(200);
 }
 
+async function waitForOperationSettings(
+  page: Page,
+  restaurantSlug: string,
+  expected: Partial<OperationSettingsSnapshot>
+) {
+  const hasMatchingTimeState = (
+    expectedValue: string | null | undefined,
+    actualValue: string | null
+  ) => {
+    if (expectedValue === undefined) {
+      return true;
+    }
+
+    if (expectedValue === null) {
+      return actualValue === null;
+    }
+
+    if (typeof actualValue !== "string") {
+      return false;
+    }
+
+    const expectedTs = Date.parse(expectedValue);
+    const actualTs = Date.parse(actualValue);
+
+    if (!Number.isFinite(expectedTs) || !Number.isFinite(actualTs)) {
+      return false;
+    }
+
+    const now = Date.now();
+    const expectedIsPast = expectedTs <= now;
+    const actualIsPast = actualTs <= now;
+
+    return expectedIsPast === actualIsPast;
+  };
+
+  await expect
+    .poll(
+      async () => {
+        const next = await fetchOperationSettingsSnapshot(page, restaurantSlug);
+
+        if (
+          expected.kitchenOpenEnabled !== undefined &&
+          next.kitchenOpenEnabled !== expected.kitchenOpenEnabled
+        ) {
+          return false;
+        }
+
+        if (!hasMatchingTimeState(expected.kitchenOpenUntil, next.kitchenOpenUntil)) {
+          return false;
+        }
+
+        if (
+          expected.barOpenEnabled !== undefined &&
+          next.barOpenEnabled !== expected.barOpenEnabled
+        ) {
+          return false;
+        }
+
+        if (!hasMatchingTimeState(expected.barOpenUntil, next.barOpenUntil)) {
+          return false;
+        }
+
+        return true;
+      },
+      { timeout: 20_000 }
+    )
+    .toBe(true);
+}
+
 async function withRestoredOperationSettings(
   page: Page,
   restaurantSlug: string,
@@ -318,6 +387,7 @@ async function withRestoredOperationSettings(
     await run();
   } finally {
     await patchOperationSettings(page, restaurantSlug, originalSettings);
+    await waitForOperationSettings(page, restaurantSlug, originalSettings);
   }
 }
 
@@ -334,22 +404,28 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenClosedAt = inPast(5);
+      const barOpenUntil = inFuture(120);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inPast(5),
+        kitchenOpenUntil: kitchenClosedAt,
         barOpenEnabled: true,
-        barOpenUntil: inFuture(120)
+        barOpenUntil
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: kitchenClosedAt,
+        barOpenEnabled: true,
+        barOpenUntil
       });
 
       await openMenuInEnglish(page, ORDERING_MENU_PATH);
       await expect(page.getByText("Kitchen closed")).toBeVisible();
 
       await addFirstDish(page);
-      await clickCartSubmit(page);
-
-      await expect(page.locator(".status-message")).toContainText(
-        "The kitchen is closed. Check your order and keep drinks only"
-      );
+      const submitButton = page.locator(".cart-submit").first();
+      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toHaveText("Unfortunately, the kitchen is closed");
     });
   });
 
@@ -358,22 +434,28 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenOpenUntil = inFuture(120);
+      const barClosedAt = inPast(5);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inFuture(120),
+        kitchenOpenUntil,
         barOpenEnabled: true,
-        barOpenUntil: inPast(5)
+        barOpenUntil: barClosedAt
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil,
+        barOpenEnabled: true,
+        barOpenUntil: barClosedAt
       });
 
       await openMenuInEnglish(page, ORDERING_MENU_PATH);
       await expect(page.getByText("Bar closed")).toBeVisible();
 
       await addFirstDrink(page);
-      await clickCartSubmit(page);
-
-      await expect(page.locator(".status-message")).toContainText(
-        "The bar is closed. Check your order and keep dishes only"
-      );
+      const submitButton = page.locator(".cart-submit").first();
+      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toHaveText("Bar closed");
     });
   });
 
@@ -382,11 +464,19 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenClosedAt = inPast(5);
+      const barOpenUntil = inFuture(120);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inPast(5),
+        kitchenOpenUntil: kitchenClosedAt,
         barOpenEnabled: true,
-        barOpenUntil: inFuture(120)
+        barOpenUntil
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: kitchenClosedAt,
+        barOpenEnabled: true,
+        barOpenUntil
       });
 
       await mockOrderPostSuccess(page);
@@ -405,11 +495,19 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenOpenUntil = inFuture(120);
+      const barClosedAt = inPast(5);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inFuture(120),
+        kitchenOpenUntil,
         barOpenEnabled: true,
-        barOpenUntil: inPast(5)
+        barOpenUntil: barClosedAt
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil,
+        barOpenEnabled: true,
+        barOpenUntil: barClosedAt
       });
 
       await mockOrderPostSuccess(page);
@@ -428,11 +526,19 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenClosedAt = inPast(5);
+      const barClosedAt = inPast(5);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inPast(5),
+        kitchenOpenUntil: kitchenClosedAt,
         barOpenEnabled: true,
-        barOpenUntil: inPast(5)
+        barOpenUntil: barClosedAt
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: kitchenClosedAt,
+        barOpenEnabled: true,
+        barOpenUntil: barClosedAt
       });
 
       await openMenuInEnglish(page, ORDERING_MENU_PATH);
@@ -457,11 +563,19 @@ test.describe("Client menu checks TC-25..TC-30", () => {
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const kitchenOpenUntil = inFuture(10);
+      const barOpenUntil = inFuture(10);
       await patchOperationSettings(page, restaurantSlug, {
         kitchenOpenEnabled: true,
-        kitchenOpenUntil: inFuture(10),
+        kitchenOpenUntil,
         barOpenEnabled: true,
-        barOpenUntil: inFuture(10)
+        barOpenUntil
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil,
+        barOpenEnabled: true,
+        barOpenUntil
       });
 
       await openMenuInEnglish(page, ORDERING_MENU_PATH);

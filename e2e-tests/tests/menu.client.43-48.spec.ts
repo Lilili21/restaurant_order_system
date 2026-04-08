@@ -52,22 +52,23 @@ type MenuSettingsSnapshot = {
   recommendations: RecommendationSettingPayload[];
 };
 
-function parseCurrency(value: string) {
-  const normalized = value
-    .replace(/\u00A0/g, " ")
-    .replace(/[^\d,.-]/g, "")
-    .replace(/,/g, "");
-  const parsed = Number.parseFloat(normalized);
-
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`Unable to parse currency from "${value}"`);
-  }
-
-  return parsed;
-}
-
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function countFractionDigits(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  const normalized = value.toString();
+  const dotIndex = normalized.indexOf(".");
+
+  if (dotIndex === -1) {
+    return 0;
+  }
+
+  return normalized.length - dotIndex - 1;
 }
 
 function parseMenuPath(menuPath: string) {
@@ -355,6 +356,36 @@ async function prepareRecommendationRule(
   };
 }
 
+async function fetchGuestMenuSnapshot(
+  page: Page,
+  restaurantSlug: string,
+  tableToken: string
+) {
+  const result = await page.evaluate(async ({ slug, token }) => {
+    const response = await fetch(
+      `/api/tables/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`,
+      { cache: "no-store" }
+    );
+
+    return {
+      status: response.status,
+      body: await response.text()
+    };
+  }, { slug: restaurantSlug, token: tableToken });
+
+  expect(result.status, `tables session GET failed: ${result.body}`).toBe(200);
+  const parsed = JSON.parse(result.body) as {
+    menu?: Array<{
+      id: string;
+      category: string;
+      price: number;
+      volumeOptions?: Array<{ id: string; price: number }>;
+    }>;
+  };
+
+  return Array.isArray(parsed.menu) ? parsed.menu : [];
+}
+
 test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -479,7 +510,7 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
 
   test("TC-45 discount math is rounded and consistent in cart", async ({ page }) => {
     const targetPath = PROMO_ACTIVE_MENU_PATH || ORDERING_MENU_PATH || PREVIEW_MENU_PATH;
-    const { restaurantSlug } = parseMenuPath(targetPath);
+    const { restaurantSlug, tableToken } = parseMenuPath(targetPath);
     const day = new Date().getDay();
     const activeWindow = buildScheduleWindow("active");
 
@@ -511,14 +542,82 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
         .first();
       await expect(discountLine).toBeVisible();
 
-      const row = page.locator(".cart-row").first();
-      const price = parseCurrency(await row.locator("p.muted").innerText());
-      const quantity = Number.parseInt(await row.locator(".quantity-box span").innerText(), 10);
-      const subtotal = price * quantity;
-      const discount = parseCurrency(await discountLine.innerText());
-      const total = parseCurrency(await page.locator(".cart-summary strong").innerText());
+      const createOrderResponsePromise = page.waitForResponse((response) => {
+        if (!response.url().includes("/api/orders")) {
+          return false;
+        }
 
-      expect(Math.abs((subtotal - discount) - total)).toBeLessThan(0.51);
+        if (response.request().method() !== "POST") {
+          return false;
+        }
+
+        if (response.status() < 200 || response.status() >= 300) {
+          return false;
+        }
+
+        let body: { type?: string } = {};
+
+        try {
+          body = JSON.parse(response.request().postData() ?? "{}") as { type?: string };
+        } catch {
+          body = {};
+        }
+
+        return body.type !== "waiter_call" && body.type !== "bill_request";
+      });
+
+      await submitOrderViaReviewDialog(page);
+      const createOrderResponse = await createOrderResponsePromise;
+      const requestPayload = JSON.parse(
+        createOrderResponse.request().postData() ?? "{}"
+      ) as {
+        items?: Array<{
+          menuItemId: string;
+          quantity: number;
+          volumeOptionId?: string;
+          priceOverride?: number;
+        }>;
+      };
+      const createdOrder = (await createOrderResponse.json()) as {
+        total?: number;
+        items?: Array<{ price?: number; quantity?: number }>;
+      };
+      const menuSnapshot = await fetchGuestMenuSnapshot(page, restaurantSlug, tableToken);
+      const menuById = new Map(menuSnapshot.map((item) => [item.id, item]));
+      const requestItems = Array.isArray(requestPayload.items) ? requestPayload.items : [];
+
+      expect(requestItems.length).toBeGreaterThan(0);
+      expect(typeof createdOrder.total).toBe("number");
+
+      const expectedTotal = Number(
+        requestItems
+          .reduce((sum, item) => {
+            const menuItem = menuById.get(item.menuItemId);
+            expect(menuItem, `Menu item "${item.menuItemId}" not found in table snapshot.`).toBeTruthy();
+
+            const volumePrice =
+              item.volumeOptionId && menuItem?.volumeOptions
+                ? menuItem.volumeOptions.find((option) => option.id === item.volumeOptionId)?.price
+                : undefined;
+            const basePrice =
+              typeof item.priceOverride === "number"
+                ? item.priceOverride
+                : typeof volumePrice === "number"
+                ? volumePrice
+                : Number(menuItem?.price ?? 0);
+            const discountedUnitPrice = Number((basePrice * 0.8).toFixed(2));
+            return sum + discountedUnitPrice * item.quantity;
+          }, 0)
+          .toFixed(2)
+      );
+
+      expect(Math.abs((createdOrder.total ?? 0) - expectedTotal)).toBeLessThan(0.001);
+      expect(countFractionDigits(createdOrder.total ?? 0)).toBeLessThanOrEqual(2);
+
+      for (const item of createdOrder.items ?? []) {
+        expect(typeof item.price).toBe("number");
+        expect(countFractionDigits(item.price ?? 0)).toBeLessThanOrEqual(2);
+      }
     } finally {
       await patchMenuSettings(page, restaurantSlug, {
         promotions: originalSettings.promotions
