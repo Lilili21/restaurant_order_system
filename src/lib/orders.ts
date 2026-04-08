@@ -2355,6 +2355,16 @@ async function persistStateToRowSupabase(
   const standardOrders = state.ordersStore.filter(
     (order) => order.kind !== "waiter_call" && order.kind !== "bill_request"
   );
+  const protectedOrderIdsWithMissingItems = new Set(
+    standardOrders
+      .filter(
+        (order) =>
+          order.status !== "cancelled" &&
+          order.total > 0 &&
+          (!Array.isArray(order.items) || order.items.length === 0)
+      )
+      .map((order) => order.id)
+  );
   const serviceRequestOrders = state.ordersStore.filter(
     (order) => order.kind === "waiter_call" || order.kind === "bill_request"
   );
@@ -2384,6 +2394,13 @@ async function persistStateToRowSupabase(
       ? order.items.map((item) => mapOrderItemToActiveRow(order.id, restaurantId, item))
       : [];
   });
+
+  if (protectedOrderIdsWithMissingItems.size > 0) {
+    logOrdersDebug("persistStateToRowSupabase.protected_orders_with_missing_items", {
+      protectedOrdersCount: protectedOrderIdsWithMissingItems.size,
+      protectedOrderIds: [...protectedOrderIdsWithMissingItems]
+    });
+  }
 
   try {
     let activeOrderRowsToPersist = [...activeOrderRows];
@@ -2498,8 +2515,16 @@ async function persistStateToRowSupabase(
 
       const currentItemIds = new Set(activeOrderItemRowsToPersist.map((row) => row.id));
       const staleItemIds = (existingItemRows ?? [])
-        .map((row) => String((row as { id: string }).id))
-        .filter((id) => !currentItemIds.has(id));
+        .map((row) => ({
+          id: String((row as { id: string }).id),
+          orderId: String((row as { order_id: string }).order_id)
+        }))
+        .filter(
+          (row) =>
+            !currentItemIds.has(row.id) &&
+            !protectedOrderIdsWithMissingItems.has(row.orderId)
+        )
+        .map((row) => row.id);
 
       if (staleItemIds.length > 0) {
         const { error: deleteStaleItemsError } = await supabase
@@ -2619,8 +2644,16 @@ async function persistStateToRowSupabase(
 
       const currentItemIds = new Set(legacyOrderItemRows.map((row) => row.id));
       const staleItemIds = (existingItemRows ?? [])
-        .map((row) => String((row as { id: string }).id))
-        .filter((id) => !currentItemIds.has(id));
+        .map((row) => ({
+          id: String((row as { id: string }).id),
+          orderId: String((row as { order_id: string }).order_id)
+        }))
+        .filter(
+          (row) =>
+            !currentItemIds.has(row.id) &&
+            !protectedOrderIdsWithMissingItems.has(row.orderId)
+        )
+        .map((row) => row.id);
 
       if (staleItemIds.length > 0) {
         const { error: deleteStaleItemsError } = await supabase
