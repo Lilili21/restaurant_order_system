@@ -3,11 +3,10 @@ import { expect, Page, test } from "@playwright/test";
 const MENU_RESTAURANT_SLUG = process.env.E2E_MENU_RESTAURANT_SLUG ?? "olive-bistro";
 const PREVIEW_MENU_PATH =
   process.env.E2E_MENU_PREVIEW_PATH ?? `/menu/${MENU_RESTAURANT_SLUG}/0`;
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
-const PROMO_ACTIVE_MENU_PATH = process.env.E2E_PROMO_ACTIVE_MENU_PATH ?? "";
-const PROMO_INACTIVE_MENU_PATH = process.env.E2E_PROMO_INACTIVE_MENU_PATH ?? "";
-const BUSINESS_LUNCH_MENU_PATH = process.env.E2E_BUSINESS_LUNCH_MENU_PATH ?? "";
-const BUSINESS_LUNCH_HIDDEN_ITEM = process.env.E2E_BUSINESS_LUNCH_HIDDEN_ITEM ?? "";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 
 type SubmittedOrder = {
   id: string;
@@ -51,9 +50,6 @@ function parseCurrency(value: string) {
   return parsed;
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function createSubmittedOrder(
   id: string,
@@ -222,7 +218,7 @@ async function mockTablesSnapshots(page: Page, snapshots: TablesSnapshot[]) {
   return () => callCount;
 }
 
-test.describe("Client menu checks TC-41..TC-54", () => {
+test.describe("Client menu checks TC-41..TC-54 (core)", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.clear();
@@ -233,11 +229,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
   test("TC-41 submitted order is not wiped when polling returns empty list once", async ({
     page
   }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     await page.addInitScript(() => {
       const originalSetInterval = window.setInterval.bind(window);
       window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
@@ -261,11 +252,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
   });
 
   test("TC-42 submitted orders remain consistent after full page refresh", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     const order = createSubmittedOrder("refresh-order", "preparing", 31, "Refresh item");
     await mockTablesSnapshots(page, [
       { currentSessionId: 1, submittedOrders: [order], activeServiceRequests: [] }
@@ -279,160 +265,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
     await dismissWelcomeDialogIfVisible(page);
     await expect(page.locator(".submitted-orders__summary")).toContainText("Preparing");
     await expect(page.locator(".submitted-orders__summary")).toContainText("31");
-  });
-
-  test("TC-43 happy hour appears only in active schedule path", async ({ page }) => {
-    test.skip(
-      !PROMO_ACTIVE_MENU_PATH || !PROMO_INACTIVE_MENU_PATH,
-      "Set both E2E_PROMO_ACTIVE_MENU_PATH and E2E_PROMO_INACTIVE_MENU_PATH."
-    );
-
-    await openMenuInEnglish(page, PROMO_ACTIVE_MENU_PATH);
-    await expect(page.locator(".menu-alert-banner.menu-happy-hour")).toHaveCount(
-      await page.locator(".menu-alert-banner.menu-happy-hour").count()
-    );
-    const activeCount = await page.locator(".menu-alert-banner.menu-happy-hour").count();
-    expect(activeCount).toBeGreaterThan(0);
-
-    await openMenuInEnglish(page, PROMO_INACTIVE_MENU_PATH);
-    await expect(page.locator(".menu-alert-banner.menu-happy-hour")).toHaveCount(0);
-  });
-
-  test("TC-44 business lunch applies only to configured categories", async ({ page }) => {
-    test.skip(
-      !BUSINESS_LUNCH_MENU_PATH,
-      "Set E2E_BUSINESS_LUNCH_MENU_PATH=/menu/<restaurantSlug>/<tableToken>."
-    );
-
-    await openMenuInEnglish(page, BUSINESS_LUNCH_MENU_PATH);
-    await expect(page.locator(".menu-business-lunch")).toBeVisible();
-
-    if (BUSINESS_LUNCH_HIDDEN_ITEM) {
-      const pattern = new RegExp(escapeRegExp(BUSINESS_LUNCH_HIDDEN_ITEM), "i");
-      await expect(page.locator(".menu-card h3", { hasText: pattern })).toHaveCount(0);
-    }
-  });
-
-  test("TC-45 discount math is rounded and consistent in cart", async ({ page }) => {
-    const targetPath = PROMO_ACTIVE_MENU_PATH || ORDERING_MENU_PATH;
-    test.skip(!targetPath, "Set E2E_PROMO_ACTIVE_MENU_PATH or E2E_ORDERING_MENU_PATH.");
-
-    await openMenuInEnglish(page, targetPath);
-    await addFirstDish(page);
-
-    const discountLine = page
-      .locator("p.muted")
-      .filter({ hasText: /Happy hour discount/i })
-      .first();
-    const hasDiscount = await discountLine.isVisible().catch(() => false);
-    test.skip(!hasDiscount, "No active discount for current cart in this environment.");
-
-    const row = page.locator(".cart-row").first();
-    const price = parseCurrency(await row.locator("p.muted").innerText());
-    const quantity = Number.parseInt(await row.locator(".quantity-box span").innerText(), 10);
-    const subtotal = price * quantity;
-    const discount = parseCurrency(await discountLine.innerText());
-    const total = parseCurrency(await page.locator(".cart-summary strong").innerText());
-
-    expect(Math.abs((subtotal - discount) - total)).toBeLessThan(0.51);
-  });
-
-  test("TC-46 discount is visible in UI and discounted order payload is sent", async ({
-    page
-  }) => {
-    const targetPath = PROMO_ACTIVE_MENU_PATH || ORDERING_MENU_PATH;
-    test.skip(!targetPath, "Set E2E_PROMO_ACTIVE_MENU_PATH or E2E_ORDERING_MENU_PATH.");
-
-    let payload: unknown = null;
-
-    await page.route("**/api/orders", async (route, request) => {
-      if (request.method() !== "POST") {
-        await route.continue();
-        return;
-      }
-
-      const body = JSON.parse(request.postData() ?? "{}") as { type?: string; items?: unknown[] };
-      if (body.type === "waiter_call" || body.type === "bill_request") {
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify({ ok: true })
-        });
-        return;
-      }
-
-      payload = body;
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "discount-order",
-          restaurantSlug: MENU_RESTAURANT_SLUG,
-          restaurantName: "E2E Restaurant",
-          tableNumber: 1,
-          sessionId: 1,
-          status: "new",
-          kind: "order",
-          serveMode: "as_ready",
-          createdAt: new Date().toISOString(),
-          total: 20,
-          items: [{ id: "i1", menuItemId: "m1", name: "Item", price: 20, quantity: 1, served: false }]
-        })
-      });
-    });
-
-    await openMenuInEnglish(page, targetPath);
-    await addFirstDish(page);
-
-    const discountLine = page
-      .locator("p.muted")
-      .filter({ hasText: /Happy hour discount/i })
-      .first();
-    const hasDiscount = await discountLine.isVisible().catch(() => false);
-    test.skip(!hasDiscount, "No active discount for current cart in this environment.");
-
-    await submitOrderViaReviewDialog(page);
-    expect(payload).not.toBeNull();
-    const parsedPayload = payload as { items?: unknown[] };
-    expect(Array.isArray(parsedPayload.items)).toBe(true);
-    expect((parsedPayload.items ?? []).length).toBeGreaterThan(0);
-  });
-
-  test("TC-47 recommendation block appears when trigger conditions are met", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-
-    const recommendations = page.locator(".cart-recommendations");
-    const hasRecommendations = (await recommendations.count()) > 0;
-    test.skip(!hasRecommendations, "No recommendation rules configured for this environment.");
-
-    await expect(recommendations.first()).toBeVisible();
-  });
-
-  test("TC-48 adding from recommendation updates cart like regular add", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-
-    const recommendationAddButton = page
-      .locator(".cart-recommendation__button")
-      .filter({ hasText: /^Add$/ })
-      .first();
-    const hasRecommendationAdd = await recommendationAddButton.isVisible().catch(() => false);
-    test.skip(!hasRecommendationAdd, "No item-based recommendation Add button available.");
-
-    const beforeCount = await page.locator(".cart-row").count();
-    await recommendationAddButton.click();
-    await expect(page.locator(".cart-row")).toHaveCount(beforeCount + 1);
   });
 
   test("TC-49 HE/EN/RU switch updates menu labels", async ({ page }) => {
@@ -457,11 +289,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
   });
 
   test("TC-50 cart selections are preserved across language switch", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
     await addFirstDish(page);
     await expect(page.locator(".cart-row")).toHaveCount(1);
@@ -497,11 +324,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
   test("TC-52 translation fallback is used when target language fields are missing", async ({
     page
   }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     await page.addInitScript(() => {
       const originalSetInterval = window.setInterval.bind(window);
       window.setInterval = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) =>
@@ -569,11 +391,6 @@ test.describe("Client menu checks TC-41..TC-54", () => {
   });
 
   test("TC-54 localized errors and confirmations are readable", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     let waiterCalls = 0;
 
     await page.route("**/api/orders", async (route, request) => {

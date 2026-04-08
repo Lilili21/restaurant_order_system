@@ -123,7 +123,6 @@ const drinkCategories = new Set<MenuCategory>([
 ]);
 
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
-const ORDER_SUBMIT_THROTTLE_MS = 3 * 1000;
 const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
 const COUNTER_CAPTCHA_SITE_KEY =
@@ -488,10 +487,6 @@ export function Cart({
   const counterCaptchaWidgetIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
-  const lastSuccessfulOrderSignatureRef = useRef<{
-    signature: string;
-    submittedAt: number;
-  } | null>(null);
   const isCounterMode = orderMode === "counter";
   const counterRequiresPhone =
     isCounterMode && (contactRequirement === "phone_only" || requireOtp);
@@ -1143,29 +1138,6 @@ export function Cart({
     });
   }
 
-  function createOrderPayloadSignature(serveMode: ServeMode) {
-    const normalizedItems = [...items]
-      .map((item) => ({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity,
-        note: item.note?.trim() ?? "",
-        volumeOptionId: item.volumeOptionId ?? "",
-        volumeLabel: item.volumeLabel ?? "",
-        priceOverride:
-          typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
-            ? item.priceOverride
-            : null
-      }))
-      .sort((left, right) =>
-        JSON.stringify(left).localeCompare(JSON.stringify(right))
-      );
-
-    return JSON.stringify({
-      serveMode,
-      items: normalizedItems
-    });
-  }
-
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
   }, [currentSessionId]);
@@ -1778,8 +1750,6 @@ export function Cart({
   }
 
   async function submitOrder(serveMode: ServeMode) {
-    const now = Date.now();
-
     if (areKitchenAndBarClosed) {
       setMessage(text.kitchenClosedAction);
       return;
@@ -1813,15 +1783,8 @@ export function Cart({
       return;
     }
 
-    const payloadSignature = createOrderPayloadSignature(serveMode);
-
-    if (
-      submitting ||
-      (lastSuccessfulOrderSignatureRef.current?.signature === payloadSignature &&
-        now - lastSuccessfulOrderSignatureRef.current.submittedAt <
-          ORDER_SUBMIT_THROTTLE_MS)
-    ) {
-      setDialogMessage(text.submitCooldown);
+    if (submitting) {
+      setShowReviewDialog(false);
       return;
     }
 
@@ -1871,10 +1834,6 @@ export function Cart({
       const order = (await response.json()) as Order;
       setItems([]);
       setLatestSubmittedOrderId(order.id);
-      lastSuccessfulOrderSignatureRef.current = {
-        signature: payloadSignature,
-        submittedAt: Date.now()
-      };
       pendingOrderRequestIdRef.current = null;
       window.localStorage.removeItem(cartStorageKey);
       window.localStorage.removeItem(pendingOrderStorageKey);

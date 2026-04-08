@@ -4,7 +4,10 @@ import { BrowserContext, Page, expect, test } from "@playwright/test";
 
 const BASE_URL =
   process.env.E2E_BASE_URL ?? "https://restaurant-order-system-blue.vercel.app";
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 const PREVIEW_MENU_PATH = process.env.E2E_PREVIEW_MENU_PATH ?? "/menu/olive-bistro/0";
 
 type IntegrationOrderItem = {

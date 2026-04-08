@@ -27,6 +27,48 @@
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-all -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: Menu Preview (Top10+11-20)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-preview-split -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu Ordering (Top10+11-20)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-ordering-split -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu 21-24 (Ordering)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-21-24 -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu 25-30 (Closures)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-25-30-closures -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu 41-42 + 49-54 (Core)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-41-42-49-54 -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu 43-46 (Promos)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC E2E_PROMO_ACTIVE_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC E2E_PROMO_INACTIVE_MENU_PATH=/menu/olive-bistro/0 E2E_BUSINESS_LUNCH_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-43-46-promos -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu 47-48 (Recommendations)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC npm run test:menu-47-48-recommendations -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Live Orders All",
       "type": "node-terminal",
       "request": "launch",
@@ -51,6 +93,24 @@
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: Menu Banners 01-02",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners-01-02 -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu Banners 03-04",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners-03-04 -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu Banners 05",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-banners-05 -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Dashboard Live Status",
       "type": "node-terminal",
       "request": "launch",
@@ -61,6 +121,12 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:tables-shift -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Tables Shift Duplicate Guard",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:tables-shift-no-skip -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
     },
     {
       "name": "E2E: Show Report",

@@ -3,7 +3,10 @@ import { expect, Page, test } from "@playwright/test";
 const MENU_RESTAURANT_SLUG = process.env.E2E_MENU_RESTAURANT_SLUG ?? "olive-bistro";
 const PREVIEW_MENU_PATH =
   process.env.E2E_MENU_PREVIEW_PATH ?? `/menu/${MENU_RESTAURANT_SLUG}/0`;
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 
 function parseCurrency(value: string) {
   const normalized = value
@@ -119,7 +122,7 @@ async function clickCartSubmit(page: Page) {
   }
 }
 
-test.describe("Client menu checks TC-11..TC-20", () => {
+test.describe("Client menu checks 11-20", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.clear();
@@ -134,7 +137,7 @@ test.describe("Client menu checks TC-11..TC-20", () => {
       .locator(".menu-card")
       .filter({ hasNot: page.locator(".menu-card__image-wrap") });
     const count = await cardsWithoutImage.count();
-    test.skip(count === 0, "No items without image in current menu dataset.");
+    expect(count).toBeGreaterThan(0);
 
     const firstCard = cardsWithoutImage.first();
     await expect(firstCard.locator("h3")).toBeVisible();
@@ -248,7 +251,7 @@ test.describe("Client menu checks TC-11..TC-20", () => {
 
     const rows = page.locator(".menu-card__volume-row");
     const rowsCount = await rows.count();
-    test.skip(rowsCount === 0, "No menu items with volume options in current dataset.");
+    expect(rowsCount).toBeGreaterThan(0);
 
     let selectedIndex = -1;
     let selectedLabel = "";

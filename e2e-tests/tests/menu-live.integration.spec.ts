@@ -1,6 +1,9 @@
 import { expect, Page, BrowserContext, test } from "@playwright/test";
 
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 const ORDER_MERGE_WINDOW_MS = 3 * 60 * 1000;
 
 type IntegrationOrderItem = {

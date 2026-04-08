@@ -1056,8 +1056,18 @@ function generateDisplayOrderNumber(prefix: string) {
   return `${normalizedPrefix}-${datePart}-${timePart}${entropyPart}`;
 }
 
+function roundMoneyToTwo(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Number(value.toFixed(2));
+}
+
 function calculateOrderItemsTotal(items: OrderItem[]) {
-  return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return roundMoneyToTwo(
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  );
 }
 
 function getEffectiveOrderTotal(order: Pick<Order, "kind" | "items" | "total">) {
@@ -1522,6 +1532,28 @@ function isMissingOrderAdvancedColumnError(error: unknown) {
   );
 }
 
+function isInvalidIntegerMoneyInputError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  return (
+    message.includes("invalid input syntax for type integer") &&
+    /\"-?\d+\.\d+\"/.test(message)
+  );
+}
+
+function toIntegerMoneyValue(value: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.round(value);
+}
+
 function toLegacyCompatibleActiveOrderRow(row: ActiveOrderRow) {
   const {
     order_channel: _orderChannel,
@@ -1531,6 +1563,45 @@ function toLegacyCompatibleActiveOrderRow(row: ActiveOrderRow) {
   } = row;
 
   return legacyCompatibleRow;
+}
+
+function toIntegerCompatibleActiveOrderRow(row: ActiveOrderRow): ActiveOrderRow {
+  return {
+    ...row,
+    total: toIntegerMoneyValue(row.total)
+  };
+}
+
+function toIntegerCompatibleLegacyOrderRow(row: LegacyOrderRow): LegacyOrderRow {
+  return {
+    ...row,
+    total: toIntegerMoneyValue(row.total)
+  };
+}
+
+function toIntegerCompatibleActiveOrderItemRow(
+  row: ActiveOrderItemRow
+): ActiveOrderItemRow {
+  return {
+    ...row,
+    price: toIntegerMoneyValue(row.price)
+  };
+}
+
+function toIntegerCompatibleLegacyOrderItemRow(
+  row: LegacyOrderItemRow
+): LegacyOrderItemRow {
+  return {
+    ...row,
+    price: toIntegerMoneyValue(row.price)
+  };
+}
+
+function toIntegerCompatibleClosedSessionRow(row: ClosedSessionRow): ClosedSessionRow {
+  return {
+    ...row,
+    total: toIntegerMoneyValue(row.total)
+  };
 }
 
 async function getMenuLookupForRestaurant(restaurantSlug: string) {
@@ -2316,6 +2387,7 @@ async function persistStateToRowSupabase(
 
   try {
     let activeOrderRowsToPersist = [...activeOrderRows];
+    let activeOrderItemRowsToPersist = [...activeOrderItemRows];
 
     if (orderIds.length === 0) {
       const { error: deleteAllItemsError } = await supabase
@@ -2351,6 +2423,19 @@ async function persistStateToRowSupabase(
           upsertOrdersError = retryUpsert.error;
         }
 
+        if (
+          upsertOrdersError &&
+          isInvalidIntegerMoneyInputError(upsertOrdersError)
+        ) {
+          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+            toIntegerCompatibleActiveOrderRow
+          );
+          const retryUpsert = await supabase
+            .from("orders")
+            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+          upsertOrdersError = retryUpsert.error;
+        }
+
         if (upsertOrdersError) {
           throw new Error(upsertOrdersError.message);
         }
@@ -2379,10 +2464,23 @@ async function persistStateToRowSupabase(
         }
       }
 
-      if (activeOrderItemRows.length > 0) {
-        const { error: upsertItemsError } = await supabase
+      if (activeOrderItemRowsToPersist.length > 0) {
+        let { error: upsertItemsError } = await supabase
           .from("order_items")
-          .upsert(activeOrderItemRows, { onConflict: "id" });
+          .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+
+        if (
+          upsertItemsError &&
+          isInvalidIntegerMoneyInputError(upsertItemsError)
+        ) {
+          activeOrderItemRowsToPersist = activeOrderItemRowsToPersist.map(
+            toIntegerCompatibleActiveOrderItemRow
+          );
+          const retryUpsert = await supabase
+            .from("order_items")
+            .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+          upsertItemsError = retryUpsert.error;
+        }
 
         if (upsertItemsError) {
           throw new Error(upsertItemsError.message);
@@ -2398,7 +2496,7 @@ async function persistStateToRowSupabase(
         throw new Error(existingItemRowsError.message);
       }
 
-      const currentItemIds = new Set(activeOrderItemRows.map((row) => row.id));
+      const currentItemIds = new Set(activeOrderItemRowsToPersist.map((row) => row.id));
       const staleItemIds = (existingItemRows ?? [])
         .map((row) => String((row as { id: string }).id))
         .filter((id) => !currentItemIds.has(id));
@@ -2419,8 +2517,8 @@ async function persistStateToRowSupabase(
       throw error;
     }
 
-    const legacyOrderRows = standardOrders.map(mapOrderToLegacyRow);
-    const legacyOrderItemRows = standardOrders.flatMap((order) =>
+    let legacyOrderRows = standardOrders.map(mapOrderToLegacyRow);
+    let legacyOrderItemRows = standardOrders.flatMap((order) =>
       order.items.map((item) => mapOrderItemToLegacyRow(order.id, item))
     );
 
@@ -2444,9 +2542,20 @@ async function persistStateToRowSupabase(
       }
     } else {
       if (legacyOrderRows.length > 0) {
-        const { error: upsertOrdersError } = await supabase
+        let { error: upsertOrdersError } = await supabase
           .from("orders_store")
           .upsert(legacyOrderRows, { onConflict: "order_id" });
+
+        if (
+          upsertOrdersError &&
+          isInvalidIntegerMoneyInputError(upsertOrdersError)
+        ) {
+          legacyOrderRows = legacyOrderRows.map(toIntegerCompatibleLegacyOrderRow);
+          const retryUpsert = await supabase
+            .from("orders_store")
+            .upsert(legacyOrderRows, { onConflict: "order_id" });
+          upsertOrdersError = retryUpsert.error;
+        }
 
         if (upsertOrdersError) {
           throw new Error(upsertOrdersError.message);
@@ -2477,9 +2586,22 @@ async function persistStateToRowSupabase(
       }
 
       if (legacyOrderItemRows.length > 0) {
-        const { error: upsertItemsError } = await supabase
+        let { error: upsertItemsError } = await supabase
           .from("order_items_store")
           .upsert(legacyOrderItemRows, { onConflict: "id" });
+
+        if (
+          upsertItemsError &&
+          isInvalidIntegerMoneyInputError(upsertItemsError)
+        ) {
+          legacyOrderItemRows = legacyOrderItemRows.map(
+            toIntegerCompatibleLegacyOrderItemRow
+          );
+          const retryUpsert = await supabase
+            .from("order_items_store")
+            .upsert(legacyOrderItemRows, { onConflict: "id" });
+          upsertItemsError = retryUpsert.error;
+        }
 
         if (upsertItemsError) {
           throw new Error(upsertItemsError.message);
@@ -2611,12 +2733,12 @@ async function persistStateToRowSupabase(
     mergedClosedSummariesCount: mergedClosedSummaries.length
   });
 
-  const closedSessionRows = mergedClosedSummaries
+  let closedSessionRows = mergedClosedSummaries
     .map((summary) => {
       const restaurantId = restaurantIdBySlug.get(summary.restaurantSlug);
       return restaurantId ? mapClosedSummaryToRow(summary, restaurantId) : null;
     })
-    .filter(Boolean);
+    .filter((row): row is ClosedSessionRow => Boolean(row));
 
   if (closedSessionRows.length === 0) {
     if (mergedClosedSummaries.length === 0) {
@@ -2634,15 +2756,26 @@ async function persistStateToRowSupabase(
       });
     }
   } else {
-    const { error: upsertClosedSessionsError } = await supabase
+    let { error: upsertClosedSessionsError } = await supabase
       .from("closed_sessions")
       .upsert(closedSessionRows, { onConflict: "id" });
+
+    if (
+      upsertClosedSessionsError &&
+      isInvalidIntegerMoneyInputError(upsertClosedSessionsError)
+    ) {
+      closedSessionRows = closedSessionRows.map(toIntegerCompatibleClosedSessionRow);
+      const retryUpsert = await supabase
+        .from("closed_sessions")
+        .upsert(closedSessionRows, { onConflict: "id" });
+      upsertClosedSessionsError = retryUpsert.error;
+    }
 
     if (upsertClosedSessionsError) {
       throw new Error(upsertClosedSessionsError.message);
     }
 
-    const currentClosedSessionIds = closedSessionRows.map((row) => row!.id);
+    const currentClosedSessionIds = closedSessionRows.map((row) => row.id);
     const staleClosedSessionIds = ((existingClosedSessionRowsData ?? []) as Array<{ id: string }>)
       .map((row) => String((row as { id: string }).id))
       .filter((id) => !currentClosedSessionIds.includes(id));

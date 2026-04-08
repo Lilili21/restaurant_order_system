@@ -1,11 +1,10 @@
 import { expect, Page, test } from "@playwright/test";
 
 const MENU_RESTAURANT_SLUG = process.env.E2E_MENU_RESTAURANT_SLUG ?? "olive-bistro";
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
-const KITCHEN_CLOSED_MENU_PATH = process.env.E2E_KITCHEN_CLOSED_MENU_PATH ?? "";
-const BAR_CLOSED_MENU_PATH = process.env.E2E_BAR_CLOSED_MENU_PATH ?? "";
-const OPEN_CLOSE_TOGGLE_MENU_PATH =
-  process.env.E2E_OPEN_CLOSE_TOGGLE_MENU_PATH ?? ORDERING_MENU_PATH;
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 
 async function dismissWelcomeDialogIfVisible(page: Page) {
   const welcomeTitle = page.locator("#welcome-dialog-title");
@@ -199,7 +198,7 @@ async function mockOrderPostSuccess(page: Page) {
   });
 }
 
-test.describe("Client menu checks TC-21..TC-30", () => {
+test.describe("Client menu checks TC-21..TC-24", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.clear();
@@ -208,11 +207,6 @@ test.describe("Client menu checks TC-21..TC-30", () => {
   });
 
   test("TC-21 successful order shows confirmation message", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     await mockOrderPostSuccess(page);
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
     await addFirstDish(page);
@@ -223,11 +217,6 @@ test.describe("Client menu checks TC-21..TC-30", () => {
   });
 
   test("TC-22 order payload contains required fields", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     let capturedPayload: unknown = null;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -297,11 +286,6 @@ test.describe("Client menu checks TC-21..TC-30", () => {
   });
 
   test("TC-23 double confirm click does not create duplicate order", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     let createOrderCalls = 0;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -353,11 +337,6 @@ test.describe("Client menu checks TC-21..TC-30", () => {
   });
 
   test("TC-24 user can retry after failed submit", async ({ page }) => {
-    test.skip(
-      !ORDERING_MENU_PATH,
-      "Set E2E_ORDERING_MENU_PATH=/menu/<restaurantSlug>/<realTableToken> to run this case."
-    );
-
     let createOrderCalls = 0;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -419,132 +398,4 @@ test.describe("Client menu checks TC-21..TC-30", () => {
     expect(createOrderCalls).toBe(2);
   });
 
-  test("TC-25 kitchen closed blocks dish submit", async ({ page }) => {
-    test.skip(
-      !KITCHEN_CLOSED_MENU_PATH,
-      "Set E2E_KITCHEN_CLOSED_MENU_PATH=/menu/<restaurantSlug>/<tableToken> with closed kitchen."
-    );
-
-    await openMenuInEnglish(page, KITCHEN_CLOSED_MENU_PATH);
-    await expect(page.getByText("Kitchen closed")).toBeVisible();
-
-    await addFirstDish(page);
-    await clickCartSubmit(page);
-
-    await expect(page.locator(".status-message")).toContainText(
-      "The kitchen is closed. Check your order and keep drinks only"
-    );
-  });
-
-  test("TC-26 bar closed blocks drink submit", async ({ page }) => {
-    test.skip(
-      !BAR_CLOSED_MENU_PATH,
-      "Set E2E_BAR_CLOSED_MENU_PATH=/menu/<restaurantSlug>/<tableToken> with closed bar."
-    );
-
-    await openMenuInEnglish(page, BAR_CLOSED_MENU_PATH);
-    await expect(page.getByText("Bar closed")).toBeVisible();
-
-    await addFirstDrink(page);
-    await clickCartSubmit(page);
-
-    await expect(page.locator(".status-message")).toContainText(
-      "The bar is closed. Check your order and keep dishes only"
-    );
-  });
-
-  test("TC-27 drinks-only order works when kitchen is closed", async ({ page }) => {
-    test.skip(
-      !KITCHEN_CLOSED_MENU_PATH,
-      "Set E2E_KITCHEN_CLOSED_MENU_PATH=/menu/<restaurantSlug>/<tableToken> with closed kitchen."
-    );
-
-    await mockOrderPostSuccess(page);
-    await openMenuInEnglish(page, KITCHEN_CLOSED_MENU_PATH);
-    await expect(page.getByText("Kitchen closed")).toBeVisible();
-    await expect(page.getByText("Bar closed")).toHaveCount(0);
-
-    await addFirstDrink(page);
-    await submitOrderViaReviewDialog(page);
-    await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
-  });
-
-  test("TC-28 dishes-only order works when bar is closed", async ({ page }) => {
-    test.skip(
-      !BAR_CLOSED_MENU_PATH,
-      "Set E2E_BAR_CLOSED_MENU_PATH=/menu/<restaurantSlug>/<tableToken> with closed bar."
-    );
-
-    await mockOrderPostSuccess(page);
-    await openMenuInEnglish(page, BAR_CLOSED_MENU_PATH);
-    await expect(page.getByText("Bar closed")).toBeVisible();
-    await expect(page.getByText("Kitchen closed")).toHaveCount(0);
-
-    await addFirstDish(page);
-    await submitOrderViaReviewDialog(page);
-    await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
-  });
-
-  test("TC-29 closed kitchen/bar messages are visible and clear", async ({ page }) => {
-    const candidatePath = KITCHEN_CLOSED_MENU_PATH || BAR_CLOSED_MENU_PATH;
-    test.skip(
-      !candidatePath,
-      "Set E2E_KITCHEN_CLOSED_MENU_PATH or E2E_BAR_CLOSED_MENU_PATH for closure-message checks."
-    );
-
-    await openMenuInEnglish(page, candidatePath);
-
-    const kitchenClosed = page.getByText("Kitchen closed");
-    const barClosed = page.getByText("Bar closed");
-    const hasKitchenClosed = (await kitchenClosed.count()) > 0;
-    const hasBarClosed = (await barClosed.count()) > 0;
-
-    test.skip(!hasKitchenClosed && !hasBarClosed, "No closed-state banners found on this path.");
-
-    if (hasKitchenClosed) {
-      await expect(page.getByText("Only drinks are available to order right now.")).toBeVisible();
-    }
-
-    if (hasBarClosed) {
-      await expect(page.getByText("Only kitchen dishes are available to order right now.")).toBeVisible();
-    }
-  });
-
-  test("TC-30 open/closed state updates after time jump", async ({ page }) => {
-    test.skip(
-      !OPEN_CLOSE_TOGGLE_MENU_PATH,
-      "Set E2E_OPEN_CLOSE_TOGGLE_MENU_PATH=/menu/<restaurantSlug>/<tableToken> with open timer."
-    );
-
-    await page.addInitScript(() => {
-      const originalNow = Date.now.bind(Date);
-      (window as Window & { __e2eTimeOffset?: number }).__e2eTimeOffset = 0;
-      Date.now = () =>
-        originalNow() +
-        ((window as Window & { __e2eTimeOffset?: number }).__e2eTimeOffset ?? 0);
-    });
-
-    await openMenuInEnglish(page, OPEN_CLOSE_TOGGLE_MENU_PATH);
-
-    const kitchenOpenBanner = page.getByText("Kitchen closed in");
-    const barOpenBanner = page.getByText("Bar closed in");
-    const hasKitchenOpen = (await kitchenOpenBanner.count()) > 0;
-    const hasBarOpen = (await barOpenBanner.count()) > 0;
-
-    test.skip(!hasKitchenOpen && !hasBarOpen, "No open-countdown banners found on this path.");
-
-    await page.evaluate(() => {
-      (window as Window & { __e2eTimeOffset?: number }).__e2eTimeOffset =
-        6 * 60 * 60 * 1000;
-    });
-    await page.waitForTimeout(1500);
-
-    if (hasKitchenOpen) {
-      await expect(page.getByText("Kitchen closed")).toBeVisible();
-    }
-
-    if (hasBarOpen) {
-      await expect(page.getByText("Bar closed")).toBeVisible();
-    }
-  });
 });

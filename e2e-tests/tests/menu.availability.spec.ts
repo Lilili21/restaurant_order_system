@@ -2,7 +2,10 @@ import { expect, Page, test } from "@playwright/test";
 
 import { createMockMenuItem } from "./fixtures";
 
-const ORDERING_MENU_PATH = process.env.E2E_ORDERING_MENU_PATH ?? "";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 
 async function dismissWelcomeDialogIfVisible(page: Page) {
   const welcomeTitle = page.locator("#welcome-dialog-title");
