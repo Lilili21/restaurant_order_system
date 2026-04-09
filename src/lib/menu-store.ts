@@ -207,9 +207,12 @@ function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
   };
 }
 
+type MenuItemUpsertRow = ReturnType<typeof mapMenuItemToRow>;
+type LegacyMenuItemUpsertRow = Omit<MenuItemUpsertRow, "price_agorot">;
+
 function toLegacyCompatibleMenuItemRow(
   row: ReturnType<typeof mapMenuItemToRow>
-) {
+): LegacyMenuItemUpsertRow {
   const { price_agorot: _priceAgorot, ...legacyCompatibleRow } = row;
   return legacyCompatibleRow;
 }
@@ -493,19 +496,20 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
         const restaurantId = slugToId.get(item.restaurantSlug);
         return restaurantId ? mapMenuItemToRow(item, restaurantId) : null;
       })
-      .filter(Boolean);
+      .filter((row): row is MenuItemUpsertRow => Boolean(row));
 
     if (rows.length > 0) {
-      let rowsToPersist = rows;
       let { error } = await supabase
         .from("menu_items")
-        .upsert(rowsToPersist, { onConflict: "id" });
+        .upsert(rows, { onConflict: "id" });
 
       if (error && isMissingPriceAgorotColumnError(error.message)) {
-        rowsToPersist = rowsToPersist.map(toLegacyCompatibleMenuItemRow);
+        const legacyRows: LegacyMenuItemUpsertRow[] = rows.map(
+          toLegacyCompatibleMenuItemRow
+        );
         const retryUpsert = await supabase
           .from("menu_items")
-          .upsert(rowsToPersist, { onConflict: "id" });
+          .upsert(legacyRows, { onConflict: "id" });
         error = retryUpsert.error;
       }
 
