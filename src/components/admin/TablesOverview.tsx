@@ -383,13 +383,13 @@ function recoverOriginalLineAgorotFromDiscounted(
     return boundedDiscounted;
   }
 
-  const numerator = BigInt(boundedDiscounted) * BigInt(10_000);
-  const denominator = BigInt(10_000 - boundedBps);
-  const quotient = numerator / denominator;
+  // Integer arithmetic with explicit half-up rounding to avoid float discount drift.
+  const numerator = boundedDiscounted * 10_000;
+  const denominator = 10_000 - boundedBps;
+  const quotient = Math.trunc(numerator / denominator);
   const remainder = numerator % denominator;
-  const rounded = remainder * 2n >= denominator ? quotient + 1n : quotient;
 
-  return Number(rounded);
+  return remainder * 2 >= denominator ? quotient + 1 : quotient;
 }
 
 function getHappyHourDiscountAmountFromOrder(

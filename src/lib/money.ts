@@ -59,13 +59,17 @@ function toBigInt(value: number) {
 }
 
 function roundBigIntDivision(numerator: bigint, denominator: bigint) {
-  if (denominator <= 0n) {
-    return 0n;
+  const ZERO = BigInt(0);
+  const TWO = BigInt(2);
+  const ONE = BigInt(1);
+
+  if (denominator <= ZERO) {
+    return ZERO;
   }
 
   const quotient = numerator / denominator;
   const remainder = numerator % denominator;
-  return remainder * 2n >= denominator ? quotient + 1n : quotient;
+  return remainder * TWO >= denominator ? quotient + ONE : quotient;
 }
 
 function sumAgorot(values: number[]) {
@@ -185,7 +189,9 @@ export function shekelsToAgorot(value: number): Agorot {
     return 0;
   }
 
-  return Number(roundBigIntDivision(BigInt(Math.round(value * 10_000)), 100n));
+  return Number(
+    roundBigIntDivision(BigInt(Math.round(value * 10_000)), BigInt(100))
+  );
 }
 
 export function agorotToShekels(value: number): number {
