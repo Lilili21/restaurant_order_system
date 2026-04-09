@@ -9,7 +9,8 @@ create table if not exists public.orders_store (
   status text not null,
   created_at timestamptz not null,
   updated_at timestamptz,
-  total numeric(10,2) not null default 0
+  total numeric(10,2) not null default 0,
+  total_agorot bigint not null default 0
 );
 
 create index if not exists orders_store_restaurant_table_idx
@@ -27,6 +28,7 @@ create table if not exists public.order_items_store (
   volume_option_id text,
   volume_label text,
   price numeric(10,2) not null,
+  price_agorot integer not null default 0,
   quantity integer not null check (quantity > 0),
   note text,
   served boolean not null default false

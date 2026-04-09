@@ -9,6 +9,7 @@ import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
 import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
 import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
 import { formatCurrency } from "@/lib/menu";
+import { agorotToShekels, percentToBps, shekelsToAgorot } from "@/lib/money";
 import type {
   BusinessLunchSettings,
   PromotionSettings,
@@ -102,6 +103,17 @@ const DASHBOARD_REQUEST_TIMEOUT_MS = 8_000;
 function toFiniteNumber(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeDiscountPercentInput(value: string) {
+  const parsed = Number.parseFloat(value || "0");
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  const normalizedBps = percentToBps(parsed);
+  return normalizedBps / 100;
 }
 
 type InsightStats = {
@@ -283,8 +295,8 @@ function getBusinessLunchValidationMessage(
 }
 
 function getPromotionValidationMessage(promotion: EditablePromotion) {
-  const parsedDiscountPercent = Number(
-    Number.parseFloat(promotion.discountPercent || "0").toFixed(2)
+  const parsedDiscountPercent = normalizeDiscountPercentInput(
+    promotion.discountPercent
   );
 
   if (
@@ -489,6 +501,36 @@ function getBadgeOptionsForKind(kind: "dishes" | "drinks") {
   return kind === "drinks" ? drinkBadgeOptions : badgeOptions;
 }
 
+function sanitizePriceInput(value: string) {
+  const normalized = value.replace(",", ".");
+  let dotSeen = false;
+  let result = "";
+
+  for (const character of normalized) {
+    if (character >= "0" && character <= "9") {
+      result += character;
+      continue;
+    }
+
+    if (character === "." && !dotSeen) {
+      result += ".";
+      dotSeen = true;
+    }
+  }
+
+  return result;
+}
+
+function parsePriceInput(value: string) {
+  const parsed = Number(sanitizePriceInput(value));
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return NaN;
+  }
+
+  return agorotToShekels(shekelsToAgorot(parsed));
+}
+
 function parseVolumeOptions(value: string): MenuVolumeOption[] {
   return value
     .split("\n")
@@ -500,7 +542,7 @@ function parseVolumeOptions(value: string): MenuVolumeOption[] {
         return null;
       }
 
-      const price = Number(rawPrice);
+      const price = parsePriceInput(rawPrice);
 
       if (!Number.isFinite(price) || price <= 0) {
         return null;
@@ -509,10 +551,10 @@ function parseVolumeOptions(value: string): MenuVolumeOption[] {
       return {
         id: `volume_${index}_${(rawLabel || "empty").replace(/\s+/g, "_")}_${Math.max(
           0,
-          Math.round(price)
+          shekelsToAgorot(price)
         )}`,
         label: rawLabel,
-        price: Math.max(0, Math.round(price))
+        price: Math.max(0, price)
       };
     })
     .filter(Boolean) as MenuVolumeOption[];
@@ -577,8 +619,7 @@ function updateVolumeRow(
 
   rows[rowIndex] = {
     ...rows[rowIndex],
-    [field]:
-      field === "price" ? nextValue.replace(/[^\d./]/g, "") : nextValue
+    [field]: field === "price" ? sanitizePriceInput(nextValue) : nextValue
   };
 
   return stringifyVolumeRows(rows);
@@ -594,7 +635,7 @@ function getBasePriceForKind(
     return Number.isFinite(firstVolumePrice) ? firstVolumePrice : NaN;
   }
 
-  return Number(priceText);
+  return parsePriceInput(priceText);
 }
 
 function hasInvalidDrinkVolumeRows(value: string) {
@@ -611,7 +652,7 @@ function hasInvalidDrinkVolumeRows(value: string) {
       return true;
     }
 
-    const parsedPrice = Number(rawPrice);
+    const parsedPrice = parsePriceInput(rawPrice);
     return !Number.isFinite(parsedPrice) || parsedPrice <= 0;
   });
 
@@ -2011,9 +2052,7 @@ export function MenuEditor() {
       text: promotion.text.trim(),
       categories: [...promotion.categories],
       days: [...new Set(promotion.days)].sort((left, right) => left - right),
-      discountPercent: String(
-        Number(Number.parseFloat(promotion.discountPercent || "0").toFixed(2))
-      ),
+      discountPercent: String(normalizeDiscountPercentInput(promotion.discountPercent)),
       startsFrom: promotion.startsFrom.trim(),
       until: promotion.until.trim()
     }));
@@ -2055,9 +2094,7 @@ export function MenuEditor() {
           text: promotion.text,
           categories: promotion.categories,
           days: promotion.days,
-          discountPercent: Number(
-            Number.parseFloat(promotion.discountPercent || "0").toFixed(2)
-          ),
+          discountPercent: normalizeDiscountPercentInput(promotion.discountPercent),
           startsFrom: promotion.enabled
             ? toPromotionIsoTimeValue(promotion.startsFrom)
             : null,

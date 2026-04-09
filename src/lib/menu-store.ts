@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { menuItems as defaultMenuItems } from "@/lib/mock-data";
 import { resolveMenuImageForRestaurant } from "@/lib/menu-images";
+import { agorotToShekels, shekelsToAgorot } from "@/lib/money";
 import { getRestaurantBySlug, invalidateRestaurantsCache } from "@/lib/restaurants";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import type {
@@ -63,6 +64,7 @@ type MenuItemRow = {
   description_en: string | null;
   description_ru: string | null;
   price: number | null;
+  price_agorot?: number | null;
   image: string | null;
   show_image: boolean | null;
   available: boolean | null;
@@ -70,6 +72,21 @@ type MenuItemRow = {
   volume_options: unknown;
   sort_order: number | null;
 };
+
+function isMissingPriceAgorotColumnError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  return (
+    message.includes("column") &&
+    message.includes("price_agorot") &&
+    message.includes("does not exist")
+  );
+}
 
 declare global {
   // eslint-disable-next-line no-var
@@ -139,6 +156,11 @@ function mapMenuItemRowToMenuItem(
   row: MenuItemRow,
   restaurantSlug: string
 ): MenuItem {
+  const normalizedPrice =
+    typeof row.price_agorot === "number" && Number.isFinite(row.price_agorot)
+      ? agorotToShekels(Math.trunc(row.price_agorot))
+      : Number(row.price ?? 0);
+
   return normalizeMenuItem({
     id: row.id,
     restaurantSlug,
@@ -153,7 +175,7 @@ function mapMenuItemRowToMenuItem(
     descriptionEn: row.description_en ?? row.description_he ?? "",
     descriptionRu:
       row.description_ru ?? row.description_en ?? row.description_he ?? "",
-    price: Number(row.price ?? 0),
+    price: normalizedPrice,
     image: row.image ?? "",
     showImage: row.show_image ?? true,
     available: row.available ?? true,
@@ -176,12 +198,20 @@ function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
     description_en: item.descriptionEn,
     description_ru: item.descriptionRu ?? item.descriptionEn,
     price: item.price,
+    price_agorot: shekelsToAgorot(item.price),
     image: item.image,
     show_image: item.showImage,
     available: item.available,
     badges: item.badges ?? [],
     volume_options: item.volumeOptions ?? []
   };
+}
+
+function toLegacyCompatibleMenuItemRow(
+  row: ReturnType<typeof mapMenuItemToRow>
+) {
+  const { price_agorot: _priceAgorot, ...legacyCompatibleRow } = row;
+  return legacyCompatibleRow;
 }
 
 async function loadMenuItemsFromSupabase() {
@@ -195,16 +225,34 @@ async function loadMenuItemsFromSupabase() {
   const { data, error } = await supabase
     .from("menu_items")
     .select(
-      "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, image, show_image, available, badges, volume_options, sort_order"
+      "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, price_agorot, image, show_image, available, badges, volume_options, sort_order"
     )
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  let rows: MenuItemRow[] = [];
 
-  const rows = Array.isArray(data) ? (data as MenuItemRow[]) : [];
+  if (error) {
+    if (!isMissingPriceAgorotColumnError(error.message)) {
+      throw new Error(error.message);
+    }
+
+    const legacyResult = await supabase
+      .from("menu_items")
+      .select(
+        "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, image, show_image, available, badges, volume_options, sort_order"
+      )
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (legacyResult.error) {
+      throw new Error(legacyResult.error.message);
+    }
+
+    rows = Array.isArray(legacyResult.data) ? (legacyResult.data as MenuItemRow[]) : [];
+  } else {
+    rows = Array.isArray(data) ? (data as MenuItemRow[]) : [];
+  }
 
   return rows
     .map((row) => {
@@ -289,6 +337,7 @@ function normalizeVolumeOptions(
     .map((option, index) => {
       const label = option?.label?.trim() || "";
       const price = Number(option?.price);
+      const normalizedPrice = agorotToShekels(shekelsToAgorot(price));
 
       if (!Number.isFinite(price)) {
         return null;
@@ -299,10 +348,10 @@ function normalizeVolumeOptions(
           option?.id?.trim() ||
           `volume_${index}_${(label || "empty").replace(/\s+/g, "_")}_${Math.max(
             0,
-            Math.round(price)
+            shekelsToAgorot(price)
           )}`,
         label,
-        price: Math.max(0, Math.round(price))
+        price: Math.max(0, normalizedPrice)
       };
     })
     .filter(Boolean) as MenuVolumeOption[];
@@ -328,7 +377,9 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
     descriptionHe,
     descriptionEn,
     descriptionRu,
-    price: Number.isFinite(item.price) ? Math.max(0, Math.round(item.price)) : 0,
+    price: Number.isFinite(item.price)
+      ? Math.max(0, agorotToShekels(shekelsToAgorot(item.price)))
+      : 0,
     available: item.available ?? true,
     showImage: item.showImage ?? true,
     image,
@@ -445,7 +496,18 @@ async function persistMenuItemsAsync(items: MenuItem[]) {
       .filter(Boolean);
 
     if (rows.length > 0) {
-      const { error } = await supabase.from("menu_items").upsert(rows, { onConflict: "id" });
+      let rowsToPersist = rows;
+      let { error } = await supabase
+        .from("menu_items")
+        .upsert(rowsToPersist, { onConflict: "id" });
+
+      if (error && isMissingPriceAgorotColumnError(error.message)) {
+        rowsToPersist = rowsToPersist.map(toLegacyCompatibleMenuItemRow);
+        const retryUpsert = await supabase
+          .from("menu_items")
+          .upsert(rowsToPersist, { onConflict: "id" });
+        error = retryUpsert.error;
+      }
 
       if (error) {
         throw new Error(error.message);
@@ -535,9 +597,15 @@ export async function createMenuItem(
       const restaurant = await getRestaurantIdBySlug(supabase, nextItem.restaurantSlug);
 
       if (restaurant) {
-        const { error } = await supabase
-          .from("menu_items")
-          .insert(mapMenuItemToRow(nextItem, restaurant.id));
+        const row = mapMenuItemToRow(nextItem, restaurant.id);
+        let { error } = await supabase.from("menu_items").insert(row);
+
+        if (error && isMissingPriceAgorotColumnError(error.message)) {
+          const retryInsert = await supabase
+            .from("menu_items")
+            .insert(toLegacyCompatibleMenuItemRow(row));
+          error = retryInsert.error;
+        }
 
         if (!error) {
           const current = getMenuStoreCache()?.items ?? [];
@@ -603,9 +671,17 @@ export async function updateMenuItem(
       const restaurant = await getRestaurantIdBySlug(supabase, current.restaurantSlug);
 
       if (restaurant) {
-        const { error } = await supabase
+        const row = mapMenuItemToRow(next, restaurant.id);
+        let { error } = await supabase
           .from("menu_items")
-          .upsert(mapMenuItemToRow(next, restaurant.id), { onConflict: "id" });
+          .upsert(row, { onConflict: "id" });
+
+        if (error && isMissingPriceAgorotColumnError(error.message)) {
+          const retryUpsert = await supabase
+            .from("menu_items")
+            .upsert(toLegacyCompatibleMenuItemRow(row), { onConflict: "id" });
+          error = retryUpsert.error;
+        }
 
         if (!error) {
           items[index] = next;

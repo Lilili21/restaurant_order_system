@@ -16,6 +16,13 @@ import {
 } from "@/lib/types";
 import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
 import { getAllMenuItems, getMenuItemById } from "@/lib/menu-store";
+import {
+  agorotToShekels,
+  calculatePercentDiscountAgorot,
+  multiplyAgorot,
+  percentToBps,
+  shekelsToAgorot
+} from "@/lib/money";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import {
   existsSync,
@@ -50,6 +57,7 @@ type LegacyOrderRow = {
   created_at: string;
   updated_at: string | null;
   total: number;
+  total_agorot?: number;
 };
 
 type ActiveOrderRow = {
@@ -70,6 +78,7 @@ type ActiveOrderRow = {
   created_at: string;
   updated_at: string | null;
   total: number;
+  total_agorot?: number | null;
 };
 
 type LegacyOrderItemRow = {
@@ -81,6 +90,7 @@ type LegacyOrderItemRow = {
   volume_option_id: string | null;
   volume_label: string | null;
   price: number;
+  price_agorot?: number;
   quantity: number;
   note: string | null;
   served: boolean;
@@ -100,6 +110,7 @@ type ActiveOrderItemRow = {
   note: string | null;
   served: boolean;
   created_at?: string;
+  price_agorot?: number | null;
 };
 
 type ClosedSessionRow = {
@@ -109,6 +120,7 @@ type ClosedSessionRow = {
   session_id: number;
   closed_at: string;
   total: number;
+  total_agorot?: number | null;
   order_ids: unknown;
   orders_snapshot: unknown;
 };
@@ -1056,18 +1068,12 @@ function generateDisplayOrderNumber(prefix: string) {
   return `${normalizedPrefix}-${datePart}-${timePart}${entropyPart}`;
 }
 
-function roundMoneyToTwo(value: number) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Number(value.toFixed(2));
-}
-
 function calculateOrderItemsTotal(items: OrderItem[]) {
-  return roundMoneyToTwo(
-    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const totalAgorot = items.reduce(
+    (sum, item) => sum + multiplyAgorot(shekelsToAgorot(item.price), item.quantity),
+    0
   );
+  return agorotToShekels(totalAgorot);
 }
 
 function getEffectiveOrderTotal(order: Pick<Order, "kind" | "items" | "total">) {
@@ -1125,7 +1131,8 @@ function mapOrderToLegacyRow(order: Order): LegacyOrderRow {
     status: order.status,
     created_at: order.createdAt,
     updated_at: order.updatedAt ?? null,
-    total: order.total
+    total: order.total,
+    total_agorot: shekelsToAgorot(order.total)
   };
 }
 
@@ -1154,7 +1161,8 @@ function mapOrderToActiveRow(order: Order, restaurantId: string): ActiveOrderRow
     guest_contact_phone: normalizeGuestContactValue(order.guestContactPhone) ?? null,
     created_at: order.createdAt,
     updated_at: order.updatedAt ?? null,
-    total: order.total
+    total: order.total,
+    total_agorot: shekelsToAgorot(order.total)
   };
 }
 
@@ -1168,10 +1176,27 @@ function mapOrderItemToLegacyRow(orderId: string, item: OrderItem): LegacyOrderI
     volume_option_id: item.volumeOptionId ?? null,
     volume_label: item.volumeLabel ?? null,
     price: item.price,
+    price_agorot: shekelsToAgorot(item.price),
     quantity: item.quantity,
     note: item.note ?? null,
     served: item.served
   };
+}
+
+function getMoneyFromPersistedRow(
+  value: unknown,
+  agorotValue?: unknown
+) {
+  if (typeof agorotValue === "number" && Number.isFinite(agorotValue)) {
+    return agorotToShekels(Math.trunc(agorotValue));
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function mapOrderItemToActiveRow(
@@ -1194,6 +1219,7 @@ function mapOrderItemToActiveRow(
     volume_option_id: item.volumeOptionId ?? null,
     volume_label: item.volumeLabel ?? null,
     price: item.price,
+    price_agorot: shekelsToAgorot(item.price),
     quantity: item.quantity,
     note: item.note ?? null,
     served: item.served
@@ -1215,7 +1241,7 @@ function mapLegacyRowsToOrders(
       name: item.name,
       volumeOptionId: item.volume_option_id ?? undefined,
       volumeLabel: item.volume_label ?? undefined,
-      price: Number(item.price) || 0,
+      price: getMoneyFromPersistedRow(item.price, item.price_agorot),
       quantity: Number(item.quantity) || 0,
       note: item.note ?? undefined,
       served: Boolean(item.served)
@@ -1236,7 +1262,7 @@ function mapLegacyRowsToOrders(
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? undefined,
     items: itemsByOrder.get(row.order_id) ?? [],
-    total: Number(row.total) || 0
+    total: getMoneyFromPersistedRow(row.total, row.total_agorot)
   }));
 }
 
@@ -1259,7 +1285,7 @@ function mapActiveRowsToOrders(
       name: item.name,
       volumeOptionId: item.volume_option_id ?? undefined,
       volumeLabel: item.volume_label ?? undefined,
-      price: Number(item.price) || 0,
+      price: getMoneyFromPersistedRow(item.price, item.price_agorot),
       quantity: Number(item.quantity) || 0,
       note: item.note ?? undefined,
       served: Boolean(item.served)
@@ -1303,7 +1329,7 @@ function mapActiveRowsToOrders(
         createdAt: row.created_at,
         updatedAt: row.updated_at ?? undefined,
         items: itemsByOrder.get(row.id) ?? [],
-        total: Number(row.total) || 0
+        total: getMoneyFromPersistedRow(row.total, row.total_agorot)
       } satisfies Order;
     })
     .filter(Boolean) as Order[];
@@ -1366,6 +1392,7 @@ function mapClosedSummaryToRow(
     session_id: summary.sessionId,
     closed_at: normalizeTimestampToIso(summary.closedAt),
     total: summary.total,
+    total_agorot: shekelsToAgorot(summary.total),
     order_ids: summary.orderIds,
     orders_snapshot: summary.orders
   };
@@ -1432,7 +1459,9 @@ function pickPreferredClosedSummary(
     return current;
   }
 
-  return candidate.total >= current.total ? candidate : current;
+  return shekelsToAgorot(candidate.total) >= shekelsToAgorot(current.total)
+    ? candidate
+    : current;
 }
 
 function mergeClosedTableSummaries(
@@ -1482,7 +1511,7 @@ function mapClosedSessionRowsToSummaries(
         tableNumber: Number(row.table_number),
         sessionId: Number(row.session_id),
         closedAt: normalizeTimestampToIso(row.closed_at),
-        total: Number(row.total) || 0,
+        total: getMoneyFromPersistedRow(row.total, row.total_agorot),
         orderCount: orderIds.length || orders.length,
         orderIds,
         orders
@@ -1532,6 +1561,21 @@ function isMissingOrderAdvancedColumnError(error: unknown) {
   );
 }
 
+function isMissingMoneyColumnError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : "";
+
+  return (
+    message.includes("column") &&
+    (message.includes("total_agorot") || message.includes("price_agorot")) &&
+    message.includes("does not exist")
+  );
+}
+
 function isInvalidIntegerMoneyInputError(error: unknown) {
   const message =
     error instanceof Error
@@ -1559,9 +1603,30 @@ function toLegacyCompatibleActiveOrderRow(row: ActiveOrderRow) {
     order_channel: _orderChannel,
     display_order_number: _displayOrderNumber,
     guest_token_hash: _guestTokenHash,
+    total_agorot: _totalAgorot,
     ...legacyCompatibleRow
   } = row;
 
+  return legacyCompatibleRow;
+}
+
+function toLegacyCompatibleActiveOrderItemRow(row: ActiveOrderItemRow) {
+  const { price_agorot: _priceAgorot, ...legacyCompatibleRow } = row;
+  return legacyCompatibleRow;
+}
+
+function toLegacyCompatibleLegacyOrderRow(row: LegacyOrderRow) {
+  const { total_agorot: _totalAgorot, ...legacyCompatibleRow } = row;
+  return legacyCompatibleRow;
+}
+
+function toLegacyCompatibleLegacyOrderItemRow(row: LegacyOrderItemRow) {
+  const { price_agorot: _priceAgorot, ...legacyCompatibleRow } = row;
+  return legacyCompatibleRow;
+}
+
+function toLegacyCompatibleClosedSessionRow(row: ClosedSessionRow) {
+  const { total_agorot: _totalAgorot, ...legacyCompatibleRow } = row;
   return legacyCompatibleRow;
 }
 
@@ -1945,9 +2010,11 @@ function rotateSessionsForNewShift(
         tableNumber: referenceOrder.tableNumber,
         sessionId,
         closedAt: closedAtIso,
-        total: billableOrders.reduce(
-          (sum, order) => sum + getEffectiveOrderTotal(order),
-          0
+        total: agorotToShekels(
+          billableOrders.reduce(
+            (sum, order) => sum + shekelsToAgorot(getEffectiveOrderTotal(order)),
+            0
+          )
         ),
         orderCount: billableOrders.length,
         orderIds: billableOrders.map((order) => order.id),
@@ -2440,6 +2507,16 @@ async function persistStateToRowSupabase(
           upsertOrdersError = retryUpsert.error;
         }
 
+        if (upsertOrdersError && isMissingMoneyColumnError(upsertOrdersError)) {
+          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+            toLegacyCompatibleActiveOrderRow
+          );
+          const retryUpsert = await supabase
+            .from("orders")
+            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+          upsertOrdersError = retryUpsert.error;
+        }
+
         if (
           upsertOrdersError &&
           isInvalidIntegerMoneyInputError(upsertOrdersError)
@@ -2485,6 +2562,16 @@ async function persistStateToRowSupabase(
         let { error: upsertItemsError } = await supabase
           .from("order_items")
           .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+
+        if (upsertItemsError && isMissingMoneyColumnError(upsertItemsError)) {
+          activeOrderItemRowsToPersist = activeOrderItemRowsToPersist.map(
+            toLegacyCompatibleActiveOrderItemRow
+          );
+          const retryUpsert = await supabase
+            .from("order_items")
+            .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+          upsertItemsError = retryUpsert.error;
+        }
 
         if (
           upsertItemsError &&
@@ -2571,6 +2658,14 @@ async function persistStateToRowSupabase(
           .from("orders_store")
           .upsert(legacyOrderRows, { onConflict: "order_id" });
 
+        if (upsertOrdersError && isMissingMoneyColumnError(upsertOrdersError)) {
+          legacyOrderRows = legacyOrderRows.map(toLegacyCompatibleLegacyOrderRow);
+          const retryUpsert = await supabase
+            .from("orders_store")
+            .upsert(legacyOrderRows, { onConflict: "order_id" });
+          upsertOrdersError = retryUpsert.error;
+        }
+
         if (
           upsertOrdersError &&
           isInvalidIntegerMoneyInputError(upsertOrdersError)
@@ -2614,6 +2709,16 @@ async function persistStateToRowSupabase(
         let { error: upsertItemsError } = await supabase
           .from("order_items_store")
           .upsert(legacyOrderItemRows, { onConflict: "id" });
+
+        if (upsertItemsError && isMissingMoneyColumnError(upsertItemsError)) {
+          legacyOrderItemRows = legacyOrderItemRows.map(
+            toLegacyCompatibleLegacyOrderItemRow
+          );
+          const retryUpsert = await supabase
+            .from("order_items_store")
+            .upsert(legacyOrderItemRows, { onConflict: "id" });
+          upsertItemsError = retryUpsert.error;
+        }
 
         if (
           upsertItemsError &&
@@ -2792,6 +2897,17 @@ async function persistStateToRowSupabase(
     let { error: upsertClosedSessionsError } = await supabase
       .from("closed_sessions")
       .upsert(closedSessionRows, { onConflict: "id" });
+
+    if (
+      upsertClosedSessionsError &&
+      isMissingMoneyColumnError(upsertClosedSessionsError)
+    ) {
+      closedSessionRows = closedSessionRows.map(toLegacyCompatibleClosedSessionRow);
+      const retryUpsert = await supabase
+        .from("closed_sessions")
+        .upsert(closedSessionRows, { onConflict: "id" });
+      upsertClosedSessionsError = retryUpsert.error;
+    }
 
     if (
       upsertClosedSessionsError &&
@@ -3166,10 +3282,13 @@ function createOrderItem(
   const matchedVolumeOption = menuItem.volumeOptions?.find(
     (option) => option.id === cartItem.volumeOptionId
   );
-  const basePrice = matchedVolumeOption?.price ?? menuItem.price;
+  const basePrice =
+    typeof cartItem.priceOverride === "number" && Number.isFinite(cartItem.priceOverride)
+      ? cartItem.priceOverride
+      : matchedVolumeOption?.price ?? menuItem.price;
   const finalPrice = menuSettings
     ? applyHappyHourDiscount(basePrice, menuItem.category, menuSettings)
-    : basePrice;
+    : agorotToShekels(shekelsToAgorot(basePrice));
 
   return {
     id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -3255,14 +3374,18 @@ function applyHappyHourDiscount(
   category: MenuItem["category"],
   settings: Awaited<ReturnType<typeof getMenuSettings>>
 ) {
+  const basePriceAgorot = shekelsToAgorot(price);
   const discountPercent = getPromotionDiscountForCategory(category, settings);
 
   if (discountPercent <= 0) {
-    return price;
+    return agorotToShekels(basePriceAgorot);
   }
 
-  const discountMultiplier = 1 - discountPercent / 100;
-  return Number(Math.max(0, price * discountMultiplier).toFixed(2));
+  const discountAgorot = calculatePercentDiscountAgorot(
+    basePriceAgorot,
+    percentToBps(discountPercent)
+  );
+  return agorotToShekels(Math.max(0, basePriceAgorot - discountAgorot));
 }
 
 async function mergeOrderItems(
@@ -4068,8 +4191,10 @@ export async function getTableOverviews(
             }
 
             const effectiveTotal = getEffectiveOrderTotal(order);
+            const storedTotalAgorot = shekelsToAgorot(order.total);
+            const effectiveTotalAgorot = shekelsToAgorot(effectiveTotal);
 
-            if (Math.abs(order.total - effectiveTotal) < 0.009) {
+            if (storedTotalAgorot === effectiveTotalAgorot) {
               return [order];
             }
 
@@ -4085,7 +4210,7 @@ export async function getTableOverviews(
             return [
               {
                 ...order,
-                total: effectiveTotal
+                total: agorotToShekels(effectiveTotalAgorot)
               }
             ];
           });
@@ -4096,9 +4221,11 @@ export async function getTableOverviews(
           tableNumber: table.number,
           currentSessionId,
           orderCount: visibleOrders.length,
-          total: visibleOrders.reduce(
-            (sum, order) => sum + getEffectiveOrderTotal(order),
-            0
+          total: agorotToShekels(
+            visibleOrders.reduce(
+              (sum, order) => sum + shekelsToAgorot(getEffectiveOrderTotal(order)),
+              0
+            )
           ),
           statuses: [...new Set(visibleOrders.map((order) => order.status))],
           orders: visibleOrders
@@ -4242,9 +4369,11 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
     tableNumber,
     sessionId: closingSessionId,
     closedAt: new Date().toISOString(),
-    total: billableOrders.reduce(
-      (sum, order) => sum + getEffectiveOrderTotal(order),
-      0
+    total: agorotToShekels(
+      billableOrders.reduce(
+        (sum, order) => sum + shekelsToAgorot(getEffectiveOrderTotal(order)),
+        0
+      )
     ),
     orderCount: billableOrders.length,
     orderIds: billableOrders.map((order) => order.id),

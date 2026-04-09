@@ -5,6 +5,12 @@ import { useEffect, useState } from "react";
 import { readSessionCache, writeSessionCache } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
 import {
+  agorotToShekels,
+  calculatePercentDiscountAgorot,
+  percentToBps,
+  shekelsToAgorot
+} from "@/lib/money";
+import {
   ClosedTableOrderSnapshot,
   ClosedTableSummary,
   MenuCategory,
@@ -209,7 +215,10 @@ function groupSessionItems(
 
       if (existing) {
         existing.quantity += item.quantity;
-        existing.total += item.price * item.quantity;
+        existing.total = agorotToShekels(
+          shekelsToAgorot(existing.total) +
+            shekelsToAgorot(item.price) * item.quantity
+        );
         existing.hasHappyHourDiscount =
           existing.hasHappyHourDiscount || isDiscounted;
         continue;
@@ -220,7 +229,7 @@ function groupSessionItems(
         name: getSessionItemName(item),
         volumeLabel: item.volumeLabel,
         quantity: item.quantity,
-        total: item.price * item.quantity,
+        total: agorotToShekels(shekelsToAgorot(item.price) * item.quantity),
         hasHappyHourDiscount: isDiscounted
       });
     }
@@ -253,7 +262,10 @@ function groupClosedSessionItems(
 
       if (existing) {
         existing.quantity += item.quantity;
-        existing.total += item.price * item.quantity;
+        existing.total = agorotToShekels(
+          shekelsToAgorot(existing.total) +
+            shekelsToAgorot(item.price) * item.quantity
+        );
         existing.hasHappyHourDiscount =
           existing.hasHappyHourDiscount || isDiscounted;
         continue;
@@ -264,7 +276,7 @@ function groupClosedSessionItems(
         name: getSessionItemName(item),
         volumeLabel: item.volumeLabel,
         quantity: item.quantity,
-        total: item.price * item.quantity,
+        total: agorotToShekels(shekelsToAgorot(item.price) * item.quantity),
         hasHappyHourDiscount: isDiscounted
       });
     }
@@ -360,6 +372,26 @@ function getCurrentShiftStartTimestampByRules(
   return getCurrentShiftStartTimestamp(fromValue);
 }
 
+function recoverOriginalLineAgorotFromDiscounted(
+  discountedLineAgorot: number,
+  discountBps: number
+) {
+  const boundedDiscounted = Math.max(0, Math.trunc(discountedLineAgorot));
+  const boundedBps = Math.max(0, Math.min(9_999, Math.trunc(discountBps)));
+
+  if (boundedDiscounted <= 0 || boundedBps <= 0) {
+    return boundedDiscounted;
+  }
+
+  const numerator = BigInt(boundedDiscounted) * BigInt(10_000);
+  const denominator = BigInt(10_000 - boundedBps);
+  const quotient = numerator / denominator;
+  const remainder = numerator % denominator;
+  const rounded = remainder * 2n >= denominator ? quotient + 1n : quotient;
+
+  return Number(rounded);
+}
+
 function getHappyHourDiscountAmountFromOrder(
   order: Pick<ClosedTableOrderSnapshot, "createdAt" | "items">,
   settings: {
@@ -379,15 +411,21 @@ function getHappyHourDiscountAmountFromOrder(
     return 0;
   }
 
-  const ratio = settings.discountPercent / (100 - settings.discountPercent);
-  return order.items.reduce((sum, item) => {
+  const discountBps = percentToBps(settings.discountPercent);
+  const discountAgorot = order.items.reduce((sum, item) => {
     if (!item.category || !settings.categories.has(item.category)) {
       return sum;
     }
 
-    const discountedLineTotal = item.price * item.quantity;
-    return sum + discountedLineTotal * ratio;
+    const discountedLineAgorot = shekelsToAgorot(item.price) * item.quantity;
+    const originalLineAgorot = recoverOriginalLineAgorotFromDiscounted(
+      discountedLineAgorot,
+      discountBps
+    );
+    return sum + Math.max(0, originalLineAgorot - discountedLineAgorot);
   }, 0);
+
+  return agorotToShekels(discountAgorot);
 }
 
 function hasRenderableClosedSessionItems(session: ClosedTableSummary) {
@@ -771,13 +809,12 @@ export function TablesOverview() {
     }
 
     const summary = (await response.json()) as ClosedTableSummary;
-    const discountAmount = Number(
-      (summary.orders ?? [])
-        .reduce(
-          (sum, order) => sum + getHappyHourDiscountAmountFromOrder(order, happyHourSettings),
-          0
-        )
-        .toFixed(2)
+    const discountAmount = agorotToShekels(
+      (summary.orders ?? []).reduce(
+        (sum, order) =>
+          sum + shekelsToAgorot(getHappyHourDiscountAmountFromOrder(order, happyHourSettings)),
+        0
+      )
     );
     const happyHourNote =
       discountAmount > 0
@@ -960,7 +997,7 @@ export function TablesOverview() {
             orderId: order.id,
             itemName: item.name,
             quantity: item.quantity,
-            itemTotal: item.price * item.quantity,
+            itemTotal: agorotToShekels(shekelsToAgorot(item.price) * item.quantity),
             sessionTotal: session.total
           };
         })
@@ -1064,7 +1101,7 @@ export function TablesOverview() {
             orderId: order.id,
             itemName: item.name,
             quantity: item.quantity,
-            itemTotal: item.price * item.quantity,
+            itemTotal: agorotToShekels(shekelsToAgorot(item.price) * item.quantity),
             sessionTotal: session.total
           };
         })

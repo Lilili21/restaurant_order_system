@@ -832,9 +832,9 @@ function ControlCenterDashboardComponent({
                       }
                     >
                       {stat.label === "Revenue"
-                        ? formatCurrency(Number(animatedLiveStats.revenue.toFixed(2)))
+                        ? formatCurrency(animatedLiveStats.revenue)
                         : stat.label === "Avg Check"
-                          ? formatCurrency(Number(animatedLiveStats.avgCheck.toFixed(2)))
+                          ? formatCurrency(animatedLiveStats.avgCheck)
                           : stat.label === "Orders"
                             ? String(Math.max(0, Math.round(animatedLiveStats.orders)))
                             : stat.label === "Active Orders"

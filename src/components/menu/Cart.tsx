@@ -7,6 +7,12 @@ import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { MenuList } from "@/components/menu/MenuList";
 import type { MenuFilter } from "@/components/menu/MenuList";
 import { formatCurrency } from "@/lib/menu";
+import {
+  agorotToShekels,
+  calculateCartTotal,
+  percentToBps,
+  shekelsToAgorot
+} from "@/lib/money";
 import type {
   BusinessLunchSettings,
   ContactRequirement,
@@ -601,13 +607,6 @@ export function Cart({
       .filter(Boolean) as { cartItem: CartItem; menuItem: MenuItem }[];
   }, [items, liveMenu]);
 
-  const total = detailedItems.reduce(
-    (sum, item) =>
-      sum +
-      (item.cartItem.priceOverride ?? item.menuItem.price) *
-        item.cartItem.quantity,
-    0
-  );
   const pendingOrderItemsCount = items.reduce(
     (sum, item) => sum + item.quantity,
     0
@@ -664,9 +663,11 @@ export function Cart({
     return acc;
   }, {});
 
-  const submittedOrdersTotal = submittedOrders.reduce(
-    (sum, order) => sum + order.total,
-    0
+  const submittedOrdersTotal = agorotToShekels(
+    submittedOrders.reduce(
+      (sum, order) => sum + shekelsToAgorot(order.total),
+      0
+    )
   );
   const submittedOrdersSummaryStatus = useMemo(() => {
     const visibleStatuses = submittedOrders
@@ -891,22 +892,46 @@ export function Cart({
       }),
     [activeBusinessLunches, language, promoCategoryLabels, text.businessLunchNow]
   );
-  const currentOrderDiscountAmount = Number(
-    detailedItems
-      .reduce((sum, { cartItem, menuItem }) => {
-        const categoryDiscount = categoryDiscounts[menuItem.category] ?? 0;
+  const cartCalculation = useMemo(() => {
+    const lineItems = detailedItems.map(({ cartItem, menuItem }) => ({
+      id: `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`,
+      name: menuItem.nameEn || menuItem.nameHe || menuItem.name,
+      unitPriceAgorot: shekelsToAgorot(cartItem.priceOverride ?? menuItem.price),
+      quantity: cartItem.quantity
+    }));
 
-        if (categoryDiscount <= 0) {
-          return sum;
-        }
+    const discountedLineIdsByCategory = new Map<MenuCategory, string[]>();
 
-        const unitPrice = cartItem.priceOverride ?? menuItem.price;
-        return sum + unitPrice * cartItem.quantity * (categoryDiscount / 100);
-      }, 0)
-      .toFixed(2)
+    for (const { cartItem, menuItem } of detailedItems) {
+      const categoryDiscount = categoryDiscounts[menuItem.category] ?? 0;
+
+      if (categoryDiscount <= 0) {
+        continue;
+      }
+
+      const currentLineIds = discountedLineIdsByCategory.get(menuItem.category) ?? [];
+      currentLineIds.push(
+        `${cartItem.menuItemId}:${cartItem.volumeOptionId ?? cartItem.volumeLabel ?? "base"}`
+      );
+      discountedLineIdsByCategory.set(menuItem.category, currentLineIds);
+    }
+
+    const discounts = [...discountedLineIdsByCategory.entries()].map(
+      ([category, lineIds]) => ({
+        type: "percent" as const,
+        valueBps: percentToBps(categoryDiscounts[category] ?? 0),
+        label: `Happy hour ${category}`,
+        appliesToItemIds: lineIds
+      })
+    );
+
+    return calculateCartTotal(lineItems, discounts);
+  }, [categoryDiscounts, detailedItems]);
+  const currentOrderDiscountAmount = agorotToShekels(
+    cartCalculation.totalDiscountAgorot
   );
-  const currentOrderTotalAfterDiscount = Number(
-    Math.max(0, total - currentOrderDiscountAmount).toFixed(2)
+  const currentOrderTotalAfterDiscount = agorotToShekels(
+    cartCalculation.totalAgorot
   );
 
   const cartStorageKey = useMemo(
@@ -2291,8 +2316,10 @@ export function Cart({
                   </span>
                   <strong>
                     {formatCurrency(
-                      (cartItem.priceOverride ?? menuItem.price) *
-                        cartItem.quantity
+                      agorotToShekels(
+                        shekelsToAgorot(cartItem.priceOverride ?? menuItem.price) *
+                          cartItem.quantity
+                      )
                     )}
                   </strong>
                 </div>
@@ -2908,7 +2935,13 @@ export function Cart({
                                   item.volumeLabel
                                 ) || item.name}
                               </span>
-                              <strong>{formatCurrency(item.price * item.quantity)}</strong>
+                              <strong>
+                                {formatCurrency(
+                                  agorotToShekels(
+                                    shekelsToAgorot(item.price) * item.quantity
+                                  )
+                                )}
+                              </strong>
                             </div>
                           ))}
                         </div>

@@ -9,16 +9,40 @@ import {
   writeJson
 } from "./helpers/test-env";
 
+function clearOrdersRuntimeCache() {
+  const runtime = globalThis as Record<string, unknown>;
+  delete runtime.__ordersStateCache;
+  delete runtime.__menuLookupCache;
+  delete runtime.__orderRequestCache;
+  delete runtime.__recentOrderPayloadCache;
+  delete runtime.__ordersPersistedPayload;
+  delete runtime.__menuStoreCache;
+  delete runtime.__availableMenuCache;
+  delete runtime.__tableSessionCache;
+  delete runtime.__menuSettingsCache;
+  delete runtime.__restaurantsCache;
+}
+
 describe("orders", () => {
   let workspace: string;
 
   beforeEach(() => {
+    delete process.env.SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    clearOrdersRuntimeCache();
     workspace = createWorkspace("orders");
     useWorkspace(workspace);
+    writeJson(workspace, "data/orders-store.json", {
+      orders: [],
+      currentTableSessions: [],
+      closedTableSummaries: []
+    });
     vi.resetModules();
   });
 
   afterEach(() => {
+    clearOrdersRuntimeCache();
     restoreWorkspace();
     vi.resetModules();
   });
@@ -303,6 +327,7 @@ describe("orders", () => {
       currentTableSessions: [["olive-bistro:6", served.sessionId]],
       closedTableSummaries: [firstClose]
     });
+    clearOrdersRuntimeCache();
 
     const secondClose = await closeTable("olive-bistro", 6);
     const tables = await getTableOverviews("olive-bistro");

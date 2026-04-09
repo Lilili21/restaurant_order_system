@@ -1,4 +1,5 @@
 import { menuItems } from "@/lib/mock-data";
+import { formatAgorotToILS, shekelsToAgorot } from "@/lib/money";
 import { MenuItem } from "@/lib/types";
 
 export function getMenuByRestaurant(slug: string): MenuItem[] {
@@ -8,9 +9,9 @@ export function getMenuByRestaurant(slug: string): MenuItem[] {
 }
 
 export function formatCurrency(value: number) {
-  return new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "ILS",
-    maximumFractionDigits: 0
-  }).format(value);
+  return formatAgorotToILS(shekelsToAgorot(value), {
+    locale: "ru-RU",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  });
 }

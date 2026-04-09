@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
 import { getMenuSettings } from "@/lib/menu-settings";
+import { agorotToShekels, shekelsToAgorot } from "@/lib/money";
 import {
   getAllStoredOrders,
   getClosedTableSummaries,
@@ -381,6 +382,18 @@ type ClosedSessionSeriesEntry = {
   ordersCount: number;
 };
 
+function sumMoneyAsAgorot(values: number[]) {
+  return values.reduce((sum, value) => sum + shekelsToAgorot(value), 0);
+}
+
+function averageMoneyFromAgorot(totalAgorot: number, count: number) {
+  if (count <= 0) {
+    return 0;
+  }
+
+  return agorotToShekels(Math.round(totalAgorot / count));
+}
+
 function hasRenderableClosedSessionItems(session: {
   orders?: Array<{
     items?: Array<{
@@ -454,11 +467,11 @@ function buildHourlySeries(
 ) {
   const labels = buildHourlyLabels(start, end);
   const orderCounts = new Map<string, number>();
-  const revenueCounts = new Map<string, number>();
+  const revenueCountsAgorot = new Map<string, number>();
 
   for (const label of labels) {
     orderCounts.set(label, 0);
-    revenueCounts.set(label, 0);
+    revenueCountsAgorot.set(label, 0);
   }
 
   for (const session of sessions) {
@@ -478,14 +491,17 @@ function buildHourlySeries(
       bucketLabel,
       (orderCounts.get(bucketLabel) ?? 0) + Math.max(0, Math.trunc(session.ordersCount))
     );
-    revenueCounts.set(bucketLabel, (revenueCounts.get(bucketLabel) ?? 0) + session.total);
+    revenueCountsAgorot.set(
+      bucketLabel,
+      (revenueCountsAgorot.get(bucketLabel) ?? 0) + shekelsToAgorot(session.total)
+    );
   }
 
   return {
     labels,
     ordersByHour: labels.map((label) => orderCounts.get(label) ?? 0),
     revenueTrend: labels.map((label) =>
-      Number((revenueCounts.get(label) ?? 0).toFixed(2))
+      agorotToShekels(revenueCountsAgorot.get(label) ?? 0)
     )
   };
 }
@@ -745,25 +761,29 @@ export async function GET(request: NextRequest) {
             ? session.orderIds.length
             : 1
     }));
-    const closedSessionsInCurrentShiftRevenue = closedSessionsInCurrentShift.reduce(
-      (sum, session) => sum + session.total,
-      0
+    const closedSessionsInCurrentShiftRevenueAgorot = sumMoneyAsAgorot(
+      closedSessionsInCurrentShift.map((session) => session.total)
     );
-    const closedSessionsInCurrentShiftAvgCheck =
-      closedSessionsInCurrentShift.length > 0
-        ? closedSessionsInCurrentShiftRevenue / closedSessionsInCurrentShift.length
-        : 0;
+    const closedSessionsInCurrentShiftRevenue = agorotToShekels(
+      closedSessionsInCurrentShiftRevenueAgorot
+    );
+    const closedSessionsInCurrentShiftAvgCheck = averageMoneyFromAgorot(
+      closedSessionsInCurrentShiftRevenueAgorot,
+      closedSessionsInCurrentShift.length
+    );
     const activeTablesCount = tables.length;
     const tableModeActiveOrdersCount = activeTablesCount;
     const closedOrdersCount = closedSessionsInCurrentShift.length;
     const totalTablesOrdersCount = tableModeActiveOrdersCount + closedOrdersCount;
-    const counterRevenue = counterShiftOrders.reduce(
-      (sum, order) => sum + order.total,
-      0
+    const counterRevenueAgorot = sumMoneyAsAgorot(
+      counterShiftOrders.map((order) => order.total)
     );
+    const counterRevenue = agorotToShekels(counterRevenueAgorot);
     const counterOrdersCount = counterShiftOrders.length;
-    const counterAvgCheck =
-      counterOrdersCount > 0 ? counterRevenue / counterOrdersCount : 0;
+    const counterAvgCheck = averageMoneyFromAgorot(
+      counterRevenueAgorot,
+      counterOrdersCount
+    );
     const counterActiveOrdersCount = counterShiftOrders.filter(
       (order) => order.status !== "served" && order.status !== "cancelled"
     ).length;
@@ -803,14 +823,14 @@ export async function GET(request: NextRequest) {
             );
           })
         : [];
-    const previousRevenue = previousClosedSessionsAtComparableTime.reduce(
-      (sum, session) => sum + session.total,
-      0
+    const previousRevenueAgorot = sumMoneyAsAgorot(
+      previousClosedSessionsAtComparableTime.map((session) => session.total)
     );
-    const previousAvgCheck =
-      previousClosedSessionsAtComparableTime.length > 0
-        ? previousRevenue / previousClosedSessionsAtComparableTime.length
-        : 0;
+    const previousRevenue = agorotToShekels(previousRevenueAgorot);
+    const previousAvgCheck = averageMoneyFromAgorot(
+      previousRevenueAgorot,
+      previousClosedSessionsAtComparableTime.length
+    );
     const previousActiveTablesCount =
       previousShiftStartTs && previousComparableEndTs
         ? getActiveSessionCountAtTime(
@@ -842,14 +862,14 @@ export async function GET(request: NextRequest) {
             );
           })
         : [];
-    const previousCounterRevenue = previousCounterOrders.reduce(
-      (sum, order) => sum + order.total,
-      0
+    const previousCounterRevenueAgorot = sumMoneyAsAgorot(
+      previousCounterOrders.map((order) => order.total)
     );
-    const previousCounterAvgCheck =
-      previousCounterOrders.length > 0
-        ? previousCounterRevenue / previousCounterOrders.length
-        : 0;
+    const previousCounterRevenue = agorotToShekels(previousCounterRevenueAgorot);
+    const previousCounterAvgCheck = averageMoneyFromAgorot(
+      previousCounterRevenueAgorot,
+      previousCounterOrders.length
+    );
     const previousCounterActiveOrdersCount = previousCounterOrders.filter(
       (order) => order.status !== "served" && order.status !== "cancelled"
     ).length;
@@ -942,8 +962,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       insights: {
-        revenue: Number(effectiveRevenue.toFixed(2)),
-        avgCheck: Number(effectiveAvgCheck.toFixed(2)),
+        revenue: effectiveRevenue,
+        avgCheck: effectiveAvgCheck,
         orders: effectiveOrdersCount,
         activeOrders: effectiveActiveOrdersCount,
         topDish: currentShiftWindow
@@ -958,12 +978,12 @@ export async function GET(request: NextRequest) {
         globalInsightStatus: globalInsight.status,
         vsYesterday: {
           revenue: formatVsYesterday(
-            Number(effectiveRevenue.toFixed(2)),
-            Number(effectivePreviousRevenue.toFixed(2))
+            effectiveRevenue,
+            effectivePreviousRevenue
           ),
           avgCheck: formatVsYesterday(
-            Number(effectiveAvgCheck.toFixed(2)),
-            Number(effectivePreviousAvgCheck.toFixed(2))
+            effectiveAvgCheck,
+            effectivePreviousAvgCheck
           ),
           orders: formatVsYesterday(effectiveOrdersCount, effectivePreviousOrdersCount),
           activeOrders: formatVsYesterday(

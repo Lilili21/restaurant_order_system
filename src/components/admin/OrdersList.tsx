@@ -9,6 +9,7 @@ import {
   writeSessionCache
 } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
+import { agorotToShekels, shekelsToAgorot } from "@/lib/money";
 import type { RestaurantOrderMode } from "@/lib/menu-settings";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
@@ -788,9 +789,11 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
             : order.items.filter((item) =>
                 !isBarCategory(item.category)
               );
-        const visibleTotal = visibleItems.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
+        const visibleTotal = agorotToShekels(
+          visibleItems.reduce(
+            (sum, item) => sum + shekelsToAgorot(item.price) * item.quantity,
+            0
+          )
         );
         const groupedBarItems = isBarView
           ? getGroupedBarItems(

@@ -370,7 +370,10 @@ export function MenuItemEditCard({
                   updateDraft(
                     item.id,
                     "draftPrice",
-                    event.target.value.replace(/[^\d]/g, "")
+                    event.target.value
+                      .replace(",", ".")
+                      .replace(/[^\d.]/g, "")
+                      .replace(/(\..*)\./g, "$1")
                   )
                 }
               />

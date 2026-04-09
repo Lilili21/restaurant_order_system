@@ -341,7 +341,13 @@ export function MenuCreateCard({
                 inputMode="numeric"
                 value={newItem.price}
                 onChange={(event) =>
-                  updateNewItem("price", event.target.value.replace(/[^\d]/g, ""))
+                  updateNewItem(
+                    "price",
+                    event.target.value
+                      .replace(",", ".")
+                      .replace(/[^\d.]/g, "")
+                      .replace(/(\..*)\./g, "$1")
+                  )
                 }
               />
               <span className="menu-editor__price-currency">₪</span>
