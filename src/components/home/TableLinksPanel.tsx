@@ -2,6 +2,7 @@ import Link from "next/link";
 
 type TableLinksPanelProps = {
   tableLinks: Array<{
+    label?: string;
     tableNumber: number;
     href: string;
   }>;
@@ -19,7 +20,7 @@ export function TableLinksPanel({
             href={table.href}
             className="table-links-panel__link"
           >
-            Table {table.tableNumber}
+            {table.label || `Table ${table.tableNumber}`}
           </Link>
         ))}
       </div>

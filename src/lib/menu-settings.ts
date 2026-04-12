@@ -710,10 +710,7 @@ function mergeRestaurantSettingsWithFallback(
       restaurantSettings.businessLunches.length > 0
         ? restaurantSettings.businessLunches
         : fallbackSettings.businessLunches,
-    recommendations:
-      restaurantSettings.recommendations.length > 0
-        ? restaurantSettings.recommendations
-        : fallbackSettings.recommendations,
+    recommendations: restaurantSettings.recommendations,
     happyHourText:
       restaurantSettings.happyHourText || fallbackSettings.happyHourText,
     happyHourCategories:

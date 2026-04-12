@@ -279,6 +279,28 @@ async function patchMenuSettings(
   ).toBe(200);
 }
 
+async function waitForRecommendationsSync(
+  page: Page,
+  restaurantSlug: string,
+  recommendationIds: string[]
+) {
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await fetchMenuSettingsSnapshot(page, restaurantSlug);
+        return snapshot.recommendations
+          .filter((recommendation) => recommendation.enabled)
+          .map((recommendation) => recommendation.id)
+          .sort();
+      },
+      {
+        timeout: 15_000,
+        intervals: [500, 1_000, 2_000]
+      }
+    )
+    .toEqual(recommendationIds.slice().sort());
+}
+
 async function readCartItemIdsFromStorage(
   page: Page,
   restaurantSlug: string,
@@ -707,12 +729,13 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
   test("TC-47 recommendation block appears when trigger conditions are met", async ({ page }) => {
     const targetPath = ORDERING_MENU_PATH;
     const recommendationSeed = await prepareRecommendationRule(page, targetPath);
+    const recommendationId = "tc-47-recommendation";
 
     try {
       await patchMenuSettings(page, recommendationSeed.restaurantSlug, {
         recommendations: [
           {
-            id: "tc-47-recommendation",
+            id: recommendationId,
             enabled: true,
             triggerItemId: recommendationSeed.triggerItemId,
             suggestedType: "item",
@@ -722,13 +745,15 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
         ]
       });
 
-      await openMenuInEnglish(page, targetPath);
+      await waitForRecommendationsSync(page, recommendationSeed.restaurantSlug, [
+        recommendationId
+      ]);
       const recommendationArea = page.locator(".cart-recommendations");
       const recommendationAddButton = recommendationArea
         .locator(".cart-recommendation__button")
         .filter({ hasText: /^Add$/ })
         .first();
-      await expect(recommendationAddButton).toBeVisible();
+      await expect(recommendationAddButton).toBeVisible({ timeout: 15_000 });
     } finally {
       await patchMenuSettings(page, recommendationSeed.restaurantSlug, {
         recommendations: recommendationSeed.originalSettings.recommendations
@@ -739,12 +764,13 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
   test("TC-48 adding from recommendation updates cart like regular add", async ({ page }) => {
     const targetPath = ORDERING_MENU_PATH;
     const recommendationSeed = await prepareRecommendationRule(page, targetPath);
+    const recommendationId = "tc-48-recommendation";
 
     try {
       await patchMenuSettings(page, recommendationSeed.restaurantSlug, {
         recommendations: [
           {
-            id: "tc-48-recommendation",
+            id: recommendationId,
             enabled: true,
             triggerItemId: recommendationSeed.triggerItemId,
             suggestedType: "item",
@@ -754,12 +780,14 @@ test.describe("Client menu checks TC-43..TC-48 (promotions & recommendations)", 
         ]
       });
 
-      await openMenuInEnglish(page, targetPath);
+      await waitForRecommendationsSync(page, recommendationSeed.restaurantSlug, [
+        recommendationId
+      ]);
       const recommendationAddButton = page
         .locator(".cart-recommendation__button")
         .filter({ hasText: /^Add$/ })
         .first();
-      await expect(recommendationAddButton).toBeVisible();
+      await expect(recommendationAddButton).toBeVisible({ timeout: 15_000 });
 
       const beforeCount = await page.locator(".cart-row").count();
       await recommendationAddButton.click();

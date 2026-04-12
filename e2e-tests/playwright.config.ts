@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL =
   process.env.E2E_BASE_URL ?? "https://restaurant-order-system-blue.vercel.app";
 const useWebServer = process.env.E2E_USE_WEB_SERVER === "true";
+const configuredWorkers = Number.parseInt(process.env.PLAYWRIGHT_WORKERS ?? "1", 10);
+const workers = Number.isFinite(configuredWorkers) && configuredWorkers > 0
+  ? configuredWorkers
+  : 1;
 const sanitizedNodeOptions = (process.env.NODE_OPTIONS ?? "")
   .split(/\s+/)
   .filter(Boolean)
@@ -12,6 +16,7 @@ const sanitizedNodeOptions = (process.env.NODE_OPTIONS ?? "")
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
+  workers,
   timeout: 45_000,
   expect: {
     timeout: 10_000

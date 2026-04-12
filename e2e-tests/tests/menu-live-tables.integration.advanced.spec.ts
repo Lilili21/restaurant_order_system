@@ -745,6 +745,8 @@ async function waitForSubmittedOrdersInStore(
 }
 
 test.describe("Menu + Live + Tables advanced integration", () => {
+  test.describe.configure({ mode: "serial" });
+
   test.beforeEach(async ({ context }) => {
     await context.addInitScript(() => {
       window.localStorage.clear();

@@ -170,17 +170,10 @@ const uiText = {
     newOrder: "ההזמנה שלי",
     emptyCart: "הוסיפו משהו טעים מהתפריט.",
     recommendationTitle: "אולי תוסיפו גם",
-    priorityHintTitle: "מומלץ להוסיף",
-    addDrinkHint: "אין עדיין שתייה בהזמנה. תרצו לבחור משהו לשתות?",
-    addDessertHint: "אין עדיין קינוח בהזמנה. תרצו להוסיף משהו מתוק?",
-    addStarterHint: "יש כרגע רק שתייה בהזמנה. תרצו להוסיף מנת פתיחה?",
     recommendationPrefix: "בחרתם",
     recommendationJoiner: ". תוסיפו גם",
     recommendationAdd: "הוספה",
     recommendationView: "צפו",
-    recommendationViewDrinks: "למשקאות",
-    recommendationViewDesserts: "לקינוחים",
-    recommendationViewStarters: "למנות פתיחה",
     total: "סה\"כ",
     happyHourDiscount: "הנחת Happy hour",
     submit: "שלח הזמנה",
@@ -264,17 +257,10 @@ const uiText = {
     newOrder: "My order",
     emptyCart: "Add something tasty from the menu.",
     recommendationTitle: "You may also like",
-    priorityHintTitle: "Recommended",
-    addDrinkHint: "There are no drinks in your order yet. Add something to drink?",
-    addDessertHint: "There is no dessert in your order yet. Add something sweet?",
-    addStarterHint: "Your cart has drinks only. Add a starter?",
     recommendationPrefix: "You chose",
     recommendationJoiner: ". Add",
     recommendationAdd: "Add",
     recommendationView: "View",
-    recommendationViewDrinks: "View drinks",
-    recommendationViewDesserts: "View desserts",
-    recommendationViewStarters: "View starters",
     total: "Total",
     happyHourDiscount: "Happy hour discount",
     submit: "Place order",
@@ -357,17 +343,10 @@ const uiText = {
     newOrder: "Мой заказ",
     emptyCart: "Добавьте что-нибудь вкусное из меню.",
     recommendationTitle: "Вам также может понравиться",
-    priorityHintTitle: "Рекомендуем",
-    addDrinkHint: "В вашем заказе пока нет напитков. Добавить что-нибудь выпить?",
-    addDessertHint: "В вашем заказе пока нет десерта. Добавить что-нибудь сладкое?",
-    addStarterHint: "В корзине сейчас только напитки. Добавить закуску?",
     recommendationPrefix: "Вы выбрали",
     recommendationJoiner: ". Добавить",
     recommendationAdd: "Добавить",
     recommendationView: "Открыть",
-    recommendationViewDrinks: "Напитки",
-    recommendationViewDesserts: "Десерты",
-    recommendationViewStarters: "Закуски",
     total: "Итого",
     happyHourDiscount: "Скидка Happy hour",
     submit: "Оформить заказ",
@@ -462,6 +441,9 @@ export function Cart({
   const [liveBusinessLunches, setLiveBusinessLunches] = useState<BusinessLunchSettings[]>(
     businessLunches
   );
+  const [liveRecommendations, setLiveRecommendations] = useState<
+    RecommendationRuleSettings[]
+  >(recommendations);
   const [submittedOrdersOpen, setSubmittedOrdersOpen] = useState(false);
   const [submittedOrders, setSubmittedOrders] = useState<Order[]>(
     initialSubmittedOrders
@@ -520,6 +502,10 @@ export function Cart({
   }, [businessLunches]);
 
   useEffect(() => {
+    setLiveRecommendations(recommendations);
+  }, [recommendations]);
+
+  useEffect(() => {
     let cancelled = false;
     let inFlightAbortController: AbortController | null = null;
     let pollTimeoutId: number | null = null;
@@ -571,6 +557,7 @@ export function Cart({
       const data = (await response.json()) as {
         promotions?: PromotionSettings[];
         businessLunches?: BusinessLunchSettings[];
+        recommendations?: RecommendationRuleSettings[];
       };
 
       if (!cancelled) {
@@ -580,6 +567,10 @@ export function Cart({
 
         if (Array.isArray(data.businessLunches)) {
           setLiveBusinessLunches(data.businessLunches);
+        }
+
+        if (Array.isArray(data.recommendations)) {
+          setLiveRecommendations(data.recommendations);
         }
       }
 
@@ -1039,7 +1030,7 @@ export function Cart({
     > = [];
     const seenSuggestions = new Set<string>();
     const hasEligibleRecommendationForTriggerItem = (triggerItemId: string) =>
-      recommendations.some((recommendation) => {
+      liveRecommendations.some((recommendation) => {
         if (!recommendation.enabled || recommendation.triggerItemId !== triggerItemId) {
           return false;
         }
@@ -1091,7 +1082,7 @@ export function Cart({
       return nextRecommendations;
     }
 
-    for (const recommendation of recommendations) {
+    for (const recommendation of liveRecommendations) {
       if (
         !recommendation.enabled ||
         recommendation.triggerItemId !== activeTriggerItemId
@@ -1191,60 +1182,14 @@ export function Cart({
     }
 
     return nextRecommendations;
-  }, [detailedItems, isBarClosed, isKitchenClosed, liveMenu, recommendations, visibleMenu]);
-  const priorityCartSuggestions = useMemo(() => {
-    if (!detailedItems.length) {
-      return [];
-    }
-
-    const suggestions: Array<{
-      id: "drinks" | "desserts" | "starters";
-      text: string;
-      buttonLabel: string;
-      filter: MenuFilter;
-    }> = [];
-
-    if (!hasDrinksInOrder && !isBarClosed) {
-      suggestions.push({
-        id: "drinks",
-        text: text.addDrinkHint,
-        buttonLabel: text.recommendationViewDrinks,
-        filter: "drinks"
-      });
-    }
-
-    if (!hasDessertInOrder && !isKitchenClosed && !hasDishesInOrder) {
-      suggestions.push({
-        id: "starters",
-        text: text.addStarterHint,
-        buttonLabel: text.recommendationViewStarters,
-        filter: "starters"
-      });
-    } else if (!hasDessertInOrder && !isKitchenClosed) {
-      suggestions.push({
-        id: "desserts",
-        text: text.addDessertHint,
-        buttonLabel: text.recommendationViewDesserts,
-        filter: "desserts"
-      });
-    }
-
-    return suggestions;
   }, [
-    detailedItems.length,
-    hasDessertInOrder,
-    hasDishesInOrder,
-    hasDrinksInOrder,
+    detailedItems,
     isBarClosed,
     isKitchenClosed,
-    text.addDessertHint,
-    text.addDrinkHint,
-    text.addStarterHint,
-    text.recommendationViewDesserts,
-    text.recommendationViewDrinks,
-    text.recommendationViewStarters
+    liveMenu,
+    liveRecommendations,
+    visibleMenu
   ]);
-
   function jumpToMenuFilter(filter: MenuFilter) {
     setSelectedMenuFilter(filter);
     window.requestAnimationFrame(() => {
@@ -2739,30 +2684,6 @@ export function Cart({
                 ))}
               </div>
             )}
-
-            {priorityCartSuggestions.length ? (
-              <div className="cart-recommendations cart-recommendations--priority" role="status" aria-live="polite">
-                {priorityCartSuggestions.map((suggestion) => (
-                  <div key={suggestion.id} className="cart-recommendation cart-recommendation--priority">
-                    <div>
-                      <p className="cart-recommendation__eyebrow">
-                        {text.priorityHintTitle}
-                      </p>
-                      <p className="cart-recommendation__text">
-                        {suggestion.text}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="button-success cart-recommendation__button cart-recommendation__button--priority"
-                      onClick={() => jumpToMenuFilter(suggestion.filter)}
-                    >
-                      {suggestion.buttonLabel}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
 
             {activeCartRecommendations.length ? (
               <div className="cart-recommendations" role="status" aria-live="polite">
