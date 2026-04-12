@@ -630,7 +630,7 @@ function MenuAlertsPanelComponent({
             </label>
             <label className="menu-settings-panel__field menu-settings-panel__field--compact">
               <span>Until</span>
-              <div className="menu-time-input">
+              <div className="menu-time-input menu-time-input--with-confirm">
                 <input
                   className="modal-input"
                   type="time"
@@ -638,14 +638,20 @@ function MenuAlertsPanelComponent({
                   placeholder="HH:MM"
                   disabled={kitchenOpenSaving}
                   onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setKitchenOpenUntil(nextValue);
-
-                    if (kitchenOpenEnabled) {
-                      void saveKitchenOpenSettings(true, nextValue);
-                    }
+                    setKitchenOpenUntil(event.target.value);
                   }}
                 />
+                <button
+                  type="button"
+                  className="menu-time-input__confirm"
+                  disabled={kitchenOpenSaving}
+                  aria-label="Apply kitchen open time"
+                  onClick={() =>
+                    void saveKitchenOpenSettings(kitchenOpenEnabled, kitchenOpenUntil)
+                  }
+                >
+                  ✓
+                </button>
               </div>
             </label>
           </div>
@@ -672,7 +678,7 @@ function MenuAlertsPanelComponent({
             </label>
             <label className="menu-settings-panel__field menu-settings-panel__field--compact">
               <span>Until</span>
-              <div className="menu-time-input">
+              <div className="menu-time-input menu-time-input--with-confirm">
                 <input
                   className="modal-input"
                   type="time"
@@ -680,14 +686,20 @@ function MenuAlertsPanelComponent({
                   placeholder="HH:MM"
                   disabled={barOpenSaving}
                   onChange={(event) => {
-                    const nextValue = event.target.value;
-                    setBarOpenUntil(nextValue);
-
-                    if (barOpenEnabled) {
-                      void saveBarOpenSettings(true, nextValue);
-                    }
+                    setBarOpenUntil(event.target.value);
                   }}
                 />
+                <button
+                  type="button"
+                  className="menu-time-input__confirm"
+                  disabled={barOpenSaving}
+                  aria-label="Apply bar open time"
+                  onClick={() =>
+                    void saveBarOpenSettings(barOpenEnabled, barOpenUntil)
+                  }
+                >
+                  ✓
+                </button>
               </div>
             </label>
           </div>
