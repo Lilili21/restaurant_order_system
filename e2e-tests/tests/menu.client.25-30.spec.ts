@@ -51,6 +51,13 @@ function inFuture(minutes: number) {
   return new Date(Date.now() + minutes * 60 * 1000).toISOString();
 }
 
+function getFutureTimeInputValue(minutesAhead: number) {
+  const target = new Date(Date.now() + minutesAhead * 60 * 1000);
+  const hours = String(target.getHours()).padStart(2, "0");
+  const minutes = String(target.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
 async function dismissWelcomeDialogIfVisible(page: Page) {
   const welcomeTitle = page.locator("#welcome-dialog-title");
   const welcomeDialog = page.locator(".modal-backdrop").filter({ has: welcomeTitle }).first();
@@ -121,6 +128,32 @@ async function openMenuInEnglish(page: Page, menuPath: string) {
   await clickLanguageButtonWithRetry(page, "EN");
   await dismissWelcomeDialogIfVisible(page);
   await expect(page.locator(".menu-sections")).toBeVisible();
+}
+
+async function openAdminNotifications(page: Page) {
+  await page.goto("/admin/menu", { waitUntil: "domcontentloaded" });
+  const settingsButton = page.getByRole("button", { name: /Settings/i });
+  await expect(settingsButton).toBeVisible();
+
+  const isSettingsOpen = (await settingsButton.getAttribute("aria-expanded")) === "true";
+  if (!isSettingsOpen) {
+    await settingsButton.click();
+  }
+
+  const notificationsButton = page.getByRole("button", { name: "Notifications" });
+  await expect(notificationsButton).toBeVisible();
+  await notificationsButton.click();
+  const kitchenLabel = page.getByText("Kitchen open", { exact: true });
+  const becameVisible = await kitchenLabel
+    .waitFor({ state: "visible", timeout: 2500 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!becameVisible) {
+    await notificationsButton.click();
+  }
+
+  await expect(kitchenLabel).toBeVisible();
 }
 
 async function addFirstDish(page: Page) {
@@ -590,6 +623,256 @@ test.describe("Client menu checks TC-25..TC-30", () => {
 
       await expect(page.getByText("Kitchen closed")).toBeVisible();
       await expect(page.getByText("Bar closed")).toBeVisible();
+    });
+  });
+
+  test("TC-31 kitchen open time survives ordering-page and control-center refresh", async ({ page }) => {
+    const { restaurantSlug } = parseMenuPath(ORDERING_MENU_PATH);
+    const nextKitchenTime = getFutureTimeInputValue(45);
+
+    await page.route("**/api/admin-auth**", async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authorized: true })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true })
+      });
+    });
+
+    await page.route("**/api/menu**", async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await page.route("**/api/admin-analytics**", async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await page.route("**/api/menu-settings**", async (route, request) => {
+      if (request.method() !== "PATCH") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await openMenuInEnglish(page, ORDERING_MENU_PATH);
+
+    await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const baselineKitchenUntil = inFuture(90);
+      await patchOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: baselineKitchenUntil
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: baselineKitchenUntil
+      });
+
+      await openAdminNotifications(page);
+
+      const kitchenRow = page
+        .locator(".menu-notice-control--inline")
+        .filter({ hasText: "Kitchen open" })
+        .first();
+      const kitchenToggle = kitchenRow.locator("input[type='checkbox']").first();
+      const kitchenTimeInput = kitchenRow.locator("input[type='time']").first();
+      const kitchenConfirmButton = kitchenRow.locator(".menu-time-input__confirm").first();
+
+      await expect(kitchenToggle).toBeVisible();
+      if (!(await kitchenToggle.isChecked())) {
+        await kitchenToggle.check();
+        await expect.poll(() => kitchenConfirmButton.isEnabled()).toBe(true);
+      }
+
+      await kitchenTimeInput.fill(nextKitchenTime);
+      await kitchenConfirmButton.click();
+
+      await expect(page.locator(".status-message")).toContainText(
+        `Kitchen open time saved until ${nextKitchenTime}.`
+      );
+      await waitForOperationSettings(page, restaurantSlug, {
+        kitchenOpenEnabled: true
+      });
+
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await dismissWelcomeDialogIfVisible(page);
+      await expect(page.locator(".menu-sections")).toBeVisible();
+
+      await openAdminNotifications(page);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await openAdminNotifications(page);
+
+      await expect(
+        page
+          .locator(".menu-notice-control--inline")
+          .filter({ hasText: "Kitchen open" })
+          .first()
+          .locator("input[type='time']")
+          .first()
+      ).toHaveValue(nextKitchenTime);
+    });
+  });
+
+  test("TC-32 bar open time survives ordering-page and control-center refresh", async ({ page }) => {
+    const { restaurantSlug } = parseMenuPath(ORDERING_MENU_PATH);
+    const nextBarTime = getFutureTimeInputValue(55);
+
+    await page.route("**/api/admin-auth**", async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authorized: true })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true })
+      });
+    });
+
+    await page.route("**/api/menu**", async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await page.route("**/api/admin-analytics**", async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await page.route("**/api/menu-settings**", async (route, request) => {
+      if (request.method() !== "PATCH") {
+        await route.continue();
+        return;
+      }
+
+      await route.continue({
+        headers: {
+          ...request.headers(),
+          "x-admin-secondary-login": SECONDARY_LOGIN,
+          "x-admin-secondary-password": SECONDARY_PASSWORD
+        }
+      });
+    });
+
+    await openMenuInEnglish(page, ORDERING_MENU_PATH);
+
+    await withRestoredOperationSettings(page, restaurantSlug, async () => {
+      const baselineBarUntil = inFuture(120);
+      await patchOperationSettings(page, restaurantSlug, {
+        barOpenEnabled: true,
+        barOpenUntil: baselineBarUntil
+      });
+      await waitForOperationSettings(page, restaurantSlug, {
+        barOpenEnabled: true,
+        barOpenUntil: baselineBarUntil
+      });
+
+      await openAdminNotifications(page);
+
+      const barRow = page
+        .locator(".menu-notice-control--inline")
+        .filter({ hasText: "Bar open" })
+        .first();
+      const barToggle = barRow.locator("input[type='checkbox']").first();
+      const barTimeInput = barRow.locator("input[type='time']").first();
+      const barConfirmButton = barRow.locator(".menu-time-input__confirm").first();
+
+      await expect(barToggle).toBeVisible();
+      if (!(await barToggle.isChecked())) {
+        await barToggle.check();
+        await expect.poll(() => barConfirmButton.isEnabled()).toBe(true);
+      }
+
+      await barTimeInput.fill(nextBarTime);
+      await barConfirmButton.click();
+
+      await expect(page.locator(".status-message")).toContainText(
+        `Bar open time saved until ${nextBarTime}.`
+      );
+      await waitForOperationSettings(page, restaurantSlug, {
+        barOpenEnabled: true
+      });
+
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await dismissWelcomeDialogIfVisible(page);
+      await expect(page.locator(".menu-sections")).toBeVisible();
+
+      await openAdminNotifications(page);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await openAdminNotifications(page);
+
+      await expect(
+        page
+          .locator(".menu-notice-control--inline")
+          .filter({ hasText: "Bar open" })
+          .first()
+          .locator("input[type='time']")
+          .first()
+      ).toHaveValue(nextBarTime);
     });
   });
 });

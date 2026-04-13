@@ -1083,7 +1083,11 @@ export async function getMenuSettings(
   options?: { skipCache?: boolean }
 ) {
   const skipCache = Boolean(options?.skipCache);
-  const cached = skipCache ? undefined : getSettingsCache(restaurantSlug);
+  // Restaurant-scoped settings include operational toggles (kitchen/bar timers)
+  // that must be immediately consistent after save across admin and guest pages.
+  // Avoid serving process-local stale cache for restaurant reads.
+  const useCache = !skipCache && !restaurantSlug;
+  const cached = useCache ? getSettingsCache(restaurantSlug) : undefined;
 
   if (cached && cached.expiresAt > Date.now()) {
     const nextSettings = applyOrderModePolicy(cached.settings, restaurantSlug);

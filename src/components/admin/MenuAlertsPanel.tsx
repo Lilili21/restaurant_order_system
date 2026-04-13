@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useRef } from "react";
 
 import type {
   EditableBusinessLunch,
@@ -206,6 +206,8 @@ function MenuAlertsPanelComponent({
   allDrinkCategories,
   categoryLabels
 }: Props) {
+  const kitchenOpenUntilInputRef = useRef<HTMLInputElement | null>(null);
+  const barOpenUntilInputRef = useRef<HTMLInputElement | null>(null);
   const recommendationItemLabelById = Object.fromEntries(
     recommendationItemOptions.map((item) => [item.id, item.label])
   ) as Record<string, string>;
@@ -634,6 +636,7 @@ function MenuAlertsPanelComponent({
                 <input
                   className="modal-input"
                   type="time"
+                  ref={kitchenOpenUntilInputRef}
                   value={kitchenOpenUntil}
                   placeholder="HH:MM"
                   disabled={kitchenOpenSaving}
@@ -647,7 +650,10 @@ function MenuAlertsPanelComponent({
                   disabled={kitchenOpenSaving || !kitchenOpenEnabled}
                   aria-label="Apply kitchen open time"
                   onClick={() =>
-                    void saveKitchenOpenSettings(kitchenOpenEnabled, kitchenOpenUntil)
+                    void saveKitchenOpenSettings(
+                      kitchenOpenEnabled,
+                      kitchenOpenUntilInputRef.current?.value ?? kitchenOpenUntil
+                    )
                   }
                 >
                   ✓
@@ -682,6 +688,7 @@ function MenuAlertsPanelComponent({
                 <input
                   className="modal-input"
                   type="time"
+                  ref={barOpenUntilInputRef}
                   value={barOpenUntil}
                   placeholder="HH:MM"
                   disabled={barOpenSaving}
@@ -695,7 +702,10 @@ function MenuAlertsPanelComponent({
                   disabled={barOpenSaving || !barOpenEnabled}
                   aria-label="Apply bar open time"
                   onClick={() =>
-                    void saveBarOpenSettings(barOpenEnabled, barOpenUntil)
+                    void saveBarOpenSettings(
+                      barOpenEnabled,
+                      barOpenUntilInputRef.current?.value ?? barOpenUntil
+                    )
                   }
                 >
                   ✓

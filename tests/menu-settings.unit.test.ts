@@ -126,4 +126,38 @@ describe("menu-settings", () => {
     expect(persisted.kitchenOpenUntil).toBe(nextKitchenUntil);
     expect(persisted.barOpenUntil).toBe(externallyUpdatedBarUntil);
   });
+
+  it("always reads fresh restaurant-scoped settings without stale cache", async () => {
+    const firstKitchenUntil = "2026-04-13T10:00:00.000Z";
+    const freshKitchenUntil = "2026-04-13T15:30:00.000Z";
+
+    writeJson(workspace, "data/menu-settings.json", {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil: firstKitchenUntil,
+      tableCount: 2,
+      tableTokens: {
+        "1": "tbl_fixed_a",
+        "2": "tbl_fixed_b"
+      }
+    });
+
+    const { getMenuSettings } = await import("@/lib/menu-settings");
+
+    const firstRead = await getMenuSettings("olive-bistro");
+    expect(firstRead.kitchenOpenUntil).toBe(firstKitchenUntil);
+
+    // Simulate external persisted update between page refreshes.
+    writeJson(workspace, "data/menu-settings.json", {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil: freshKitchenUntil,
+      tableCount: 2,
+      tableTokens: {
+        "1": "tbl_fixed_a",
+        "2": "tbl_fixed_b"
+      }
+    });
+
+    const refreshedRead = await getMenuSettings("olive-bistro");
+    expect(refreshedRead.kitchenOpenUntil).toBe(freshKitchenUntil);
+  });
 });
