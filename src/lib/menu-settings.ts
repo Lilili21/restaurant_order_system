@@ -206,6 +206,19 @@ function setSettingsCache(settings: MenuSettings, restaurantSlug?: string) {
   };
 }
 
+function invalidateSettingsCache(restaurantSlug?: string) {
+  if (!globalThis.__menuSettingsCache) {
+    return;
+  }
+
+  if (restaurantSlug) {
+    delete globalThis.__menuSettingsCache[getSettingsCacheKey(restaurantSlug)];
+    return;
+  }
+
+  delete globalThis.__menuSettingsCache[getSettingsCacheKey(undefined)];
+}
+
 function generateTableToken() {
   return `tbl_${randomBytes(9).toString("base64url")}`;
 }
@@ -1065,8 +1078,12 @@ async function persistRestaurantSettingsAsync(
   return syncedSettings;
 }
 
-export async function getMenuSettings(restaurantSlug?: string) {
-  const cached = getSettingsCache(restaurantSlug);
+export async function getMenuSettings(
+  restaurantSlug?: string,
+  options?: { skipCache?: boolean }
+) {
+  const skipCache = Boolean(options?.skipCache);
+  const cached = skipCache ? undefined : getSettingsCache(restaurantSlug);
 
   if (cached && cached.expiresAt > Date.now()) {
     const nextSettings = applyOrderModePolicy(cached.settings, restaurantSlug);
@@ -1174,7 +1191,8 @@ export async function updateMenuSettings(
     typeof restaurantSlugOrUpdates === "string"
       ? maybeUpdates ?? {}
       : restaurantSlugOrUpdates ?? {};
-  const current = await getMenuSettings(restaurantSlug);
+  // Always merge updates over a fresh snapshot to avoid restoring stale cached values.
+  const current = await getMenuSettings(restaurantSlug, { skipCache: true });
   if (
     updates.orderMode === "counter" &&
     !isCounterModeAllowedForRestaurant(restaurantSlug)
@@ -1193,9 +1211,12 @@ export async function updateMenuSettings(
   );
 
   if (restaurantSlug) {
-    return persistRestaurantSettingsAsync(restaurantSlug, next);
+    const saved = await persistRestaurantSettingsAsync(restaurantSlug, next);
+    invalidateSettingsCache(restaurantSlug);
+    return saved;
   } else {
     await persistMenuSettingsAsync(next);
+    invalidateSettingsCache();
     return next;
   }
 }

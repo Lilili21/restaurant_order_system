@@ -75,4 +75,55 @@ describe("menu-settings", () => {
     expect(persisted.tableCount).toBe(100);
     expect(persisted.tableTokens["1"]).toMatch(/^tbl_/);
   });
+
+  it("merges updates over fresh settings snapshot instead of stale cache", async () => {
+    const initialKitchenUntil = "2026-04-13T10:00:00.000Z";
+    const initialBarUntil = "2026-04-13T11:00:00.000Z";
+    const externallyUpdatedBarUntil = "2026-04-13T12:00:00.000Z";
+    const nextKitchenUntil = "2026-04-13T13:00:00.000Z";
+
+    writeJson(workspace, "data/menu-settings.json", {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil: initialKitchenUntil,
+      barOpenEnabled: true,
+      barOpenUntil: initialBarUntil,
+      tableCount: 2,
+      tableTokens: {
+        "1": "tbl_fixed_a",
+        "2": "tbl_fixed_b"
+      }
+    });
+
+    const { getMenuSettings, updateMenuSettings } = await import("@/lib/menu-settings");
+
+    // Prime in-memory cache with initial values.
+    await getMenuSettings("olive-bistro");
+
+    // Simulate external write that changes bar window while cache is stale.
+    writeJson(workspace, "data/menu-settings.json", {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil: initialKitchenUntil,
+      barOpenEnabled: true,
+      barOpenUntil: externallyUpdatedBarUntil,
+      tableCount: 2,
+      tableTokens: {
+        "1": "tbl_fixed_a",
+        "2": "tbl_fixed_b"
+      }
+    });
+
+    const updated = await updateMenuSettings("olive-bistro", {
+      kitchenOpenUntil: nextKitchenUntil
+    });
+
+    expect(updated.kitchenOpenUntil).toBe(nextKitchenUntil);
+    expect(updated.barOpenUntil).toBe(externallyUpdatedBarUntil);
+
+    const persisted = JSON.parse(
+      readFileSync(path.join(workspace, "data/menu-settings.json"), "utf8")
+    ) as { kitchenOpenUntil: string | null; barOpenUntil: string | null };
+
+    expect(persisted.kitchenOpenUntil).toBe(nextKitchenUntil);
+    expect(persisted.barOpenUntil).toBe(externallyUpdatedBarUntil);
+  });
 });
