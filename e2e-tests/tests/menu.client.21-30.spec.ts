@@ -1,10 +1,207 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, Page, test, type APIRequestContext } from "@playwright/test";
 
 const MENU_RESTAURANT_SLUG = process.env.E2E_MENU_RESTAURANT_SLUG ?? "olive-bistro";
 const ORDERING_MENU_PATH =
   process.env.E2E_ORDERING_MENU_PATH?.trim() ||
   process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
   "/olive-bistro/menu/tbl_GkoFz28VwFqC";
+const E2E_BASE_ORIGIN =
+  (process.env.E2E_BASE_URL ?? "https://restaurant-order-system-blue.vercel.app").replace(
+    /\/$/,
+    ""
+  );
+const SECONDARY_LOGIN =
+  process.env.E2E_ADMIN_SECONDARY_LOGIN ?? process.env.ADMIN_SECONDARY_LOGIN ?? "admin";
+const SECONDARY_PASSWORD =
+  process.env.E2E_ADMIN_SECONDARY_PASSWORD ?? process.env.ADMIN_SECONDARY_PASSWORD ?? "admin";
+
+type OperationSettingsSnapshot = {
+  kitchenOpenEnabled: boolean;
+  kitchenOpenUntil: string | null;
+  barOpenEnabled: boolean;
+  barOpenUntil: string | null;
+};
+
+function parseMenuPath(menuPath: string) {
+  const pathname = new URL(menuPath, "https://example.local").pathname;
+  const prefixedMatch = /^\/menu\/([^/]+)\/([^/]+)/.exec(pathname);
+
+  if (prefixedMatch) {
+    return {
+      restaurantSlug: decodeURIComponent(prefixedMatch[1]),
+      tableToken: decodeURIComponent(prefixedMatch[2])
+    };
+  }
+
+  const slugFirstMatch = /^\/([^/]+)\/menu\/([^/]+)/.exec(pathname);
+
+  if (slugFirstMatch) {
+    return {
+      restaurantSlug: decodeURIComponent(slugFirstMatch[1]),
+      tableToken: decodeURIComponent(slugFirstMatch[2])
+    };
+  }
+
+  return {
+    restaurantSlug: MENU_RESTAURANT_SLUG,
+    tableToken: "0"
+  };
+}
+
+function inFuture(minutes: number) {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
+async function fetchOperationSettingsSnapshot(
+  request: APIRequestContext,
+  restaurantSlug: string
+): Promise<OperationSettingsSnapshot> {
+  const response = await request.get(
+    `/api/menu-settings?restaurantSlug=${encodeURIComponent(restaurantSlug)}`,
+    { failOnStatusCode: false }
+  );
+  const result = {
+    status: response.status(),
+    body: await response.text()
+  };
+
+  expect(result.status, `menu-settings GET failed: ${result.body}`).toBe(200);
+  const parsed = JSON.parse(result.body) as Partial<OperationSettingsSnapshot>;
+
+  return {
+    kitchenOpenEnabled: Boolean(parsed.kitchenOpenEnabled),
+    kitchenOpenUntil:
+      typeof parsed.kitchenOpenUntil === "string" ? parsed.kitchenOpenUntil : null,
+    barOpenEnabled: Boolean(parsed.barOpenEnabled),
+    barOpenUntil: typeof parsed.barOpenUntil === "string" ? parsed.barOpenUntil : null
+  };
+}
+
+async function patchOperationSettings(
+  request: APIRequestContext,
+  restaurantSlug: string,
+  updates: Partial<OperationSettingsSnapshot>
+) {
+  const response = await request.patch("/api/menu-settings", {
+    failOnStatusCode: false,
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-secondary-login": SECONDARY_LOGIN,
+      "x-admin-secondary-password": SECONDARY_PASSWORD,
+      Origin: E2E_BASE_ORIGIN,
+      Referer: `${E2E_BASE_ORIGIN}/admin/menu`
+    },
+    data: {
+      restaurantSlug,
+      ...updates
+    }
+  });
+  const result = {
+    status: response.status(),
+    body: await response.text()
+  };
+
+  expect(result.status, `menu-settings PATCH failed: ${result.body}`).toBe(200);
+}
+
+async function waitForOperationSettings(
+  request: APIRequestContext,
+  restaurantSlug: string,
+  expected: Partial<OperationSettingsSnapshot>
+) {
+  const hasMatchingTimeState = (
+    expectedValue: string | null | undefined,
+    actualValue: string | null
+  ) => {
+    if (expectedValue === undefined) {
+      return true;
+    }
+
+    if (expectedValue === null) {
+      return actualValue === null;
+    }
+
+    if (typeof actualValue !== "string") {
+      return false;
+    }
+
+    const expectedTs = Date.parse(expectedValue);
+    const actualTs = Date.parse(actualValue);
+
+    if (!Number.isFinite(expectedTs) || !Number.isFinite(actualTs)) {
+      return false;
+    }
+
+    const now = Date.now();
+    const expectedIsPast = expectedTs <= now;
+    const actualIsPast = actualTs <= now;
+
+    return expectedIsPast === actualIsPast;
+  };
+
+  await expect
+    .poll(
+      async () => {
+        const next = await fetchOperationSettingsSnapshot(request, restaurantSlug);
+
+        if (
+          expected.kitchenOpenEnabled !== undefined &&
+          next.kitchenOpenEnabled !== expected.kitchenOpenEnabled
+        ) {
+          return false;
+        }
+
+        if (!hasMatchingTimeState(expected.kitchenOpenUntil, next.kitchenOpenUntil)) {
+          return false;
+        }
+
+        if (
+          expected.barOpenEnabled !== undefined &&
+          next.barOpenEnabled !== expected.barOpenEnabled
+        ) {
+          return false;
+        }
+
+        if (!hasMatchingTimeState(expected.barOpenUntil, next.barOpenUntil)) {
+          return false;
+        }
+
+        return true;
+      },
+      { timeout: 20_000 }
+    )
+    .toBe(true);
+}
+
+async function withOpenedKitchenAndBar(
+  request: APIRequestContext,
+  menuPath: string,
+  run: () => Promise<void>
+) {
+  const { restaurantSlug } = parseMenuPath(menuPath);
+  const originalSettings = await fetchOperationSettingsSnapshot(request, restaurantSlug);
+
+  try {
+    const kitchenOpenUntil = inFuture(180);
+    const barOpenUntil = inFuture(180);
+    await patchOperationSettings(request, restaurantSlug, {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil,
+      barOpenEnabled: true,
+      barOpenUntil
+    });
+    await waitForOperationSettings(request, restaurantSlug, {
+      kitchenOpenEnabled: true,
+      kitchenOpenUntil,
+      barOpenEnabled: true,
+      barOpenUntil
+    });
+    await run();
+  } finally {
+    await patchOperationSettings(request, restaurantSlug, originalSettings);
+    await waitForOperationSettings(request, restaurantSlug, originalSettings);
+  }
+}
 
 async function dismissWelcomeDialogIfVisible(page: Page) {
   const welcomeTitle = page.locator("#welcome-dialog-title");
@@ -206,17 +403,19 @@ test.describe("Client menu checks TC-21..TC-24", () => {
     });
   });
 
-  test("TC-21 successful order shows confirmation message", async ({ page }) => {
-    await mockOrderPostSuccess(page);
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-    await submitOrderViaReviewDialog(page);
+  test("TC-21 successful order shows confirmation message", async ({ page, request }) => {
+    await withOpenedKitchenAndBar(request, ORDERING_MENU_PATH, async () => {
+      await mockOrderPostSuccess(page);
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await addFirstDish(page);
+      await submitOrderViaReviewDialog(page);
 
-    const dialog = page.locator(".modal-card");
-    await expect(dialog).toContainText("Your order has been sent.");
+      const dialog = page.locator(".modal-card");
+      await expect(dialog).toContainText("Your order has been sent.");
+    });
   });
 
-  test("TC-22 order payload contains required fields", async ({ page }) => {
+  test("TC-22 order payload contains required fields", async ({ page, request }) => {
     let capturedPayload: unknown = null;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -262,30 +461,32 @@ test.describe("Client menu checks TC-21..TC-24", () => {
       });
     });
 
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-    await submitOrderViaReviewDialog(page);
+    await withOpenedKitchenAndBar(request, ORDERING_MENU_PATH, async () => {
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await addFirstDish(page);
+      await submitOrderViaReviewDialog(page);
 
-    const payload = capturedPayload as
-      | {
-          restaurantSlug?: string;
-          tableNumber?: number;
-          serveMode?: string;
-          items?: Array<{ menuItemId?: string; quantity?: number }>;
-        }
-      | null;
+      const payload = capturedPayload as
+        | {
+            restaurantSlug?: string;
+            tableNumber?: number;
+            serveMode?: string;
+            items?: Array<{ menuItemId?: string; quantity?: number }>;
+          }
+        | null;
 
-    expect(payload).not.toBeNull();
-    expect(typeof payload?.restaurantSlug).toBe("string");
-    expect(typeof payload?.tableNumber).toBe("number");
-    expect(payload?.serveMode).toBe("as_ready");
-    expect(Array.isArray(payload?.items)).toBe(true);
-    expect((payload?.items?.length ?? 0) > 0).toBe(true);
-    expect(typeof payload?.items?.[0]?.menuItemId).toBe("string");
-    expect(typeof payload?.items?.[0]?.quantity).toBe("number");
+      expect(payload).not.toBeNull();
+      expect(typeof payload?.restaurantSlug).toBe("string");
+      expect(typeof payload?.tableNumber).toBe("number");
+      expect(payload?.serveMode).toBe("as_ready");
+      expect(Array.isArray(payload?.items)).toBe(true);
+      expect((payload?.items?.length ?? 0) > 0).toBe(true);
+      expect(typeof payload?.items?.[0]?.menuItemId).toBe("string");
+      expect(typeof payload?.items?.[0]?.quantity).toBe("number");
+    });
   });
 
-  test("TC-23 double confirm click does not create duplicate order", async ({ page }) => {
+  test("TC-23 double confirm click does not create duplicate order", async ({ page, request }) => {
     let createOrderCalls = 0;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -324,19 +525,21 @@ test.describe("Client menu checks TC-21..TC-24", () => {
       });
     });
 
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-    await clickCartSubmit(page);
+    await withOpenedKitchenAndBar(request, ORDERING_MENU_PATH, async () => {
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await addFirstDish(page);
+      await clickCartSubmit(page);
 
-    const okButton = page.locator(".modal-card--review").getByRole("button", { name: "OK" });
-    await expect(okButton).toBeVisible();
-    await okButton.dblclick();
+      const okButton = page.locator(".modal-card--review").getByRole("button", { name: "OK" });
+      await expect(okButton).toBeVisible();
+      await okButton.dblclick();
 
-    await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
-    expect(createOrderCalls).toBe(1);
+      await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
+      expect(createOrderCalls).toBe(1);
+    });
   });
 
-  test("TC-24 user can retry after failed submit", async ({ page }) => {
+  test("TC-24 user can retry after failed submit", async ({ page, request }) => {
     let createOrderCalls = 0;
 
     await page.route("**/api/orders", async (route, request) => {
@@ -385,17 +588,19 @@ test.describe("Client menu checks TC-21..TC-24", () => {
       });
     });
 
-    await openMenuInEnglish(page, ORDERING_MENU_PATH);
-    await addFirstDish(page);
-    await submitOrderViaReviewDialog(page);
+    await withOpenedKitchenAndBar(request, ORDERING_MENU_PATH, async () => {
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await addFirstDish(page);
+      await submitOrderViaReviewDialog(page);
 
-    await expect(page.locator(".status-message")).toContainText(
-      "Your cart is still here"
-    );
+      await expect(page.locator(".status-message")).toContainText(
+        "Your cart is still here"
+      );
 
-    await submitOrderViaReviewDialog(page);
-    await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
-    expect(createOrderCalls).toBe(2);
+      await submitOrderViaReviewDialog(page);
+      await expect(page.locator(".modal-card")).toContainText("Your order has been sent.");
+      expect(createOrderCalls).toBe(2);
+    });
   });
 
 });
