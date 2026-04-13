@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { readSessionCache, writeSessionCache } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
@@ -17,19 +17,15 @@ import {
   Order,
   TableOverview
 } from "@/lib/types";
-import type { WeeklyOrdersArchiveMeta } from "@/lib/orders";
 
 type TablesResponse = {
   tables: TableOverview[];
   closedSessions: ClosedTableSummary[];
 };
 
-type WeeklyArchiveResponse = {
-  archives?: WeeklyOrdersArchiveMeta[];
-};
-
-type WeeklyArchivePayload = {
-  weekKey: string;
+type DateRangeArchivePayload = {
+  start: string;
+  end: string;
   closedTableSummaries: ClosedTableSummary[];
 };
 
@@ -96,12 +92,90 @@ const DRINK_CATEGORIES = new Set<string>([
   "dot4"
 ]);
 const TABLES_VIEW_CACHE_TTL_MS = 30 * 1000;
-const TABLES_ARCHIVES_CACHE_TTL_MS = 15 * 60 * 1000;
 const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
-const TABLES_ARCHIVES_CACHE_KEY = "admin-tables-archives-cache-v1";
 const TABLES_ACTIVE_POLL_MS = 4_000;
 const TABLES_HIDDEN_POLL_MS = 12_000;
 const TABLES_REQUEST_TIMEOUT_MS = 8_000;
+
+type MonthlyExportRange = {
+  key: string;
+  start: string;
+  end: string;
+  label: string;
+};
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function formatDateKey(value: Date) {
+  return `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(value.getDate())}`;
+}
+
+function formatMonthRangeLabel(start: Date, end: Date) {
+  return `${pad2(start.getDate())}.${pad2(start.getMonth() + 1)} - ${pad2(end.getDate())}.${pad2(end.getMonth() + 1)}`;
+}
+
+function getMonthlySegmentIndex(dayOfMonth: number) {
+  if (dayOfMonth <= 7) {
+    return 0;
+  }
+
+  if (dayOfMonth <= 14) {
+    return 1;
+  }
+
+  if (dayOfMonth <= 21) {
+    return 2;
+  }
+
+  return 3;
+}
+
+function buildMonthlyExportRange(
+  year: number,
+  monthIndex: number,
+  segmentIndex: number
+): MonthlyExportRange {
+  const rangeStarts = [1, 8, 15, 22];
+  const monthLastDay = new Date(year, monthIndex + 1, 0).getDate();
+  const rangeEnds = [7, 14, 21, monthLastDay];
+  const start = new Date(year, monthIndex, rangeStarts[segmentIndex] ?? 1);
+  const end = new Date(year, monthIndex, rangeEnds[segmentIndex] ?? monthLastDay);
+  const startKey = formatDateKey(start);
+  const endKey = formatDateKey(end);
+
+  return {
+    key: `${startKey}_${endKey}`,
+    start: startKey,
+    end: endKey,
+    label: formatMonthRangeLabel(start, end)
+  };
+}
+
+function getMonthlyExportRanges(referenceDate: Date, count = 4): MonthlyExportRange[] {
+  const ranges: MonthlyExportRange[] = [];
+  let year = referenceDate.getFullYear();
+  let month = referenceDate.getMonth();
+  let segment = getMonthlySegmentIndex(referenceDate.getDate());
+
+  for (let index = 0; index < count; index += 1) {
+    ranges.push(buildMonthlyExportRange(year, month, segment));
+    segment -= 1;
+
+    if (segment < 0) {
+      segment = 3;
+      month -= 1;
+
+      if (month < 0) {
+        month = 11;
+        year -= 1;
+      }
+    }
+  }
+
+  return ranges;
+}
 
 function getTablesServiceRequests(orders: Order[]) {
   return orders.filter(
@@ -459,13 +533,6 @@ export function TablesOverview() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [weeklyArchives, setWeeklyArchives] = useState<WeeklyOrdersArchiveMeta[]>(
-    () =>
-      readSessionCache<WeeklyOrdersArchiveMeta[]>(
-        TABLES_ARCHIVES_CACHE_KEY,
-        TABLES_ARCHIVES_CACHE_TTL_MS
-      ) ?? []
-  );
   const [serviceRequests, setServiceRequests] = useState<Order[]>(
     () =>
       getTablesServiceRequests(
@@ -526,6 +593,7 @@ export function TablesOverview() {
         )?.workingHoursRules ?? []
     );
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
+  const monthlyExportRanges = useMemo(() => getMonthlyExportRanges(new Date(), 4), []);
 
   function getPosSyncKey(table: TableOverview) {
     return `${table.restaurantSlug}:${table.tableNumber}:${table.currentSessionId}`;
@@ -584,10 +652,6 @@ export function TablesOverview() {
     workingHoursFrom,
     workingHoursRules
   ]);
-
-  useEffect(() => {
-    writeSessionCache(TABLES_ARCHIVES_CACHE_KEY, weeklyArchives);
-  }, [weeklyArchives]);
 
   useEffect(() => {
     let cancelled = false;
@@ -739,57 +803,6 @@ export function TablesOverview() {
       }
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadWeeklyArchives() {
-      const response = await fetch("/api/orders-archive", {
-        cache: "no-store"
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      const payload = (await response.json()) as WeeklyArchiveResponse;
-
-      if (!cancelled) {
-        setWeeklyArchives(
-          Array.isArray(payload.archives) ? payload.archives.slice(0, 4) : []
-        );
-      }
-    }
-
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let idleCallbackId: number | null = null;
-
-    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-      idleCallbackId = window.requestIdleCallback(() => {
-        void loadWeeklyArchives();
-      });
-    } else {
-      timeoutId = globalThis.setTimeout(() => {
-        void loadWeeklyArchives();
-      }, 250);
-    }
-
-    return () => {
-      cancelled = true;
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-
-      if (
-        idleCallbackId !== null &&
-        typeof window !== "undefined" &&
-        "cancelIdleCallback" in window
-      ) {
-        window.cancelIdleCallback(idleCallbackId);
-      }
     };
   }, []);
 
@@ -1064,9 +1077,13 @@ export function TablesOverview() {
     URL.revokeObjectURL(url);
   }
 
-  async function exportClosedOrdersForWeek(weekKey: string, label: string) {
+  async function exportClosedOrdersForDateRange(
+    start: string,
+    end: string,
+    label: string
+  ) {
     const response = await fetch(
-      `/api/orders-archive?weekKey=${encodeURIComponent(weekKey)}`,
+      `/api/orders-archive?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
       {
         cache: "no-store"
       }
@@ -1077,7 +1094,7 @@ export function TablesOverview() {
       return;
     }
 
-    const payload = (await response.json()) as WeeklyArchivePayload;
+    const payload = (await response.json()) as DateRangeArchivePayload;
     const sessions = Array.isArray(payload.closedTableSummaries)
       ? payload.closedTableSummaries
       : [];
@@ -1161,7 +1178,7 @@ export function TablesOverview() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `closed-orders-${weekKey}.xls`;
+    link.download = `closed-orders-${start}_to_${end}.xls`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1458,13 +1475,17 @@ export function TablesOverview() {
             >
               Export today to Excel
             </button>
-            {weeklyArchives.map((archive) => (
+            {monthlyExportRanges.map((archive) => (
               <button
-                key={archive.weekKey}
+                key={archive.key}
                 className="button-neutral tables-action-button"
                 type="button"
                 onClick={() =>
-                  void exportClosedOrdersForWeek(archive.weekKey, archive.label)
+                  void exportClosedOrdersForDateRange(
+                    archive.start,
+                    archive.end,
+                    archive.label
+                  )
                 }
               >
                 Download {archive.label}

@@ -420,6 +420,33 @@ test("item switched to unavailable in admin disappears from guest menu", async (
     })
   ];
   let lastPatchPayload: unknown = null;
+  const openUntilIso = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+  const menuPathname = new URL(ORDERING_MENU_PATH, "https://example.local").pathname;
+  const menuPathMatch = /^\/([^/]+)\/menu\/([^/]+)/.exec(menuPathname);
+  const restaurantSlug = menuPathMatch?.[1] ?? "olive-bistro";
+  const tableToken = menuPathMatch?.[2] ?? "0";
+
+  async function fetchGuestMenuIds() {
+    return page.evaluate(async ({ slug, token }) => {
+      const response = await fetch(`/api/tables/${slug}/${token}`, {
+        cache: "no-store"
+      });
+
+      if (!response.ok) {
+        return [] as string[];
+      }
+
+      const payload = (await response.json()) as {
+        menu?: Array<{ id?: string }>;
+      };
+
+      return Array.isArray(payload.menu)
+        ? payload.menu
+            .map((item) => (typeof item?.id === "string" ? item.id : ""))
+            .filter(Boolean)
+        : [];
+    }, { slug: restaurantSlug, token: tableToken });
+  }
 
   await page.route("**/api/admin-auth**", async (route, request) => {
     if (request.method() === "GET") {
@@ -438,11 +465,22 @@ test("item switched to unavailable in admin disappears from guest menu", async (
     });
   });
 
-  await page.route("**/api/menu-settings?**", async (route) => {
+  await page.route("**/api/menu-settings**", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil: openUntilIso,
+        barOpenEnabled: true,
+        barOpenUntil: openUntilIso,
+        happyHourEnabled: false
+      })
     });
   });
 
@@ -539,35 +577,41 @@ test("item switched to unavailable in admin disappears from guest menu", async (
   });
 
   await openMenuInEnglish(page, ORDERING_MENU_PATH);
-  await expect(
-    page.locator(".menu-card h3", { hasText: targetDishName }).first()
-  ).toBeVisible();
+  await expect
+    .poll(() => fetchGuestMenuIds())
+    .toContain(targetItemId);
 
   await page.goto("/admin/menu");
   await page.getByRole("button", { name: /^Menu$/ }).click();
   await page.getByRole("button", { name: "Edit" }).click();
 
-  const firstCard = page
+  const targetCard = page
     .locator("article.order-card")
     .filter({
-      has: page.locator(".menu-editor__availability", { hasText: "Available" })
+      has: page.locator(`input[value="${targetDishName}"]`)
     })
     .first();
-  const availabilityToggle = firstCard.locator(
+  const availabilityToggle = targetCard.locator(
     ".menu-editor__availability-toggle input[type='checkbox']"
   );
+  await expect(targetCard).toBeVisible();
+  await expect(targetCard.locator(".menu-editor__availability")).toHaveText("Available");
   await availabilityToggle.click();
 
   await expect
     .poll(() => lastPatchPayload)
     .toBeNull();
 
-  await firstCard.getByRole("button", { name: "Save" }).click();
+  await targetCard.getByRole("button", { name: "Save" }).click();
 
   await expect
     .poll(() => lastPatchPayload as { id?: string; available?: boolean } | null)
     .toMatchObject({ id: targetItemId, available: false });
 
   await openMenuInEnglish(page, ORDERING_MENU_PATH);
+  await expect
+    .poll(() => fetchGuestMenuIds())
+    .not.toContain(targetItemId);
+  await page.getByRole("button", { name: /Dishes/i }).first().click();
   await expect(page.locator(".menu-card h3", { hasText: targetDishName })).toHaveCount(0);
 });

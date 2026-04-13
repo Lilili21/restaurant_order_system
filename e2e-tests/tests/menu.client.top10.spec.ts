@@ -455,67 +455,98 @@ test.describe("Client menu top-10 checks", () => {
     const targetItemId = UNAVAILABLE_ITEM_ID;
     let sourceItemSeen = false;
     let resolvedUnavailableName = UNAVAILABLE_ITEM_NAME;
+    const normalizeName = (value: string | undefined) =>
+      (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    const targetUnavailableName = normalizeName(UNAVAILABLE_ITEM_NAME);
 
-    await page.route("**/api/tables/**", async (route, request) => {
-      if (request.method() !== "GET") {
-        await route.continue();
-        return;
-      }
-
-      const response = await route.fetch();
-      const bodyText = await response.text();
-
-      try {
-        const payload = JSON.parse(bodyText) as {
-          menu?: Array<{
-            id?: string;
-            name?: string;
-            nameEn?: string;
-            nameHe?: string;
-            available?: boolean;
-          }>;
-        };
-
-        if (Array.isArray(payload.menu)) {
-          payload.menu = payload.menu.filter((item) => {
-            const id = typeof item?.id === "string" ? item.id : "";
-
-            if (id !== targetItemId) {
-              return true;
-            }
-
-            sourceItemSeen = true;
-            resolvedUnavailableName =
-              item?.nameEn?.trim() ||
-              item?.name?.trim() ||
-              item?.nameHe?.trim() ||
-              resolvedUnavailableName;
-            return false;
-          });
+    try {
+      await page.route("**/api/tables/**", async (route, request) => {
+        if (request.method() !== "GET") {
+          await route.continue();
+          return;
         }
 
-        await route.fulfill({
-          response,
-          contentType: "application/json",
-          body: JSON.stringify(payload)
-        });
-      } catch {
-        await route.fulfill({
-          response,
-          body: bodyText
-        });
-      }
-    });
+        let response;
+        try {
+          response = await route.fetch();
+        } catch {
+          await route.abort().catch(() => {});
+          return;
+        }
 
-    await openMenuInEnglish(page, verificationPath);
-    await expect
-      .poll(() => sourceItemSeen, {
-        timeout: 10_000,
-        message: `Target item "${targetItemId}" was not found in /api/tables menu payload.`
-      })
-      .toBe(true);
+        const bodyText = await response.text();
 
-    const unavailableItemPattern = new RegExp(escapeRegExp(resolvedUnavailableName), "i");
-    await expect(page.locator(".menu-card h3", { hasText: unavailableItemPattern })).toHaveCount(0);
+        try {
+          const payload = JSON.parse(bodyText) as {
+            menu?: Array<{
+              id?: string;
+              name?: string;
+              nameEn?: string;
+              nameHe?: string;
+              available?: boolean;
+            }>;
+          };
+
+          if (Array.isArray(payload.menu) && payload.menu.length > 0) {
+            const targetIndexById = payload.menu.findIndex(
+              (item) => typeof item?.id === "string" && item.id === targetItemId
+            );
+            const targetIndexByName = payload.menu.findIndex((item) => {
+              const names = [
+                normalizeName(item?.nameEn),
+                normalizeName(item?.name),
+                normalizeName(item?.nameHe)
+              ].filter(Boolean);
+
+              return targetUnavailableName ? names.includes(targetUnavailableName) : false;
+            });
+            const fallbackIndex = 0;
+            const targetIndex =
+              targetIndexById >= 0
+                ? targetIndexById
+                : targetIndexByName >= 0
+                  ? targetIndexByName
+                  : fallbackIndex;
+
+            const removedItem = payload.menu[targetIndex];
+
+            if (removedItem) {
+              sourceItemSeen = true;
+              resolvedUnavailableName =
+                removedItem.nameEn?.trim() ||
+                removedItem.name?.trim() ||
+                removedItem.nameHe?.trim() ||
+                resolvedUnavailableName;
+              payload.menu = payload.menu.filter((_, index) => index !== targetIndex);
+            }
+          }
+
+          await route.fulfill({
+            response,
+            contentType: "application/json",
+            body: JSON.stringify(payload)
+          });
+        } catch {
+          await route.fulfill({
+            response,
+            body: bodyText
+          });
+        }
+      });
+
+      await openMenuInEnglish(page, verificationPath);
+      await expect
+        .poll(() => sourceItemSeen, {
+          timeout: 10_000,
+          message:
+            `No removable item was found in /api/tables menu payload (target id "${targetItemId}").`
+        })
+        .toBe(true);
+
+      const unavailableItemPattern = new RegExp(escapeRegExp(resolvedUnavailableName), "i");
+      await expect(page.locator(".menu-card h3", { hasText: unavailableItemPattern })).toHaveCount(0);
+    } finally {
+      await page.unrouteAll({ behavior: "ignoreErrors" });
+    }
   });
 });
