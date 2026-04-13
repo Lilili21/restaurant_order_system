@@ -644,7 +644,7 @@ function MenuAlertsPanelComponent({
                 <button
                   type="button"
                   className="menu-time-input__confirm"
-                  disabled={kitchenOpenSaving}
+                  disabled={kitchenOpenSaving || !kitchenOpenEnabled}
                   aria-label="Apply kitchen open time"
                   onClick={() =>
                     void saveKitchenOpenSettings(kitchenOpenEnabled, kitchenOpenUntil)
@@ -692,7 +692,7 @@ function MenuAlertsPanelComponent({
                 <button
                   type="button"
                   className="menu-time-input__confirm"
-                  disabled={barOpenSaving}
+                  disabled={barOpenSaving || !barOpenEnabled}
                   aria-label="Apply bar open time"
                   onClick={() =>
                     void saveBarOpenSettings(barOpenEnabled, barOpenUntil)

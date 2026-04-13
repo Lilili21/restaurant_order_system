@@ -2642,6 +2642,11 @@ export function MenuEditor() {
     }
 
     setKitchenOpenSaving(false);
+    if (nextEnabled) {
+      setMessage(`Kitchen open time saved until ${normalizedTime}.`);
+    } else {
+      setMessage("Kitchen open settings saved.");
+    }
   }
 
   async function saveBarOpenSettings(nextEnabled: boolean, nextTime: string) {
@@ -2695,6 +2700,11 @@ export function MenuEditor() {
     }
 
     setBarOpenSaving(false);
+    if (nextEnabled) {
+      setMessage(`Bar open time saved until ${normalizedTime}.`);
+    } else {
+      setMessage("Bar open settings saved.");
+    }
   }
 
   async function saveItem(itemId: string) {
