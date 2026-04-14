@@ -1,24 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { TableLinksPanel } from "./TableLinksPanel";
 
 type RestaurantLandingProps = {
   restaurantSlug: string;
   restaurantName: string;
   restaurantDescription: string;
-  tableLinks: Array<{
-    label?: string;
-    tableNumber: number;
-    href: string;
-  }>;
 };
 
 export function RestaurantLanding({
   restaurantSlug,
   restaurantName,
-  restaurantDescription,
-  tableLinks
+  restaurantDescription
 }: RestaurantLandingProps) {
   return (
     <main className="page-shell">
@@ -46,7 +39,6 @@ export function RestaurantLanding({
         </div>
       </section>
 
-      <TableLinksPanel tableLinks={tableLinks} />
     </main>
   );
 }

@@ -439,21 +439,6 @@ export function WorkingHoursControl({
             <div className="menu-editor__field">
               <h3>Order flow</h3>
               <label className="menu-editor__field menu-settings-panel__field--compact">
-                <span>Mode</span>
-                <select
-                  className="modal-input"
-                  value={draftOrderMode}
-                  onChange={(event) =>
-                    setDraftOrderMode(
-                      event.target.value === "counter" ? "counter" : "tables"
-                    )
-                  }
-                >
-                  <option value="tables">Tables</option>
-                  <option value="counter">Counter queue</option>
-                </select>
-              </label>
-              <label className="menu-editor__field menu-settings-panel__field--compact">
                 <span>Contact requirement</span>
                 <select
                   className="modal-input"

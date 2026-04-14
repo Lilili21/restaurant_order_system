@@ -19,22 +19,11 @@ export default async function RestaurantLandingPage({
     notFound();
   }
 
-  const exposeTableLinks =
-    process.env.PUBLIC_TABLE_LINKS_ENABLED === "true" ||
-    process.env.NODE_ENV !== "production";
-  const tableLinks = exposeTableLinks
-    ? restaurant.tables.map((table) => ({
-          tableNumber: table.number,
-          href: `/${restaurant.slug}/menu/${table.accessToken}`
-        }))
-    : [];
-
   return (
     <RestaurantLanding
       restaurantSlug={restaurant.slug}
       restaurantName={restaurant.name}
       restaurantDescription={restaurant.description}
-      tableLinks={tableLinks}
     />
   );
 }

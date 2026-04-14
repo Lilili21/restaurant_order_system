@@ -9,8 +9,6 @@ export default async function HomePage() {
     return null;
   }
 
-  const primaryRestaurant = restaurants[0];
-
   return (
     <main className="page-shell">
       <section className="hero">
@@ -28,11 +26,6 @@ export default async function HomePage() {
               </Link>
             ))}
           </div>
-        </div>
-
-        <div className="hero-card">
-          <strong>{primaryRestaurant.name}</strong>
-          <p>{primaryRestaurant.description}</p>
         </div>
       </section>
     </main>
