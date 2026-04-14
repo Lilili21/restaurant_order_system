@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { readSessionCache, writeSessionCache } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
@@ -103,6 +103,14 @@ type MonthlyExportRange = {
   end: string;
   label: string;
 };
+
+type TablesOverviewProps = {
+  restaurantSlug?: string;
+};
+
+function buildTablesViewCacheKey(restaurantSlug: string) {
+  return `${TABLES_VIEW_CACHE_KEY}:${restaurantSlug || "all"}`;
+}
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
@@ -508,23 +516,48 @@ function hasRenderableClosedSessionItems(session: ClosedTableSummary) {
   );
 }
 
-export function TablesOverview() {
-  const [data, setData] = useState<TablesResponse>(
+export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
+  const normalizedRestaurantSlug = useMemo(() => {
+    if (typeof restaurantSlug !== "string") {
+      return "";
+    }
+
+    return restaurantSlug.trim().toLowerCase();
+  }, [restaurantSlug]);
+  const querySuffix = useMemo(() => {
+    if (!normalizedRestaurantSlug) {
+      return "";
+    }
+
+    return `?restaurantSlug=${encodeURIComponent(normalizedRestaurantSlug)}`;
+  }, [normalizedRestaurantSlug]);
+  const tablesApiPath = useMemo(() => `/api/tables${querySuffix}`, [querySuffix]);
+  const ordersApiPath = useMemo(() => `/api/orders${querySuffix}`, [querySuffix]);
+  const menuSettingsApiPath = useMemo(
+    () => `/api/menu-settings${querySuffix}`,
+    [querySuffix]
+  );
+  const tablesViewCacheKey = useMemo(
+    () => buildTablesViewCacheKey(normalizedRestaurantSlug),
+    [normalizedRestaurantSlug]
+  );
+  const readCachedTablesView = useCallback(
     () =>
       readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
+        tablesViewCacheKey,
         TABLES_VIEW_CACHE_TTL_MS
-      )?.data ?? {
+      ),
+    [tablesViewCacheKey]
+  );
+  const [data, setData] = useState<TablesResponse>(
+    () =>
+      readCachedTablesView()?.data ?? {
         tables: [],
         closedSessions: []
       }
   );
   const [loading, setLoading] = useState(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      ) === null
+    () => readCachedTablesView() === null
   );
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
   const [moveAuthTable, setMoveAuthTable] = useState<TableOverview | null>(null);
@@ -534,63 +567,29 @@ export function TablesOverview() {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [serviceRequests, setServiceRequests] = useState<Order[]>(
-    () =>
-      getTablesServiceRequests(
-        readSessionCache<TablesViewCache>(
-          TABLES_VIEW_CACHE_KEY,
-          TABLES_VIEW_CACHE_TTL_MS
-        )?.serviceRequests ?? []
-      )
+    () => getTablesServiceRequests(readCachedTablesView()?.serviceRequests ?? [])
   );
   const [happyHourEnabled, setHappyHourEnabled] = useState(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.happyHourEnabled ?? false
+    () => readCachedTablesView()?.happyHourEnabled ?? false
   );
   const [happyHourDiscountPercent, setHappyHourDiscountPercent] = useState(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.happyHourDiscountPercent ?? 0
+    () => readCachedTablesView()?.happyHourDiscountPercent ?? 0
   );
   const [happyHourCategories, setHappyHourCategories] = useState<MenuCategory[]>(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.happyHourCategories ?? []
+    () => readCachedTablesView()?.happyHourCategories ?? []
   );
   const [happyHourStartsFrom, setHappyHourStartsFrom] = useState<string | null>(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.happyHourStartsFrom ?? null
+    () => readCachedTablesView()?.happyHourStartsFrom ?? null
   );
   const [happyHourUntil, setHappyHourUntil] = useState<string | null>(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.happyHourUntil ?? null
+    () => readCachedTablesView()?.happyHourUntil ?? null
   );
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(
-    () =>
-      readSessionCache<TablesViewCache>(
-        TABLES_VIEW_CACHE_KEY,
-        TABLES_VIEW_CACHE_TTL_MS
-      )?.workingHoursFrom ?? null
+    () => readCachedTablesView()?.workingHoursFrom ?? null
   );
   const [workingHoursRules, setWorkingHoursRules] =
     useState<MenuSettingsResponse["workingHoursRules"]>(
-      () =>
-        readSessionCache<TablesViewCache>(
-          TABLES_VIEW_CACHE_KEY,
-          TABLES_VIEW_CACHE_TTL_MS
-        )?.workingHoursRules ?? []
+      () => readCachedTablesView()?.workingHoursRules ?? []
     );
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
   const monthlyExportRanges = useMemo(() => getMonthlyExportRanges(new Date(), 4), []);
@@ -616,7 +615,7 @@ export function TablesOverview() {
   }
 
   async function refreshTablesData() {
-    const response = await fetch("/api/tables", {
+    const response = await fetch(tablesApiPath, {
       cache: "no-store"
     });
 
@@ -630,7 +629,7 @@ export function TablesOverview() {
   }
 
   useEffect(() => {
-    writeSessionCache(TABLES_VIEW_CACHE_KEY, {
+    writeSessionCache(tablesViewCacheKey, {
       data,
       serviceRequests,
       happyHourEnabled,
@@ -649,6 +648,7 @@ export function TablesOverview() {
     happyHourStartsFrom,
     happyHourUntil,
     serviceRequests,
+    tablesViewCacheKey,
     workingHoursFrom,
     workingHoursRules
   ]);
@@ -698,9 +698,9 @@ export function TablesOverview() {
       try {
         const [tablesResult, ordersResult, menuSettingsResult] =
           await Promise.allSettled([
-            fetchTablesResource("/api/tables", { cache: "no-store" }),
-            fetchTablesResource("/api/orders", { cache: "no-store" }),
-            fetchTablesResource("/api/menu-settings", { cache: "no-store" })
+            fetchTablesResource(tablesApiPath, { cache: "no-store" }),
+            fetchTablesResource(ordersApiPath, { cache: "no-store" }),
+            fetchTablesResource(menuSettingsApiPath, { cache: "no-store" })
           ]);
 
         if (cancelled) {
@@ -804,7 +804,7 @@ export function TablesOverview() {
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [menuSettingsApiPath, ordersApiPath, tablesApiPath]);
 
   async function handleCloseTable(restaurantSlug: string, tableNumber: number) {
     const response = await fetch("/api/tables", {
@@ -853,7 +853,7 @@ export function TablesOverview() {
   }
 
   async function resolveServiceRequest(orderId: string) {
-    const response = await fetch("/api/orders", {
+    const response = await fetch(ordersApiPath, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -1083,7 +1083,7 @@ export function TablesOverview() {
     label: string
   ) {
     const response = await fetch(
-      `/api/orders-archive?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+      `/api/orders-archive?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}${normalizedRestaurantSlug ? `&restaurantSlug=${encodeURIComponent(normalizedRestaurantSlug)}` : ""}`,
       {
         cache: "no-store"
       }

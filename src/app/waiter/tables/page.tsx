@@ -40,7 +40,7 @@ export default async function WaiterTablesPage() {
             Tables view is disabled in counter mode. Use Orders queue instead.
           </p>
         ) : (
-          <TablesOverview />
+          <TablesOverview restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG} />
         )}
       </main>
     </AdminAccessGate>

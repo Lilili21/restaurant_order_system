@@ -35,7 +35,10 @@ export default async function WaiterOrdersPage() {
           </div>
         </section>
 
-        <OrdersList orderMode={settings.orderMode} />
+        <OrdersList
+          orderMode={settings.orderMode}
+          restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+        />
       </main>
     </AdminAccessGate>
   );

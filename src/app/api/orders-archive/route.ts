@@ -14,6 +14,10 @@ function isValidDateKey(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isValidSlug(value: string) {
+  return /^[a-z0-9-]+$/.test(value);
+}
+
 function getClosedDateKey(value: string) {
   const timestamp = new Date(value).getTime();
 
@@ -53,6 +57,18 @@ export async function GET(request: NextRequest) {
   const weekKey = request.nextUrl.searchParams.get("weekKey");
   const start = request.nextUrl.searchParams.get("start");
   const end = request.nextUrl.searchParams.get("end");
+  const restaurantSlugRaw = request.nextUrl.searchParams.get("restaurantSlug");
+  const restaurantSlug =
+    typeof restaurantSlugRaw === "string" && restaurantSlugRaw.trim()
+      ? restaurantSlugRaw.trim().toLowerCase()
+      : null;
+
+  if (restaurantSlug && !isValidSlug(restaurantSlug)) {
+    return NextResponse.json(
+      { message: "restaurantSlug must contain only lowercase letters, digits, and dashes" },
+      { status: 400 }
+    );
+  }
 
   if (weekKey) {
     const archive = getWeeklyOrdersArchive(weekKey);
@@ -61,7 +77,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: "Archive not found" }, { status: 404 });
     }
 
-    return NextResponse.json(archive);
+    if (!restaurantSlug) {
+      return NextResponse.json(archive);
+    }
+
+    return NextResponse.json({
+      ...archive,
+      closedTableSummaries: (archive.closedTableSummaries ?? []).filter(
+        (summary) => summary.restaurantSlug === restaurantSlug
+      )
+    });
   }
 
   if (start || end) {
@@ -79,10 +104,18 @@ export async function GET(request: NextRequest) {
 
     const archiveSummaries = intersectedWeekKeys.flatMap((currentWeekKey) => {
       const archive = getWeeklyOrdersArchive(currentWeekKey);
-      return archive?.closedTableSummaries ?? [];
+      const summaries = archive?.closedTableSummaries ?? [];
+
+      if (!restaurantSlug) {
+        return summaries;
+      }
+
+      return summaries.filter((summary) => summary.restaurantSlug === restaurantSlug);
     });
 
-    const runtimeSummaries = await getClosedTableSummaries(undefined, { scope: "all" });
+    const runtimeSummaries = await getClosedTableSummaries(restaurantSlug ?? undefined, {
+      scope: "all"
+    });
     const summariesInRange = [...archiveSummaries, ...runtimeSummaries].filter((summary) => {
       const dateKey = getClosedDateKey(summary.closedAt);
       return Boolean(dateKey && dateKey >= start && dateKey <= end);

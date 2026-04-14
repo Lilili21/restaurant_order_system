@@ -302,10 +302,28 @@ function readCachedFilters(): OrdersFiltersCache {
 
 type OrdersListProps = {
   orderMode?: RestaurantOrderMode;
+  restaurantSlug?: string;
 };
 
-export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
+export function OrdersList({
+  orderMode = "tables",
+  restaurantSlug
+}: OrdersListProps) {
   const isCounterMode = orderMode === "counter";
+  const normalizedRestaurantSlug = useMemo(() => {
+    if (typeof restaurantSlug !== "string") {
+      return "";
+    }
+
+    return restaurantSlug.trim().toLowerCase();
+  }, [restaurantSlug]);
+  const ordersApiPath = useMemo(() => {
+    if (!normalizedRestaurantSlug) {
+      return "/api/orders";
+    }
+
+    return `/api/orders?restaurantSlug=${encodeURIComponent(normalizedRestaurantSlug)}`;
+  }, [normalizedRestaurantSlug]);
   const [orders, setOrders] = useState<Order[]>(() => readCachedOrders() ?? []);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
@@ -437,7 +455,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
       loadingInFlight = true;
 
       try {
-        const response = await fetch("/api/orders");
+        const response = await fetch(ordersApiPath);
         const payload = response.ok ? await response.json() : [];
         const data = mergeOrdersWithStoredWaiterCalls(payload);
 
@@ -480,10 +498,10 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [ordersApiPath]);
 
   async function changeStatus(orderId: string, status: OrderStatus) {
-    const response = await fetch("/api/orders", {
+    const response = await fetch(ordersApiPath, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -521,7 +539,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
     orderItemId: string,
     served: boolean
   ) {
-    const response = await fetch("/api/orders", {
+    const response = await fetch(ordersApiPath, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -549,7 +567,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
     cooked: boolean,
     station: "kitchen" | "bar"
   ) {
-    const response = await fetch("/api/orders", {
+    const response = await fetch(ordersApiPath, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"
@@ -573,7 +591,7 @@ export function OrdersList({ orderMode = "tables" }: OrdersListProps) {
     orderItemId: string,
     quantityDelta: number
   ) {
-    const response = await fetch("/api/orders", {
+    const response = await fetch(ordersApiPath, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json"

@@ -58,7 +58,7 @@ export default async function RestaurantWaiterTablesPage({
             Tables view is disabled in counter mode. Use Orders queue instead.
           </p>
         ) : (
-          <TablesOverview />
+          <TablesOverview restaurantSlug={restaurant.slug} />
         )}
       </main>
     </AdminAccessGate>

@@ -53,7 +53,10 @@ export default async function RestaurantWaiterOrdersPage({
           </div>
         </section>
 
-        <OrdersList orderMode={settings.orderMode} />
+        <OrdersList
+          orderMode={settings.orderMode}
+          restaurantSlug={restaurant.slug}
+        />
       </main>
     </AdminAccessGate>
   );

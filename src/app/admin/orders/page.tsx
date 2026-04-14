@@ -33,7 +33,10 @@ export default async function AdminOrdersPage() {
         </div>
       </section>
 
-      <OrdersList orderMode={settings.orderMode} />
+      <OrdersList
+        orderMode={settings.orderMode}
+        restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+      />
     </main>
   );
 }
