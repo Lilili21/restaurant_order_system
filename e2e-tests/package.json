@@ -10,6 +10,7 @@
     "test": "playwright test",
     "test:prod": "E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app E2E_USE_WEB_SERVER=false playwright test",
     "test:local": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test",
+    "test:all": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test --workers=1",
     "test:live-top10": "playwright test tests/live-orders.expanded.top10.spec.ts",
     "test:live-11-25": "playwright test tests/live-orders.expanded.11-25.spec.ts",
     "test:live-26-45": "playwright test tests/live-orders.expanded.26-45.spec.ts",

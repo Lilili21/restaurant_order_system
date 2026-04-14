@@ -123,6 +123,28 @@ function getWhatsAppLink(order: Order) {
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
 }
 
+function getShortDisplayOrderNumber(displayOrderNumber: string | undefined, fallbackId: string) {
+  const raw = typeof displayOrderNumber === "string" ? displayOrderNumber.trim() : "";
+
+  if (!raw) {
+    return fallbackId;
+  }
+
+  const parts = raw.split("-").filter(Boolean);
+  const tailSource = (parts.length ? parts[parts.length - 1] : "") || raw;
+  const tailDigits = tailSource.replace(/\D/g, "");
+
+  if (tailDigits.length >= 4) {
+    return tailDigits.slice(-4);
+  }
+
+  if (tailSource.length >= 4) {
+    return tailSource.slice(-4).toUpperCase();
+  }
+
+  return tailDigits || tailSource || fallbackId;
+}
+
 function isKitchenReadyOrder(order: Order) {
   return isOrderReadyForStation(order, "kitchen");
 }
@@ -1270,7 +1292,10 @@ export function OrdersList({
                   <div>
                     <h3>
                       {isCounterMode || order.orderChannel === "counter"
-                        ? `Order ${order.displayOrderNumber ?? order.id}`
+                        ? `Order ${getShortDisplayOrderNumber(
+                            order.displayOrderNumber,
+                            order.id
+                          )}`
                         : `Table ${order.tableNumber}`}
                       {isHallView && !isCounterMode && order.kind === "waiter_call"
                         ? " · Waiter call"
@@ -1278,6 +1303,14 @@ export function OrdersList({
                           ? " · Bill request"
                         : ""}
                     </h3>
+                    {(isCounterMode || order.orderChannel === "counter") &&
+                    order.displayOrderNumber ? (
+                      <p className="muted">
+                        Short: {getShortDisplayOrderNumber(order.displayOrderNumber, order.id)} ·
+                        {" "}
+                        Full: {order.displayOrderNumber}
+                      </p>
+                    ) : null}
                     {isBarView ? (
                       <p className="muted">Drinks {totalDrinksCount}</p>
                     ) : null}
