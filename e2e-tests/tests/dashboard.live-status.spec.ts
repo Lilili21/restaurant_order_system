@@ -175,8 +175,8 @@ async function setupDashboardApis(
   };
 }
 
-async function openDashboard(page: Page) {
-  await page.goto("/admin/menu");
+async function openDashboard(page: Page, path = "/admin/menu") {
+  await page.goto(path);
   await expect(page.getByRole("heading", { name: "Live status" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Daily status" })).toBeVisible();
 }
@@ -213,6 +213,91 @@ async function forceDashboardRefresh(page: Page) {
 }
 
 test.describe("Dashboard live status and charts", () => {
+  test("DASH-00 analytics request is scoped by restaurant slug on restaurant admin route", async ({
+    page
+  }) => {
+    const seenAnalyticsSlugs: string[] = [];
+
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+    });
+
+    await page.route(/\/api\/admin-auth(\?|$)/, async (route, request) => {
+      if (request.method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ authorized: true })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true })
+      });
+    });
+
+    await page.route(/\/api\/menu(\?|$)/, async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([])
+      });
+    });
+
+    await page.route(/\/api\/menu-settings(\?|$)/, async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true })
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({})
+      });
+    });
+
+    await page.route(/\/api\/admin-analytics(\?|$)/, async (route, request) => {
+      if (request.method() !== "GET") {
+        await route.continue();
+        return;
+      }
+
+      const url = new URL(request.url());
+      seenAnalyticsSlugs.push(url.searchParams.get("restaurantSlug") ?? "");
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(buildAnalyticsPayload())
+      });
+    });
+
+    await openDashboard(page, "/olive-bistro/admin");
+
+    await expect
+      .poll(() => seenAnalyticsSlugs.length, { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    expect(seenAnalyticsSlugs[0]).toBe("olive-bistro");
+  });
+
   test("DASH-01 renders Live status metrics and descriptions", async ({ page }) => {
     await setupDashboardApis(page, {
       analyticsSnapshots: [
@@ -423,4 +508,3 @@ test.describe("Dashboard live status and charts", () => {
     await expect(ordersChart.locator(".control-center-chart__hotspot")).toHaveCount(3);
   });
 });
-

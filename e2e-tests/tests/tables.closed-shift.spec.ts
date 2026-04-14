@@ -521,3 +521,141 @@ test("closed tables list hides empty sessions without order items", async ({ pag
   await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 50" })).toHaveCount(0);
   await expect(page.locator(".closed-grid article.info-card h2", { hasText: "Table 51" })).toHaveCount(1);
 });
+
+test("restaurant tables page requests tables, orders, settings and export strictly for current restaurant", async ({
+  page
+}) => {
+  test.skip(
+    process.env.E2E_USE_WEB_SERVER !== "true",
+    "Run in local mode (E2E_USE_WEB_SERVER=true) to verify restaurant-scoped table APIs."
+  );
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  const seenTablesSlugs: string[] = [];
+  const seenOrdersSlugs: string[] = [];
+  const seenSettingsSlugs: string[] = [];
+  const seenArchiveSlugs: string[] = [];
+  const nowIso = new Date().toISOString();
+
+  await page.route("**/api/admin-auth**", async (route, request) => {
+    if (request.method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ authorized: true })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true })
+    });
+  });
+
+  await page.route("**/api/menu-settings**", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true })
+      });
+      return;
+    }
+
+    const url = new URL(request.url());
+    seenSettingsSlugs.push(url.searchParams.get("restaurantSlug") ?? "");
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        workingHoursFrom: "09:00",
+        workingHoursRules: [],
+        happyHourEnabled: false,
+        happyHourDiscountPercent: 0,
+        happyHourCategories: [],
+        happyHourStartsFrom: null,
+        happyHourUntil: null,
+        orderMode: "tables"
+      })
+    });
+  });
+
+  await page.route("**/api/orders", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    const url = new URL(request.url());
+    seenOrdersSlugs.push(url.searchParams.get("restaurantSlug") ?? "");
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route("**/api/tables", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    const url = new URL(request.url());
+    seenTablesSlugs.push(url.searchParams.get("restaurantSlug") ?? "");
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        tables: [],
+        closedSessions: [
+          createClosedSession({
+            tableNumber: 77,
+            sessionId: 7701,
+            closedAt: nowIso,
+            total: 72,
+            itemName: "Restaurant-scoped session"
+          })
+        ]
+      })
+    });
+  });
+
+  await page.route("**/api/orders-archive**", async (route, request) => {
+    const url = new URL(request.url());
+    seenArchiveSlugs.push(url.searchParams.get("restaurantSlug") ?? "");
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        start: url.searchParams.get("start"),
+        end: url.searchParams.get("end"),
+        closedTableSummaries: []
+      })
+    });
+  });
+
+  await page.goto("/olive-bistro/waiter/tables");
+  await expect(page.getByRole("heading", { name: "Closed tables" })).toBeVisible();
+
+  await expect
+    .poll(() => seenTablesSlugs.length + seenOrdersSlugs.length + seenSettingsSlugs.length)
+    .toBeGreaterThan(2);
+  expect(seenTablesSlugs).toContain("olive-bistro");
+  expect(seenOrdersSlugs).toContain("olive-bistro");
+  expect(seenSettingsSlugs).toContain("olive-bistro");
+
+  await page.getByRole("button", { name: /^Download / }).first().click();
+  await expect.poll(() => seenArchiveSlugs.length).toBeGreaterThan(0);
+  expect(seenArchiveSlugs).toContain("olive-bistro");
+});

@@ -42,6 +42,7 @@
     "test:menu-banners-05": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test tests/menu.banners.spec.ts --grep 'BANNER-05'",
     "test:menu-smoke": "playwright test tests/menu.client.smoke.spec.ts",
     "test:tables-shift": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test tests/tables.closed-shift.spec.ts",
+    "test:restaurant-scope": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test tests/restaurant.order-scope.spec.ts --workers=1",
     "test:tables-shift-no-skip": "E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true playwright test tests/tables.closed-shift.spec.ts --grep 'duplicate cards'",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
