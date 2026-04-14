@@ -1004,7 +1004,7 @@ export async function GET(request: NextRequest) {
         ordersLabel:
           settings.orderMode === "counter"
             ? "Counter orders this shift"
-            : "Active tables + closed sessions",
+            : "Active + closed tables",
         activeOrdersLabel:
           settings.orderMode === "counter"
             ? "Queue orders not served"
@@ -1059,7 +1059,7 @@ export async function GET(request: NextRequest) {
         },
         meta: {
           orderMode: "tables",
-          ordersLabel: "Active tables + closed sessions",
+          ordersLabel: "Active + closed tables",
           activeOrdersLabel: "Open tables right now",
           error:
             error instanceof Error ? error.message : "Failed to build admin analytics",

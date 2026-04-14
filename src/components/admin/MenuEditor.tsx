@@ -758,7 +758,7 @@ export function MenuEditor() {
   });
   const [dashboardMeta, setDashboardMeta] = useState<DashboardMeta>({
     orderMode: "tables",
-    ordersLabel: "Active tables + closed sessions",
+    ordersLabel: "Active + closed tables",
     activeOrdersLabel: "Open tables right now"
   });
   const [workingHoursFrom, setWorkingHoursFrom] = useState<string | null>(null);
@@ -1632,7 +1632,7 @@ export function MenuEditor() {
                 typeof analytics.meta?.ordersLabel === "string" &&
                 analytics.meta.ordersLabel.trim()
                   ? analytics.meta.ordersLabel
-                  : "Active tables + closed sessions",
+                  : "Active + closed tables",
               activeOrdersLabel:
                 typeof analytics.meta?.activeOrdersLabel === "string" &&
                 analytics.meta.activeOrdersLabel.trim()
