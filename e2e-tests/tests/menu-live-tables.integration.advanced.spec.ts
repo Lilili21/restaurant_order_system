@@ -766,6 +766,11 @@ test.describe("Menu + Live + Tables advanced integration", () => {
     });
   });
 
+  test.afterEach(async ({ context, page }) => {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
   test("ADV-01 close table moves order to Closed tables and allows export", async ({
     page,
     context

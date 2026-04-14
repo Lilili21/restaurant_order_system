@@ -403,6 +403,10 @@ test.describe("Client menu checks TC-21..TC-24", () => {
     });
   });
 
+  test.afterEach(async ({ page }) => {
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+  });
+
   test("TC-21 successful order shows confirmation message", async ({ page, request }) => {
     await withOpenedKitchenAndBar(request, ORDERING_MENU_PATH, async () => {
       await mockOrderPostSuccess(page);

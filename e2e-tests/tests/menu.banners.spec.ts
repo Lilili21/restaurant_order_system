@@ -1,6 +1,10 @@
 import { expect, Page, test } from "@playwright/test";
 
 const PREVIEW_MENU_PATH = process.env.E2E_MENU_PREVIEW_PATH ?? "/menu/olive-bistro/0";
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
 const SECONDARY_LOGIN =
   process.env.E2E_ADMIN_SECONDARY_LOGIN ?? process.env.ADMIN_SECONDARY_LOGIN ?? "admin";
 const SECONDARY_PASSWORD =
@@ -522,12 +526,12 @@ test.describe("Client menu banners", () => {
   test("BANNER-05 submitted order keeps discounted total after happy-hour ends", async ({
     page
   }) => {
-    const restaurantSlug = parseRestaurantSlugFromPath(PREVIEW_MENU_PATH);
+    const restaurantSlug = parseRestaurantSlugFromPath(ORDERING_MENU_PATH);
     const day = new Date().getDay();
     const activeWindow = buildScheduleWindow("active");
     const pastWindow = buildScheduleWindow("past");
 
-    await openMenuInEnglish(page, PREVIEW_MENU_PATH);
+    await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
     await withRestoredBannerSettings(page, restaurantSlug, async () => {
       await patchMenuSettings(page, restaurantSlug, {
@@ -545,7 +549,7 @@ test.describe("Client menu banners", () => {
         ],
         businessLunches: []
       });
-      await openMenuInEnglish(page, PREVIEW_MENU_PATH);
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
 
       const createOrderResponsePromise = page.waitForResponse(
         (response) =>
@@ -584,7 +588,7 @@ test.describe("Client menu banners", () => {
         businessLunches: []
       });
 
-      await openMenuInEnglish(page, PREVIEW_MENU_PATH);
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
       await expect(
         page.locator(".menu-alert-banner.menu-happy-hour:not(.menu-business-lunch)")
       ).toHaveCount(0);
