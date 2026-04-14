@@ -248,10 +248,19 @@ test.describe("Client menu checks 11-20", () => {
     );
 
     await openMenuInEnglish(page, ORDERING_MENU_PATH);
+    const drinksTab = page.getByRole("button", { name: /Drinks/i }).first();
+    await expect(drinksTab).toBeVisible();
+    await drinksTab.click();
+    await expect(drinksTab).toHaveClass(/admin-switch__item--active|category-toggle-button--active|active/i);
 
     const rows = page.locator(".menu-card__volume-row");
+    await expect
+      .poll(async () => rows.count(), {
+        timeout: 10_000,
+        message: "No drink volume rows found after switching to Drinks."
+      })
+      .toBeGreaterThan(0);
     const rowsCount = await rows.count();
-    expect(rowsCount).toBeGreaterThan(0);
 
     let selectedIndex = -1;
     let selectedLabel = "";

@@ -290,33 +290,41 @@ async function openMenuInEnglish(page: Page, menuPath: string) {
 }
 
 async function addFirstDish(page: Page, quantity = 1) {
-  const isKitchenClosed = (await page.getByText("Kitchen closed").count()) > 0;
-  const isBarClosed = (await page.getByText("Bar closed").count()) > 0;
-
-  if (isKitchenClosed && isBarClosed) {
-    throw new Error("Both kitchen and bar are closed. Cannot add any orderable item.");
-  }
-
-  const targetSection = isKitchenClosed ? /Drinks/i : /Dishes/i;
-  await page.getByRole("button", { name: targetSection }).first().click();
-
   for (let index = 0; index < quantity; index += 1) {
-    const flatAddButton = page
-      .locator(".menu-card .menu-card__footer button")
-      .filter({ hasText: "Add" })
-      .first();
+    let added = false;
+    const sections: Array<RegExp> = [/Dishes/i, /Drinks/i];
 
-    if ((await flatAddButton.count()) > 0) {
-      await expect(flatAddButton).toBeVisible();
-      await flatAddButton.click();
-      continue;
+    for (const section of sections) {
+      await page.getByRole("button", { name: section }).first().click();
+
+      const flatAddButton = page
+        .locator(".menu-card .menu-card__footer button:not([disabled])")
+        .filter({ hasText: /^Add$/ })
+        .first();
+      const volumeAddButton = page
+        .locator(".menu-card__volume-row button:not([disabled])")
+        .filter({ hasText: /^Add$/ })
+        .first();
+
+      if ((await flatAddButton.count()) > 0 && (await flatAddButton.isVisible().catch(() => false))) {
+        await flatAddButton.click();
+        added = true;
+        break;
+      }
+
+      if (
+        (await volumeAddButton.count()) > 0 &&
+        (await volumeAddButton.isVisible().catch(() => false))
+      ) {
+        await volumeAddButton.click();
+        added = true;
+        break;
+      }
     }
 
-    const volumeAddButton = page.locator(".menu-card__volume-row button", {
-      hasText: "Add"
-    }).first();
-    await expect(volumeAddButton).toBeVisible();
-    await volumeAddButton.click();
+    if (!added) {
+      throw new Error("No enabled Add button found in Dishes or Drinks sections.");
+    }
   }
 }
 
@@ -388,6 +396,20 @@ async function attachSharedBackend(
   const now = new Date();
   const happyHourStartsFrom = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
   const happyHourUntil = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
+  const openUntil = new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString();
+  const menuSettings = {
+    workingHoursFrom,
+    workingHoursRules: [],
+    kitchenOpenEnabled: true,
+    kitchenOpenUntil: openUntil,
+    barOpenEnabled: true,
+    barOpenUntil: openUntil,
+    happyHourEnabled: discountPercent > 0,
+    happyHourDiscountPercent: discountPercent,
+    happyHourCategories: discountPercent > 0 ? ["mains"] : [],
+    happyHourStartsFrom: discountPercent > 0 ? happyHourStartsFrom : null,
+    happyHourUntil: discountPercent > 0 ? happyHourUntil : null
+  };
 
   await context.route("**/api/admin-auth**", async (route, request) => {
     if (request.method() === "GET") {
@@ -406,19 +428,11 @@ async function attachSharedBackend(
     });
   });
 
-  await context.route("**/api/menu-settings**", async (route) => {
+  await context.route(/\/api\/menu-settings(\?|$)/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        workingHoursFrom,
-        workingHoursRules: [],
-        happyHourEnabled: discountPercent > 0,
-        happyHourDiscountPercent: discountPercent,
-        happyHourCategories: discountPercent > 0 ? ["mains"] : [],
-        happyHourStartsFrom: discountPercent > 0 ? happyHourStartsFrom : null,
-        happyHourUntil: discountPercent > 0 ? happyHourUntil : null
-      })
+      body: JSON.stringify(menuSettings)
     });
   });
 
@@ -745,8 +759,6 @@ async function waitForSubmittedOrdersInStore(
 }
 
 test.describe("Menu + Live + Tables advanced integration", () => {
-  test.describe.configure({ mode: "serial" });
-
   test.beforeEach(async ({ context }) => {
     await context.addInitScript(() => {
       window.localStorage.clear();

@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL =
   process.env.E2E_BASE_URL ?? "https://restaurant-order-system-blue.vercel.app";
+const defaultOrderingMenuPath = "/olive-bistro/menu/tbl_GkoFz28VwFqC";
+process.env.E2E_ORDERING_MENU_PATH ??= defaultOrderingMenuPath;
 const useWebServer = process.env.E2E_USE_WEB_SERVER === "true";
 const configuredWorkers = Number.parseInt(process.env.PLAYWRIGHT_WORKERS ?? "1", 10);
 const workers = Number.isFinite(configuredWorkers) && configuredWorkers > 0

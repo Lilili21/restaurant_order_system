@@ -493,8 +493,6 @@ async function setupSharedMenuLiveBackend(context: BrowserContext) {
 }
 
 test.describe("Menu + Live Orders integration", () => {
-  test.describe.configure({ mode: "serial" });
-
   test.beforeEach(async ({ context }) => {
     await context.addInitScript(() => {
       window.localStorage.clear();

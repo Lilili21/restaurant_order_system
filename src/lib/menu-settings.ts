@@ -595,6 +595,114 @@ function applyOrderModePolicy(
   return settings;
 }
 
+function parseClockTime(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number.parseInt(match[1], 10);
+  const minutes = Number.parseInt(match[2], 10);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  return { hours, minutes };
+}
+
+function getLatestShiftStartTimestamp(settings: MenuSettings, now: Date) {
+  const candidateDates = [
+    new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    new Date(now)
+  ];
+  let latestShiftStart: number | null = null;
+
+  for (const date of candidateDates) {
+    const matchedRule = settings.workingHoursRules.find((rule) =>
+      rule.days.includes(date.getDay())
+    );
+    const from = parseClockTime(matchedRule?.from ?? settings.workingHoursFrom);
+    const until = parseClockTime(matchedRule?.until ?? settings.workingHoursUntil);
+
+    if (!from || !until) {
+      continue;
+    }
+
+    const shiftStart = new Date(date);
+    shiftStart.setHours(from.hours, from.minutes, 0, 0);
+
+    const shiftEnd = new Date(date);
+    shiftEnd.setHours(until.hours, until.minutes, 0, 0);
+
+    if (shiftEnd.getTime() <= shiftStart.getTime()) {
+      shiftEnd.setDate(shiftEnd.getDate() + 1);
+    }
+
+    if (now.getTime() >= shiftEnd.getTime()) {
+      continue;
+    }
+
+    const shiftStartTs = shiftStart.getTime();
+
+    if (shiftStartTs <= now.getTime()) {
+      latestShiftStart =
+        latestShiftStart === null
+          ? shiftStartTs
+          : Math.max(latestShiftStart, shiftStartTs);
+    }
+  }
+
+  return latestShiftStart;
+}
+
+function applyOpenTimersShiftPolicy(settings: MenuSettings): MenuSettings {
+  const now = new Date();
+  const latestShiftStart = getLatestShiftStartTimestamp(settings, now);
+
+  if (latestShiftStart === null) {
+    return settings;
+  }
+
+  const kitchenUntilTs = settings.kitchenOpenUntil
+    ? Date.parse(settings.kitchenOpenUntil)
+    : Number.NaN;
+  const barUntilTs = settings.barOpenUntil
+    ? Date.parse(settings.barOpenUntil)
+    : Number.NaN;
+  const kitchenExpiredInPreviousShift =
+    settings.kitchenOpenEnabled &&
+    Number.isFinite(kitchenUntilTs) &&
+    kitchenUntilTs < latestShiftStart;
+  const barExpiredInPreviousShift =
+    settings.barOpenEnabled &&
+    Number.isFinite(barUntilTs) &&
+    barUntilTs < latestShiftStart;
+
+  if (!kitchenExpiredInPreviousShift && !barExpiredInPreviousShift) {
+    return settings;
+  }
+
+  return {
+    ...settings,
+    kitchenOpenEnabled: kitchenExpiredInPreviousShift
+      ? false
+      : settings.kitchenOpenEnabled,
+    kitchenOpenUntil: kitchenExpiredInPreviousShift ? null : settings.kitchenOpenUntil,
+    barOpenEnabled: barExpiredInPreviousShift ? false : settings.barOpenEnabled,
+    barOpenUntil: barExpiredInPreviousShift ? null : settings.barOpenUntil
+  };
+}
+
+function applyMenuRuntimePolicies(settings: MenuSettings, restaurantSlug?: string) {
+  return applyOpenTimersShiftPolicy(applyOrderModePolicy(settings, restaurantSlug));
+}
+
 function mapRestaurantSettingsRowToSettings(
   row: RestaurantSettingsRow | null | undefined
 ): Partial<MenuSettings> {
@@ -1090,7 +1198,7 @@ export async function getMenuSettings(
   const cached = useCache ? getSettingsCache(restaurantSlug) : undefined;
 
   if (cached && cached.expiresAt > Date.now()) {
-    const nextSettings = applyOrderModePolicy(cached.settings, restaurantSlug);
+    const nextSettings = applyMenuRuntimePolicies(cached.settings, restaurantSlug);
     return {
       ...nextSettings,
       tableTokens: { ...nextSettings.tableTokens }
@@ -1100,7 +1208,7 @@ export async function getMenuSettings(
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
-    const localSettings = applyOrderModePolicy(
+    const localSettings = applyMenuRuntimePolicies(
       getMenuSettingsSync(),
       restaurantSlug
     );
@@ -1119,7 +1227,7 @@ export async function getMenuSettings(
       );
 
       if (restaurantSettings) {
-        const nextRestaurantSettings = applyOrderModePolicy(
+        const nextRestaurantSettings = applyMenuRuntimePolicies(
           hasWorkingHoursConfigured(restaurantSettings)
             ? restaurantSettings
             : mergeRestaurantSettingsWithFallback(
@@ -1148,7 +1256,7 @@ export async function getMenuSettings(
     }
 
     if (!data?.value) {
-      const normalized = applyOrderModePolicy(
+      const normalized = applyMenuRuntimePolicies(
         normalizeSettings(DEFAULT_SETTINGS),
         restaurantSlug
       );
@@ -1163,7 +1271,7 @@ export async function getMenuSettings(
       };
     }
 
-    const normalized = applyOrderModePolicy(
+    const normalized = applyMenuRuntimePolicies(
       normalizeSettings(data.value as Partial<MenuSettings>),
       restaurantSlug
     );
@@ -1173,7 +1281,7 @@ export async function getMenuSettings(
       tableTokens: { ...normalized.tableTokens }
     };
   } catch {
-    const localSettings = applyOrderModePolicy(
+    const localSettings = applyMenuRuntimePolicies(
       getMenuSettingsSync(),
       restaurantSlug
     );
