@@ -13,6 +13,7 @@ import {
   percentToBps,
   shekelsToAgorot
 } from "@/lib/money";
+import { getGuestShortOrderNumber } from "@/lib/order-number-display";
 import type {
   BusinessLunchSettings,
   ContactRequirement,
@@ -139,28 +140,6 @@ const COUNTER_CAPTCHA_PUBLIC_ENABLED = ["1", "true", "yes", "on"].includes(
 const COUNTER_CAPTCHA_MISSING_MESSAGE = "Please complete the captcha check.";
 const COUNTER_CAPTCHA_INIT_FAILED_MESSAGE =
   "Captcha could not be initialized. Please refresh and try again.";
-
-function getShortGuestOrderNumber(displayOrderNumber: string) {
-  const raw = displayOrderNumber.trim();
-
-  if (!raw) {
-    return "";
-  }
-
-  const parts = raw.split("-").filter(Boolean);
-  const tailSource = (parts.length ? parts[parts.length - 1] : "") || raw;
-  const tailDigits = tailSource.replace(/\D/g, "");
-
-  if (tailDigits.length >= 4) {
-    return tailDigits.slice(-4);
-  }
-
-  if (tailSource.length >= 4) {
-    return tailSource.slice(-4).toUpperCase();
-  }
-
-  return tailDigits || tailSource || raw;
-}
 
 const uiText = {
   he: {
@@ -1932,7 +1911,7 @@ export function Cart({
       });
       setDialogMessage(
         isCounterMode && order.displayOrderNumber
-          ? `${text.orderSent}\nOrder number: ${getShortGuestOrderNumber(order.displayOrderNumber)}`
+          ? `${text.orderSent}\nOrder number: ${getGuestShortOrderNumber(order.displayOrderNumber)}`
           : text.orderSent
       );
       if (isCounterMode) {

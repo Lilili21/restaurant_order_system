@@ -10,6 +10,7 @@ import {
 } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
 import { agorotToShekels, shekelsToAgorot } from "@/lib/money";
+import { getStaffShortOrderNumber } from "@/lib/order-number-display";
 import type { RestaurantOrderMode } from "@/lib/menu-settings";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
@@ -116,33 +117,11 @@ function getWhatsAppLink(order: Order) {
   const normalizedPhone = phone.startsWith("+") ? phone.slice(1) : phone;
   const orderLabel =
     order.orderChannel === "counter"
-      ? `order ${order.displayOrderNumber ?? order.id}`
+      ? `order ${getStaffShortOrderNumber(order.displayOrderNumber, order.id)}`
       : `table ${order.tableNumber}`;
   const message = `Hi ${order.guestContactName ?? ""}, your ${orderLabel} at ${order.restaurantName} is ready.`;
 
   return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message.trim())}`;
-}
-
-function getShortDisplayOrderNumber(displayOrderNumber: string | undefined, fallbackId: string) {
-  const raw = typeof displayOrderNumber === "string" ? displayOrderNumber.trim() : "";
-
-  if (!raw) {
-    return fallbackId;
-  }
-
-  const parts = raw.split("-").filter(Boolean);
-  const tailSource = (parts.length ? parts[parts.length - 1] : "") || raw;
-  const tailDigits = tailSource.replace(/\D/g, "");
-
-  if (tailDigits.length >= 4) {
-    return tailDigits.slice(-4);
-  }
-
-  if (tailSource.length >= 4) {
-    return tailSource.slice(-4).toUpperCase();
-  }
-
-  return tailDigits || tailSource || fallbackId;
 }
 
 function isKitchenReadyOrder(order: Order) {
@@ -1291,8 +1270,8 @@ export function OrdersList({
                 <div className="order-card__header">
                   <div>
                     <h3>
-                      {isCounterMode || order.orderChannel === "counter"
-                        ? `Order ${getShortDisplayOrderNumber(
+                      {isCounterMode
+                        ? `Order ${getStaffShortOrderNumber(
                             order.displayOrderNumber,
                             order.id
                           )}`
@@ -1303,10 +1282,9 @@ export function OrdersList({
                           ? " · Bill request"
                         : ""}
                     </h3>
-                    {(isCounterMode || order.orderChannel === "counter") &&
-                    order.displayOrderNumber ? (
+                    {isCounterMode && order.displayOrderNumber ? (
                       <p className="muted">
-                        Short: {getShortDisplayOrderNumber(order.displayOrderNumber, order.id)} ·
+                        Short: {getStaffShortOrderNumber(order.displayOrderNumber, order.id)} ·
                         {" "}
                         Full: {order.displayOrderNumber}
                       </p>

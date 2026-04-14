@@ -1,8 +1,28 @@
-import { expect, Page, test } from "@playwright/test";
+import { APIRequestContext, expect, Page, test } from "@playwright/test";
 
 import { createMockOrder } from "./fixtures";
 
 type OrderRecord = ReturnType<typeof createMockOrder>;
+
+const ORDERING_MENU_PATH =
+  process.env.E2E_ORDERING_MENU_PATH?.trim() ||
+  process.env.E2E_DEFAULT_ORDERING_MENU_PATH?.trim() ||
+  "/olive-bistro/menu/tbl_GkoFz28VwFqC";
+const SECONDARY_LOGIN =
+  process.env.E2E_ADMIN_SECONDARY_LOGIN ?? process.env.ADMIN_SECONDARY_LOGIN ?? "admin";
+const SECONDARY_PASSWORD =
+  process.env.E2E_ADMIN_SECONDARY_PASSWORD ?? process.env.ADMIN_SECONDARY_PASSWORD ?? "admin";
+
+type CounterSettingsSnapshot = {
+  orderMode: "tables" | "counter";
+  kitchenOpenEnabled: boolean;
+  kitchenOpenUntil: string | null;
+  barOpenEnabled: boolean;
+  barOpenUntil: string | null;
+  contactRequirement: "none" | "name_or_phone" | "phone_only";
+  requireOtp: boolean;
+  orderNumberPrefix: string;
+};
 
 function cloneOrders(input: OrderRecord[]) {
   return input.map((order) => ({
@@ -28,6 +48,157 @@ async function setupAdminAuth(page: Page) {
       body: JSON.stringify({ ok: true })
     });
   });
+}
+
+function parseMenuPath(menuPath: string) {
+  const pathname = new URL(menuPath, "https://example.local").pathname;
+  const prefixedMatch = /^\/menu\/([^/]+)\/([^/]+)/.exec(pathname);
+
+  if (prefixedMatch) {
+    return {
+      restaurantSlug: decodeURIComponent(prefixedMatch[1]),
+      tableToken: decodeURIComponent(prefixedMatch[2])
+    };
+  }
+
+  const slugFirstMatch = /^\/([^/]+)\/menu\/([^/]+)/.exec(pathname);
+
+  if (slugFirstMatch) {
+    return {
+      restaurantSlug: decodeURIComponent(slugFirstMatch[1]),
+      tableToken: decodeURIComponent(slugFirstMatch[2])
+    };
+  }
+
+  return {
+    restaurantSlug: "olive-bistro",
+    tableToken: "0"
+  };
+}
+
+function inFuture(minutes: number) {
+  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+}
+
+function getGuestShortNumber(displayOrderNumber: string) {
+  const parts = displayOrderNumber.split("-").filter(Boolean);
+  const tailSource = (parts.length ? parts[parts.length - 1] : "") || displayOrderNumber;
+  const tailDigits = tailSource.replace(/\D/g, "");
+
+  if (tailDigits.length >= 4) {
+    return tailDigits.slice(-4);
+  }
+
+  if (tailSource.length >= 4) {
+    return tailSource.slice(-4).toUpperCase();
+  }
+
+  return tailDigits || tailSource;
+}
+
+async function dismissWelcomeDialogIfVisible(page: Page) {
+  const welcomeTitle = page.locator("#welcome-dialog-title");
+  const welcomeDialog = page.locator(".modal-backdrop").filter({ has: welcomeTitle }).first();
+
+  const appeared = await welcomeDialog
+    .waitFor({ state: "visible", timeout: 1200 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!appeared) {
+    return;
+  }
+
+  await welcomeDialog.locator("button.button-success").first().click({ force: true });
+  await welcomeDialog.waitFor({ state: "hidden", timeout: 5000 });
+}
+
+async function openMenuInEnglish(page: Page, menuPath: string) {
+  await page.goto(menuPath, { waitUntil: "domcontentloaded" });
+  await dismissWelcomeDialogIfVisible(page);
+  await page.getByRole("button", { name: "EN", exact: true }).click();
+  await dismissWelcomeDialogIfVisible(page);
+  await expect(page.locator(".menu-sections")).toBeVisible();
+}
+
+async function addFirstOrderableItem(page: Page) {
+  const directAdd = page
+    .locator(".menu-card .menu-card__footer button")
+    .filter({ hasText: /^Add$/ })
+    .first();
+
+  if ((await directAdd.count()) > 0) {
+    await directAdd.click();
+    return;
+  }
+
+  const volumeAdd = page
+    .locator(".menu-card__volume-row button")
+    .filter({ hasText: /^Add$/ })
+    .first();
+  await expect(volumeAdd).toBeVisible();
+  await volumeAdd.click();
+}
+
+async function submitOrderFromReviewDialog(page: Page) {
+  const submitButton = page.locator(".cart-submit").first();
+  await expect(submitButton).toBeVisible();
+  await expect(submitButton).toBeEnabled();
+  await submitButton.click({ force: true });
+
+  const reviewDialog = page.locator(".modal-card--review");
+  await expect(reviewDialog).toBeVisible();
+  await reviewDialog.getByRole("button", { name: "OK" }).first().click({ force: true });
+}
+
+async function fetchCounterSettingsSnapshot(
+  request: APIRequestContext,
+  restaurantSlug: string
+): Promise<CounterSettingsSnapshot> {
+  const response = await request.get(
+    `/api/menu-settings?restaurantSlug=${encodeURIComponent(restaurantSlug)}`
+  );
+  expect(response.ok()).toBe(true);
+  const parsed = (await response.json()) as Partial<CounterSettingsSnapshot>;
+
+  return {
+    orderMode: parsed.orderMode === "counter" ? "counter" : "tables",
+    kitchenOpenEnabled: Boolean(parsed.kitchenOpenEnabled),
+    kitchenOpenUntil:
+      typeof parsed.kitchenOpenUntil === "string" ? parsed.kitchenOpenUntil : null,
+    barOpenEnabled: Boolean(parsed.barOpenEnabled),
+    barOpenUntil: typeof parsed.barOpenUntil === "string" ? parsed.barOpenUntil : null,
+    contactRequirement:
+      parsed.contactRequirement === "phone_only" ||
+      parsed.contactRequirement === "name_or_phone"
+        ? parsed.contactRequirement
+        : "none",
+    requireOtp: Boolean(parsed.requireOtp),
+    orderNumberPrefix:
+      typeof parsed.orderNumberPrefix === "string" && parsed.orderNumberPrefix.trim()
+        ? parsed.orderNumberPrefix.trim()
+        : "ORD"
+  };
+}
+
+async function patchCounterSettings(
+  request: APIRequestContext,
+  restaurantSlug: string,
+  updates: Partial<CounterSettingsSnapshot>
+) {
+  const response = await request.patch("/api/menu-settings", {
+    headers: {
+      "Content-Type": "application/json",
+      "x-admin-secondary-login": SECONDARY_LOGIN,
+      "x-admin-secondary-password": SECONDARY_PASSWORD
+    },
+    data: {
+      restaurantSlug,
+      ...updates
+    }
+  });
+
+  expect(response.ok()).toBe(true);
 }
 
 test.describe("Restaurant order scoping", () => {
@@ -319,5 +490,76 @@ test.describe("Restaurant order scoping", () => {
     await page.getByRole("button", { name: /^Download / }).first().click();
     await expect.poll(() => seenArchiveSlugs.length).toBeGreaterThan(0);
     expect(seenArchiveSlugs).toContain("olive-bistro");
+  });
+
+  test("SCOPE-04 counter submit shows short popup number and waiter card shows short + full", async ({
+    page,
+    request
+  }) => {
+    const { restaurantSlug } = parseMenuPath(ORDERING_MENU_PATH);
+    const originalSettings = await fetchCounterSettingsSnapshot(request, restaurantSlug);
+    const kitchenOpenUntil = inFuture(120);
+    const barOpenUntil = inFuture(120);
+
+    try {
+      await patchCounterSettings(request, restaurantSlug, {
+        orderMode: "counter",
+        kitchenOpenEnabled: true,
+        kitchenOpenUntil,
+        barOpenEnabled: true,
+        barOpenUntil,
+        contactRequirement: "none",
+        requireOtp: false,
+        orderNumberPrefix: "BB"
+      });
+
+      await openMenuInEnglish(page, ORDERING_MENU_PATH);
+      await addFirstOrderableItem(page);
+
+      const createdOrderPromise = page.waitForResponse(
+        (response) =>
+          response.url().includes("/api/orders") &&
+          response.request().method() === "POST" &&
+          response.status() === 201
+      );
+
+      await submitOrderFromReviewDialog(page);
+
+      const createdOrderResponse = await createdOrderPromise;
+      const createdOrder = (await createdOrderResponse.json()) as {
+        displayOrderNumber?: string;
+      };
+      expect(typeof createdOrder.displayOrderNumber).toBe("string");
+
+      const fullNumber = createdOrder.displayOrderNumber as string;
+      const shortNumber = getGuestShortNumber(fullNumber);
+
+      const ackDialog = page.locator(".modal-card").filter({
+        hasText: "Your order has been sent"
+      });
+      await expect(ackDialog).toBeVisible();
+      await expect(ackDialog).toContainText(`Order number: ${shortNumber}`);
+      await expect(ackDialog).not.toContainText(fullNumber);
+      await ackDialog.getByRole("button").first().click({ force: true });
+
+      await page.goto(`/${restaurantSlug}/waiter/orders`, {
+        waitUntil: "domcontentloaded"
+      });
+      await expect(page.getByRole("heading", { name: /Counter queue|Incoming orders/i })).toBeVisible();
+      await expect
+        .poll(
+          async () =>
+            page
+              .locator(".order-card .muted")
+              .filter({
+                hasText: `Short: ${shortNumber} · Full: ${fullNumber}`
+              })
+              .count(),
+          { timeout: 15_000 }
+        )
+        .toBeGreaterThan(0);
+    } finally {
+      await patchCounterSettings(request, restaurantSlug, originalSettings);
+    }
   });
 });
