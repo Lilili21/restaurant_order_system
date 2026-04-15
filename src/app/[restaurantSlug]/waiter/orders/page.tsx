@@ -56,6 +56,7 @@ export default async function RestaurantWaiterOrdersPage({
         <OrdersList
           orderMode={settings.orderMode}
           restaurantSlug={restaurant.slug}
+          restaurantId={restaurant.id}
         />
       </main>
     </AdminAccessGate>

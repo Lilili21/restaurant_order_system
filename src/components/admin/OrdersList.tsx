@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   readLocalCache,
@@ -11,6 +11,7 @@ import {
 import { formatCurrency } from "@/lib/menu";
 import { agorotToShekels, shekelsToAgorot } from "@/lib/money";
 import { getStaffShortOrderNumber } from "@/lib/order-number-display";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { RestaurantOrderMode } from "@/lib/menu-settings";
 import { MenuCategory, Order, OrderStatus } from "@/lib/types";
 
@@ -26,6 +27,7 @@ const ORDERS_CACHE_TTL_MS = 30 * 1000;
 const ORDERS_FILTERS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ORDERS_CACHE_KEY = "admin-orders-cache-v1";
 const ORDERS_FILTERS_CACHE_KEY = "admin-orders-filters-v1";
+const REALTIME_RELOAD_DEBOUNCE_MS = 250;
 
 const statusLabels = {
   new: "New",
@@ -304,11 +306,13 @@ function readCachedFilters(): OrdersFiltersCache {
 type OrdersListProps = {
   orderMode?: RestaurantOrderMode;
   restaurantSlug?: string;
+  restaurantId?: string;
 };
 
 export function OrdersList({
   orderMode = "tables",
-  restaurantSlug
+  restaurantSlug,
+  restaurantId
 }: OrdersListProps) {
   const isCounterMode = orderMode === "counter";
   const normalizedRestaurantSlug = useMemo(() => {
@@ -345,6 +349,7 @@ export function OrdersList({
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const loadOrdersRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (!isCounterMode) {
@@ -487,11 +492,13 @@ export function OrdersList({
       void load();
     }
 
+    loadOrdersRef.current = load;
     void load();
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       cancelled = true;
+      loadOrdersRef.current = null;
 
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
@@ -500,6 +507,82 @@ export function OrdersList({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [ordersApiPath]);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      return;
+    }
+
+    let cancelled = false;
+    let debounceId: number | null = null;
+    const scheduleRealtimeReload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (debounceId !== null) {
+        window.clearTimeout(debounceId);
+      }
+
+      debounceId = window.setTimeout(() => {
+        void loadOrdersRef.current?.();
+      }, REALTIME_RELOAD_DEBOUNCE_MS);
+    };
+    const realtimeChannel = supabase
+      .channel(
+        `admin-orders-live-${normalizedRestaurantSlug || "all"}-${Date.now()}`
+      )
+      .on(
+        "postgres_changes",
+        restaurantId
+          ? {
+              event: "*",
+              schema: "public",
+              table: "orders",
+              filter: `restaurant_id=eq.${restaurantId}`
+            }
+          : { event: "*", schema: "public", table: "orders" },
+        scheduleRealtimeReload
+      )
+      .on(
+        "postgres_changes",
+        restaurantId
+          ? {
+              event: "*",
+              schema: "public",
+              table: "order_items",
+              filter: `restaurant_id=eq.${restaurantId}`
+            }
+          : { event: "*", schema: "public", table: "order_items" },
+        scheduleRealtimeReload
+      )
+      .on(
+        "postgres_changes",
+        restaurantId
+          ? {
+              event: "*",
+              schema: "public",
+              table: "service_requests",
+              filter: `restaurant_id=eq.${restaurantId}`
+            }
+          : { event: "*", schema: "public", table: "service_requests" },
+        scheduleRealtimeReload
+      );
+
+    realtimeChannel.subscribe();
+
+    return () => {
+      cancelled = true;
+
+      if (debounceId !== null) {
+        window.clearTimeout(debounceId);
+      }
+
+      void supabase.removeChannel(realtimeChannel);
+    };
+  }, [normalizedRestaurantSlug, restaurantId]);
 
   async function changeStatus(orderId: string, status: OrderStatus) {
     const response = await fetch(ordersApiPath, {

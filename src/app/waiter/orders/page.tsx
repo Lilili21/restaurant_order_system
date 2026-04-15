@@ -3,12 +3,16 @@ import Link from "next/link";
 import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { OrdersList } from "@/components/admin/OrdersList";
 import { getMenuSettings } from "@/lib/menu-settings";
+import { getRestaurantBySlug } from "@/lib/restaurants";
 
 const ADMIN_DEFAULT_RESTAURANT_SLUG =
   process.env.ADMIN_DEFAULT_RESTAURANT_SLUG ?? "olive-bistro";
 
 export default async function WaiterOrdersPage() {
-  const settings = await getMenuSettings(ADMIN_DEFAULT_RESTAURANT_SLUG);
+  const [settings, restaurant] = await Promise.all([
+    getMenuSettings(ADMIN_DEFAULT_RESTAURANT_SLUG),
+    getRestaurantBySlug(ADMIN_DEFAULT_RESTAURANT_SLUG)
+  ]);
   const isCounterMode = settings.orderMode === "counter";
 
   return (
@@ -38,6 +42,7 @@ export default async function WaiterOrdersPage() {
         <OrdersList
           orderMode={settings.orderMode}
           restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+          restaurantId={restaurant?.id}
         />
       </main>
     </AdminAccessGate>
