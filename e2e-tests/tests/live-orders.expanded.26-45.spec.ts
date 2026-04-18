@@ -135,7 +135,7 @@ async function setupOrdersApi(
     }
   };
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       const snapshotIndex = Math.min(
         getOrdersCallCount,
@@ -293,7 +293,7 @@ async function setupTablesApi(
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       await route.fulfill({
         status: 200,
@@ -310,7 +310,7 @@ async function setupTablesApi(
     });
   });
 
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route(/\/api\/tables\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       await route.fulfill({
         status: 200,

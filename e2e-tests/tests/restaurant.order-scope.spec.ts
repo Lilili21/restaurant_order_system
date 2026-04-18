@@ -264,7 +264,7 @@ test.describe("Restaurant order scoping", () => {
 
     const seenGetSlugs: string[] = [];
 
-    await page.route("**/api/orders**", async (route, request) => {
+    await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
       if (request.method() !== "GET") {
         await route.continue();
         return;
@@ -340,7 +340,7 @@ test.describe("Restaurant order scoping", () => {
     };
     const seenPatchSlugs: string[] = [];
 
-    await page.route("**/api/orders**", async (route, request) => {
+    await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
       const url = new URL(request.url());
       const restaurantSlug = (url.searchParams.get("restaurantSlug") ?? "").toLowerCase();
 
@@ -434,7 +434,7 @@ test.describe("Restaurant order scoping", () => {
       });
     });
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
       if (request.method() !== "GET") {
         await route.continue();
         return;
@@ -449,7 +449,7 @@ test.describe("Restaurant order scoping", () => {
       });
     });
 
-    await page.route("**/api/tables", async (route, request) => {
+    await page.route("**/api/tables**", async (route, request) => {
       if (request.method() !== "GET") {
         await route.continue();
         return;

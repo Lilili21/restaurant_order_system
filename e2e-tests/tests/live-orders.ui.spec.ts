@@ -27,7 +27,7 @@ test.describe("Live Orders UI", () => {
       window.sessionStorage.removeItem("admin-orders-cache-v1");
     });
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "GET") {
         await route.continue();
         return;

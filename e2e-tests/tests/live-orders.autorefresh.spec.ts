@@ -33,7 +33,7 @@ test("live orders list refreshes from polling without manual reload", async ({ p
 
   let getOrdersCallCount = 0;
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;

@@ -338,7 +338,7 @@ test.describe("Client menu checks 11-20", () => {
 
     let createOrderPayload: unknown = null;
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;

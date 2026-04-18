@@ -1,9 +1,12 @@
+const path = require("node:path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
   poweredByHeader: false,
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  outputFileTracingRoot: path.join(__dirname),
   async headers() {
     return [
       {

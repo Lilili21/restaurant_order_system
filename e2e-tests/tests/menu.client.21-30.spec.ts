@@ -330,7 +330,7 @@ async function submitOrderViaReviewDialog(page: Page) {
 async function mockOrderPostSuccess(page: Page) {
   let counter = 0;
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route("**/api/orders**", async (route, request) => {
     if (request.method() !== "POST") {
       await route.continue();
       return;
@@ -422,7 +422,7 @@ test.describe("Client menu checks TC-21..TC-24", () => {
   test("TC-22 order payload contains required fields", async ({ page, request }) => {
     let capturedPayload: unknown = null;
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;
@@ -493,7 +493,7 @@ test.describe("Client menu checks TC-21..TC-24", () => {
   test("TC-23 double confirm click does not create duplicate order", async ({ page, request }) => {
     let createOrderCalls = 0;
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;
@@ -546,7 +546,7 @@ test.describe("Client menu checks TC-21..TC-24", () => {
   test("TC-24 user can retry after failed submit", async ({ page, request }) => {
     let createOrderCalls = 0;
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;

@@ -44,7 +44,7 @@ async function setupOrdersApi(
   let getOrdersCallCount = 0;
   const patchPayloads: Array<Record<string, unknown>> = [];
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       const snapshotIndex = Math.min(
         getOrdersCallCount,

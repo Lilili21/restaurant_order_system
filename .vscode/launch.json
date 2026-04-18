@@ -2,7 +2,31 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js: dev server",
+      "name": "E2E: All Tests (Choose local/dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app E2E_USE_WEB_SERVER=false; fi; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:all -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Menu All (Choose local/dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app E2E_USE_WEB_SERVER=false; fi; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:menu-all -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: Local All (Auto WebServer)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && echo \"[E2E] LOCAL MODE: Playwright will auto-start webServer (E2E_USE_WEB_SERVER=true).\" && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=true npm run test:all -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+    },
+    {
+      "name": "E2E: All Tests (LOCAL One Click)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && echo \"[E2E] LOCAL MODE: webServer is NOT auto-started (E2E_USE_WEB_SERVER=false). Start app manually first (npm run dev).\" && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" E2E_BASE_URL=http://127.0.0.1:3010 E2E_USE_WEB_SERVER=false npm run test:all -- --reporter=list,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report; exit $TEST_EXIT"
+    },
+    {
+      "name": "Start Project Locally",
       "type": "node-terminal",
       "request": "launch",
       "command": "npm run dev"
@@ -141,11 +165,23 @@
       "command": "cd e2e-tests && NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report"
     }
   ],
+  "inputs": [
+    {
+      "id": "e2eTarget",
+      "type": "pickString",
+      "description": "Where to run E2E",
+      "options": [
+        "local",
+        "dev"
+      ],
+      "default": "local"
+    }
+  ],
   "compounds": [
     {
       "name": "Run App in VS Code",
       "configurations": [
-        "Next.js: dev server",
+        "Start Project Locally",
         "Open Chrome on localhost:3010"
       ]
     }

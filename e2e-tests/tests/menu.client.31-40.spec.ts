@@ -203,7 +203,7 @@ async function mockTablesSnapshots(page: Page, snapshots: TablesSnapshot[]) {
 async function mockOrderPostSuccess(page: Page) {
   let counter = 0;
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route("**/api/orders**", async (route, request) => {
     if (request.method() !== "POST") {
       await route.continue();
       return;
@@ -301,7 +301,7 @@ test.describe("Client menu checks TC-31..TC-40", () => {
     await mockTablesSnapshots(page, [
       { currentSessionId: 1, submittedOrders: [], activeServiceRequests: [] }
     ]);
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;
@@ -357,7 +357,7 @@ test.describe("Client menu checks TC-31..TC-40", () => {
     await mockTablesSnapshots(page, [
       { currentSessionId: 1, submittedOrders: [], activeServiceRequests: [] }
     ]);
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;
@@ -396,7 +396,7 @@ test.describe("Client menu checks TC-31..TC-40", () => {
     await mockTablesSnapshots(page, [
       { currentSessionId: 1, submittedOrders: [], activeServiceRequests: [] }
     ]);
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;

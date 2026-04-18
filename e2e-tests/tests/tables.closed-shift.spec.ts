@@ -120,7 +120,7 @@ test("closed tables list shows only current shift sessions", async ({ page }) =>
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -141,7 +141,7 @@ test("closed tables list shows only current shift sessions", async ({ page }) =>
     });
   });
 
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route("**/api/tables**", async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -226,7 +226,7 @@ test("closed tables list does not show duplicate cards for the same closed sessi
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -250,7 +250,7 @@ test("closed tables list does not show duplicate cards for the same closed sessi
   const sharedClosedAt = new Date().toISOString();
   const duplicateClosedAt = sharedClosedAt.replace("Z", "+00:00");
 
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route("**/api/tables**", async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -327,7 +327,7 @@ test("tables view keeps existing tables when a polling request fails", async ({ 
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -349,7 +349,7 @@ test("tables view keeps existing tables when a polling request fails", async ({ 
   });
 
   let tablesCalls = 0;
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route("**/api/tables**", async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -458,7 +458,7 @@ test("closed tables list hides empty sessions without order items", async ({ pag
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -481,7 +481,7 @@ test("closed tables list hides empty sessions without order items", async ({ pag
 
   const nowIso = new Date().toISOString();
 
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route("**/api/tables**", async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -587,7 +587,7 @@ test("restaurant tables page requests tables, orders, settings and export strict
     });
   });
 
-  await page.route("**/api/orders", async (route, request) => {
+  await page.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;
@@ -603,7 +603,7 @@ test("restaurant tables page requests tables, orders, settings and export strict
     });
   });
 
-  await page.route("**/api/tables", async (route, request) => {
+  await page.route("**/api/tables**", async (route, request) => {
     if (request.method() !== "GET") {
       await route.continue();
       return;

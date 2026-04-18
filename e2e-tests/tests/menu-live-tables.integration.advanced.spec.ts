@@ -480,7 +480,7 @@ async function attachSharedBackend(
     });
   });
 
-  await context.route("**/api/tables", async (route, request) => {
+  await context.route("**/api/tables**", async (route, request) => {
     if (request.method() === "GET") {
       await route.fulfill({
         status: 200,
@@ -591,7 +591,7 @@ async function attachSharedBackend(
     await route.continue();
   });
 
-  await context.route("**/api/orders", async (route, request) => {
+  await context.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       const activeOrders = store.orders
         .filter((order) => order.status !== "served" && order.status !== "cancelled")

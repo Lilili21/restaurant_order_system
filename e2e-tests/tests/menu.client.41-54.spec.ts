@@ -623,7 +623,7 @@ test.describe("Client menu checks TC-41..TC-54 (core)", () => {
   test("TC-54 localized errors and confirmations are readable", async ({ page, request }) => {
     let waiterCalls = 0;
 
-    await page.route("**/api/orders", async (route, request) => {
+    await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
         await route.continue();
         return;
