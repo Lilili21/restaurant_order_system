@@ -616,20 +616,6 @@ export function TablesOverview({
     };
   }
 
-  async function refreshTablesData() {
-    const response = await fetch(tablesApiPath, {
-      cache: "no-store"
-    });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const nextData = normalizeTablesResponse(await response.json());
-    setData(nextData);
-    return true;
-  }
-
   useEffect(() => {
     writeSessionCache(tablesViewCacheKey, {
       data,
@@ -853,20 +839,16 @@ export function TablesOverview({
     setDialogMessage(
       `Table ${summary.tableNumber} closed. Session #${summary.sessionId}: ${formatCurrency(summary.total)}.${happyHourNote}`
     );
-    const refreshed = await refreshTablesData();
-
-    if (!refreshed) {
-      setData((current) => ({
-        tables: current.tables.filter(
-          (table) =>
-            !(
-              table.restaurantSlug === restaurantSlug &&
-              table.tableNumber === tableNumber
-            )
-        ),
-        closedSessions: [summary, ...current.closedSessions]
-      }));
-    }
+    setData((current) => ({
+      tables: current.tables.filter(
+        (table) =>
+          !(
+            table.restaurantSlug === restaurantSlug &&
+            table.tableNumber === tableNumber
+          )
+      ),
+      closedSessions: dedupeClosedSessions([summary, ...current.closedSessions])
+    }));
   }
 
   async function resolveServiceRequest(orderId: string) {
@@ -963,8 +945,63 @@ export function TablesOverview({
     setDialogMessage(
       `Orders moved from table ${moveAuthTable.tableNumber} to table ${nextTableNumber}.`
     );
+    setData((current) => {
+      const sourceTable = current.tables.find(
+        (table) =>
+          table.restaurantSlug === moveAuthTable.restaurantSlug &&
+          table.tableNumber === moveAuthTable.tableNumber
+      );
 
-    await refreshTablesData();
+      if (!sourceTable) {
+        return current;
+      }
+
+      const tablesWithoutSource = current.tables.filter(
+        (table) =>
+          !(
+            table.restaurantSlug === moveAuthTable.restaurantSlug &&
+            table.tableNumber === moveAuthTable.tableNumber
+          )
+      );
+      const targetIndex = tablesWithoutSource.findIndex(
+        (table) =>
+          table.restaurantSlug === moveAuthTable.restaurantSlug &&
+          table.tableNumber === nextTableNumber
+      );
+
+      if (targetIndex === -1) {
+        return {
+          ...current,
+          tables: [
+            ...tablesWithoutSource,
+            {
+              ...sourceTable,
+              tableNumber: nextTableNumber
+            }
+          ]
+        };
+      }
+
+      const targetTable = tablesWithoutSource[targetIndex];
+      const mergedTable: TableOverview = {
+        ...targetTable,
+        orderCount: targetTable.orderCount + sourceTable.orderCount,
+        total: agorotToShekels(
+          shekelsToAgorot(targetTable.total) + shekelsToAgorot(sourceTable.total)
+        ),
+        statuses: Array.from(
+          new Set([...targetTable.statuses, ...sourceTable.statuses])
+        ),
+        orders: [...targetTable.orders, ...sourceTable.orders]
+      };
+      const nextTables = [...tablesWithoutSource];
+      nextTables[targetIndex] = mergedTable;
+
+      return {
+        ...current,
+        tables: nextTables
+      };
+    });
   }
 
   function sendTableToPos(table: TableOverview) {

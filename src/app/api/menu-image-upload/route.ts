@@ -6,6 +6,7 @@ import { requireAdminAccess } from "@/lib/admin-auth";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 const MENU_IMAGES_BUCKET = process.env.MENU_IMAGES_BUCKET?.trim() || "menu-images";
 

@@ -18,6 +18,7 @@ import type {
 } from "@/lib/menu-settings";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 8;
 
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",

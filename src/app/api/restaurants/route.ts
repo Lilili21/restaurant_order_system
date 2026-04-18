@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRestaurantBySlug, getRestaurants } from "@/lib/restaurants";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 4;
 
 export async function GET(request: NextRequest) {
   const restaurantSlug = (request.nextUrl.searchParams.get("restaurantSlug") ?? "")

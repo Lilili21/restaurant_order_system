@@ -4,6 +4,7 @@ import { requireAdminAccess } from "@/lib/admin-auth";
 import { getRecentSecurityAuditEvents } from "@/lib/security-audit";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 6;
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminAccess(request, "admin");

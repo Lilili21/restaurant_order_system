@@ -11,6 +11,7 @@ import {
 } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 const TABLES_API_DEBUG_ENABLED = ["1", "true", "yes", "on"].includes(
   (process.env.DEBUG_ORDERS_STATE ?? "").toLowerCase()

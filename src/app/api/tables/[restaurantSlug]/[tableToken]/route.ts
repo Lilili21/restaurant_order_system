@@ -7,6 +7,8 @@ import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
 
+export const maxDuration = 6;
+
 type TableRouteProps = {
   params: Promise<{
     restaurantSlug: string;

@@ -10,6 +10,8 @@ import {
 } from "@/lib/admin-auth";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 
+export const maxDuration = 3;
+
 function isScope(value: string | null): value is AdminAuthScope {
   return value === "admin" || value === "secondary";
 }

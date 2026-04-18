@@ -26,6 +26,7 @@ import { auditSecurityEvent } from "@/lib/security-audit";
 import { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

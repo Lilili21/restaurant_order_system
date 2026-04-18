@@ -6,6 +6,7 @@ import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 import { auditSecurityEvent } from "@/lib/security-audit";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 6;
 
 function isValidSlug(value: unknown): value is string {
   return (

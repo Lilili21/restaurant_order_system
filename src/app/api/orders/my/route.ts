@@ -5,6 +5,7 @@ import { getOrdersByGuestToken } from "@/lib/orders";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 6;
 
 function isValidSlug(value: unknown): value is string {
   return (
@@ -66,4 +67,3 @@ export async function GET(request: NextRequest) {
   response.headers.set("Cache-Control", "no-store");
   return response;
 }
-

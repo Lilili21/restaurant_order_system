@@ -11,6 +11,7 @@ import {
 import { MenuBadge, MenuCategory, MenuVolumeOption } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 8;
 
 export async function GET(request: NextRequest) {
   const unauthorized = await requireAdminAccess(request, "secondary");

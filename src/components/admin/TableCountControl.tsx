@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type MenuSettingsResponse = {
   tableCount?: number;
@@ -29,8 +29,20 @@ export function TableCountControl({
   const [selectedTable, setSelectedTable] = useState("1");
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const lastLoadedAtRef = useRef(0);
 
-  async function loadSettings() {
+  const SETTINGS_CACHE_TTL_MS = 30_000;
+
+  async function loadSettings(force = false) {
+    const hasLocalData = Object.keys(tableTokens).length > 0;
+    if (
+      !force &&
+      hasLocalData &&
+      Date.now() - lastLoadedAtRef.current < SETTINGS_CACHE_TTL_MS
+    ) {
+      return true;
+    }
+
     const response = await fetch(
       `/api/menu-settings?restaurantSlug=${encodeURIComponent(
         restaurantSlug
@@ -58,12 +70,13 @@ export function TableCountControl({
 
       return "1";
     });
+    lastLoadedAtRef.current = Date.now();
 
     return true;
   }
 
   useEffect(() => {
-    void loadSettings();
+    void loadSettings(true);
   }, [restaurantSlug]);
 
   async function saveTableCount() {
@@ -104,8 +117,8 @@ export function TableCountControl({
 
       return "1";
     });
+    lastLoadedAtRef.current = Date.now();
     setDialogOpen(false);
-    await loadSettings();
     setSaving(false);
     return true;
   }
@@ -208,7 +221,7 @@ export function TableCountControl({
         onClick={() => {
           onOpen?.();
           setDialogOpen(true);
-          void loadSettings();
+          void loadSettings(false);
         }}
       >
         <span>Tables QR links</span>

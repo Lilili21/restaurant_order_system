@@ -11,6 +11,7 @@ import {
 import type { MenuCategory, Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 const DRINK_CATEGORIES = new Set<MenuCategory>([
   "drinks",
