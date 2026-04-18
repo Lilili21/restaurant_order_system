@@ -89,7 +89,7 @@ Counter mode + captcha (optional):
 FEATURE_COUNTER_MODE_ENABLED=true
 # Leave empty (or use *) to allow all restaurant slugs.
 # Use comma-separated slugs to limit rollout, for example:
-# COUNTER_MODE_ALLOWED_SLUGS=beerabar,olive-bistro
+# COUNTER_MODE_ALLOWED_SLUGS=simuLev,olive-bistro
 COUNTER_MODE_ALLOWED_SLUGS=
 COUNTER_CAPTCHA_ENABLED=true
 COUNTER_CAPTCHA_SECRET=...

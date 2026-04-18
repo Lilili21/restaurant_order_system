@@ -1,8 +1,9 @@
 export const DEFAULT_MENU_IMAGE = "/images/default-menu-item.svg";
-export const BIR_BAR_DEFAULT_MENU_IMAGE = "/images/default-menu-item-beerabar.svg";
+export const SIMULEV_SLUG = "simuLev";
+export const SIMULEV_DEFAULT_MENU_IMAGE = "/images/default-menu-item-simuLev.svg";
 
 function isDefaultMenuImagePath(imagePath: string) {
-  return imagePath === DEFAULT_MENU_IMAGE || imagePath === BIR_BAR_DEFAULT_MENU_IMAGE;
+  return imagePath === DEFAULT_MENU_IMAGE || imagePath === SIMULEV_DEFAULT_MENU_IMAGE;
 }
 
 export function getDefaultMenuImageByRestaurantSlug(
@@ -10,8 +11,8 @@ export function getDefaultMenuImageByRestaurantSlug(
 ) {
   const normalizedSlug = (restaurantSlug ?? "").trim().toLowerCase();
 
-  if (normalizedSlug === "beerabar") {
-    return BIR_BAR_DEFAULT_MENU_IMAGE;
+  if (normalizedSlug === SIMULEV_SLUG.toLowerCase()) {
+    return SIMULEV_DEFAULT_MENU_IMAGE;
   }
 
   return DEFAULT_MENU_IMAGE;

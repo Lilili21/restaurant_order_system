@@ -17,18 +17,18 @@ export const restaurants: Restaurant[] = [
     }))
   },
   {
-    id: "rest_beerabar",
-    slug: "beerabar",
-    name: "BeeraBar",
+    id: "rest_simuLev",
+    slug: "simuLev",
+    name: "SimuLev",
     description: "New restaurant space with QR ordering, ready for setup.",
     currency: "ILS",
     tables: Array.from({ length: 10 }, (_, index) => ({
-      id: `beerabar_table_${index + 1}`,
+      id: `simuLev_table_${index + 1}`,
       number: index + 1,
       seats: index < 6 ? 2 : 4,
       zone: index < 5 ? "Main hall" : "Bar area",
-      accessToken: `beerabar-demo-token-${index + 1}`,
-      qrCodeValue: `/beerabar/menu/beerabar-demo-token-${index + 1}`
+      accessToken: `simuLev-demo-token-${index + 1}`,
+      qrCodeValue: `/simuLev/menu/simuLev-demo-token-${index + 1}`
     }))
   }
 ];

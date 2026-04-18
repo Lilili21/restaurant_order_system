@@ -12,6 +12,7 @@ const SECONDARY_LOGIN =
   process.env.E2E_ADMIN_SECONDARY_LOGIN ?? process.env.ADMIN_SECONDARY_LOGIN ?? "admin";
 const SECONDARY_PASSWORD =
   process.env.E2E_ADMIN_SECONDARY_PASSWORD ?? process.env.ADMIN_SECONDARY_PASSWORD ?? "admin";
+const SIMULEV_SLUG = "simuLev";
 
 type CounterSettingsSnapshot = {
   orderMode: "tables" | "counter";
@@ -240,11 +241,11 @@ test.describe("Restaurant order scoping", () => {
           total: 64
         })
       ],
-      beerabar: [
+      [SIMULEV_SLUG]: [
         createMockOrder({
           id: "beer-order-1",
-          restaurantSlug: "beerabar",
-          restaurantName: "BeeraBar",
+          restaurantSlug: SIMULEV_SLUG,
+          restaurantName: "SimuLev",
           tableNumber: 22,
           items: [
             {
@@ -287,10 +288,10 @@ test.describe("Restaurant order scoping", () => {
     await expect(page.getByRole("heading", { name: /Incoming orders|Counter queue/i })).toBeVisible();
     expect(seenGetSlugs).toContain("olive-bistro");
 
-    await page.goto("/beerabar/waiter/orders");
+    await page.goto(`/${SIMULEV_SLUG}/waiter/orders`);
     await expect(page.getByText("Beer only dish")).toBeVisible();
     await expect(page.getByText("Olive only dish")).toHaveCount(0);
-    expect(seenGetSlugs).toContain("beerabar");
+    expect(seenGetSlugs).toContain(SIMULEV_SLUG.toLowerCase());
   });
 
   test("SCOPE-02 status change is written only inside current restaurant scope", async ({
@@ -317,11 +318,11 @@ test.describe("Restaurant order scoping", () => {
           total: 44
         })
       ],
-      beerabar: [
+      [SIMULEV_SLUG]: [
         createMockOrder({
           id: "beer-order-2",
-          restaurantSlug: "beerabar",
-          restaurantName: "BeeraBar",
+          restaurantSlug: SIMULEV_SLUG,
+          restaurantName: "SimuLev",
           tableNumber: 8,
           items: [
             {
@@ -392,9 +393,9 @@ test.describe("Restaurant order scoping", () => {
     await page.getByRole("button", { name: "Served" }).first().click();
     await expect(page.getByText("Scope patch dish")).toHaveCount(0);
     expect(seenPatchSlugs).toContain("olive-bistro");
-    expect(seenPatchSlugs).not.toContain("beerabar");
+    expect(seenPatchSlugs).not.toContain(SIMULEV_SLUG.toLowerCase());
 
-    await page.goto("/beerabar/waiter/orders");
+    await page.goto(`/${SIMULEV_SLUG}/waiter/orders`);
     await expect(page.getByText("Beer untouched dish")).toBeVisible();
   });
 

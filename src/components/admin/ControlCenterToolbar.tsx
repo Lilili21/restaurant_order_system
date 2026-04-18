@@ -64,11 +64,10 @@ function ControlCenterToolbarComponent({
   onSelectDrinks,
   orderMode = "tables"
 }: Props) {
+  const simuLevSlug = "simuLev";
   const normalizedRestaurantSlug = restaurantSlug.trim().toLowerCase();
-  const isBeerBarRestaurant =
-    normalizedRestaurantSlug === "beerabar" ||
-    normalizedRestaurantSlug === "beerbar";
-  const showLinkToOrderButton = orderMode === "counter" || isBeerBarRestaurant;
+  const isSimuLevRestaurant = normalizedRestaurantSlug === simuLevSlug.toLowerCase();
+  const showLinkToOrderButton = orderMode === "counter" || isSimuLevRestaurant;
   const linkToOrderHref = `/${restaurantSlug}/menu/0`;
 
   function openLinkToOrder() {
