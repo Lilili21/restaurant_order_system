@@ -221,11 +221,33 @@ export async function GET(request: NextRequest) {
   }
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+  if (!isValidSlug(restaurantSlug)) {
+    return NextResponse.json(
+      { message: "restaurantSlug is required" },
+      { status: 400 }
+    );
+  }
   const sessionId = request.nextUrl.searchParams.get("sessionId");
-  const orders = (await getOrders(restaurantSlug ?? undefined)).filter((order) =>
+  const limitRaw = Number.parseInt(request.nextUrl.searchParams.get("limit") ?? "", 10);
+  const offsetRaw = Number.parseInt(request.nextUrl.searchParams.get("offset") ?? "", 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(limitRaw, 500)) : null;
+  const offset = Number.isFinite(offsetRaw) ? Math.max(0, offsetRaw) : 0;
+
+  const filteredOrders = (await getOrders(restaurantSlug)).filter((order) =>
     sessionId ? order.sessionId === Number(sessionId) : true
   );
-  return NextResponse.json(orders);
+  const total = filteredOrders.length;
+  const pagedOrders =
+    limit === null
+      ? filteredOrders
+      : filteredOrders.slice(offset, offset + limit);
+
+  const response = NextResponse.json(pagedOrders);
+  response.headers.set("x-total-count", String(total));
+  response.headers.set("x-offset", String(offset));
+  response.headers.set("x-limit", String(limit ?? total));
+  response.headers.set("x-has-more", String(limit !== null && offset + limit < total));
+  return response;
 }
 
 export async function POST(request: NextRequest) {
@@ -414,7 +436,8 @@ export async function POST(request: NextRequest) {
         clientRequestId,
         guestToken,
         guestContactName,
-        guestContactPhone
+        guestContactPhone,
+        menuSettings
       });
       if (counterModeEnabled) {
         auditSecurityEvent("counter.order_created", {

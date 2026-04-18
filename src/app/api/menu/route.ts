@@ -20,7 +20,18 @@ export async function GET(request: NextRequest) {
   }
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
-  return NextResponse.json(await getAllMenuItems(restaurantSlug ?? undefined));
+  const isValidSlug =
+    typeof restaurantSlug === "string" &&
+    /^[a-z0-9-]+$/.test(restaurantSlug);
+
+  if (!isValidSlug) {
+    return NextResponse.json(
+      { message: "restaurantSlug is required" },
+      { status: 400 }
+    );
+  }
+
+  return NextResponse.json(await getAllMenuItems(restaurantSlug));
 }
 
 export async function PATCH(request: NextRequest) {

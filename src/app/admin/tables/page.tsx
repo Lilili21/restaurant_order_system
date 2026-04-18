@@ -1,45 +1,17 @@
-import Link from "next/link";
-
-import { TablesOverview } from "@/components/admin/TablesOverview";
-import { getMenuSettings } from "@/lib/menu-settings";
+import { TablesPageClient } from "@/components/admin/TablesPageClient";
 
 const ADMIN_DEFAULT_RESTAURANT_SLUG =
   process.env.ADMIN_DEFAULT_RESTAURANT_SLUG ?? "olive-bistro";
+export const revalidate = 300;
 
-export default async function AdminTablesPage() {
-  const settings = await getMenuSettings(ADMIN_DEFAULT_RESTAURANT_SLUG);
-  const isCounterMode = settings.orderMode === "counter";
-
+export default function AdminTablesPage() {
   return (
-    <main className="page-shell">
-      <section className="hero hero--compact">
-        <div>
-          <h1>{isCounterMode ? "Counter mode" : "Orders by table"}</h1>
-        </div>
-        <div className="admin-nav" aria-label="Admin navigation">
-          <div className="admin-switch">
-            <Link href="/admin/orders" className="admin-switch__item">
-              Orders
-            </Link>
-            {!isCounterMode ? (
-              <Link href="/admin/tables" className="admin-switch__item admin-switch__item--active">
-                Tables
-              </Link>
-            ) : null}
-          </div>
-          <Link href="/admin/menu" className="admin-menu-bubble">
-            Menu
-          </Link>
-        </div>
-      </section>
-
-      {isCounterMode ? (
-        <p className="muted">
-          Tables view is disabled in counter mode. Use Orders queue instead.
-        </p>
-      ) : (
-        <TablesOverview restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG} />
-      )}
-    </main>
+    <TablesPageClient
+      restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+      ordersHref="/admin/orders"
+      tablesHref="/admin/tables"
+      menuHref="/admin/menu"
+      navigationLabel="Admin navigation"
+    />
   );
 }

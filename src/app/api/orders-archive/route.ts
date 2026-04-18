@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
 import {
-  getClosedTableSummaries,
   getWeeklyOrdersArchive,
   listWeeklyOrdersArchiveMeta
-} from "@/lib/orders";
+} from "@/lib/orders-archive";
 import type { ClosedTableSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -71,14 +70,17 @@ export async function GET(request: NextRequest) {
   }
 
   if (weekKey) {
+    if (!restaurantSlug) {
+      return NextResponse.json(
+        { message: "restaurantSlug is required" },
+        { status: 400 }
+      );
+    }
+
     const archive = getWeeklyOrdersArchive(weekKey);
 
     if (!archive) {
       return NextResponse.json({ message: "Archive not found" }, { status: 404 });
-    }
-
-    if (!restaurantSlug) {
-      return NextResponse.json(archive);
     }
 
     return NextResponse.json({
@@ -97,6 +99,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!restaurantSlug) {
+      return NextResponse.json(
+        { message: "restaurantSlug is required" },
+        { status: 400 }
+      );
+    }
+
     const archiveMeta = listWeeklyOrdersArchiveMeta();
     const intersectedWeekKeys = archiveMeta
       .filter((archive) => archive.start && archive.end && archive.start <= end && archive.end >= start)
@@ -106,14 +115,11 @@ export async function GET(request: NextRequest) {
       const archive = getWeeklyOrdersArchive(currentWeekKey);
       const summaries = archive?.closedTableSummaries ?? [];
 
-      if (!restaurantSlug) {
-        return summaries;
-      }
-
       return summaries.filter((summary) => summary.restaurantSlug === restaurantSlug);
     });
 
-    const runtimeSummaries = await getClosedTableSummaries(restaurantSlug ?? undefined, {
+    const { getClosedTableSummaries } = await import("@/lib/orders");
+    const runtimeSummaries = await getClosedTableSummaries(restaurantSlug, {
       scope: "all"
     });
     const summariesInRange = [...archiveSummaries, ...runtimeSummaries].filter((summary) => {

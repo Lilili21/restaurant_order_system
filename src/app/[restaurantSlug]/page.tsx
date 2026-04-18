@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { RestaurantLanding } from "@/components/home/RestaurantLanding";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
+export const revalidate = 300;
+
 type RestaurantLandingPageProps = {
   params: Promise<{
     restaurantSlug: string;

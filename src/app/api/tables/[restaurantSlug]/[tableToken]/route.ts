@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  getCurrentTableSessionId,
-  getTableSessionOrders,
-  getTableSessionServiceRequests
+  getTableSessionSnapshot
 } from "@/lib/orders";
 import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
-import { getTableSession } from "@/lib/restaurants";
+import { getRestaurantBySlug } from "@/lib/restaurants";
+import { getAvailableMenuByRestaurant } from "@/lib/menu-store";
 
 type TableRouteProps = {
   params: Promise<{
@@ -17,6 +16,7 @@ type TableRouteProps = {
 
 export async function GET(request: NextRequest, { params }: TableRouteProps) {
   const { restaurantSlug, tableToken } = await params;
+  const includeMenuPayload = request.nextUrl.searchParams.get("includeMenu") === "1";
   const limited = applyRateLimit({
     id: `table-session:${restaurantSlug}:${tableToken}:${getRequestClientId(request)}`,
     maxRequests: 180,
@@ -28,22 +28,22 @@ export async function GET(request: NextRequest, { params }: TableRouteProps) {
     return limited;
   }
 
-  const session = await getTableSession(restaurantSlug, tableToken);
+  const restaurant = await getRestaurantBySlug(restaurantSlug);
+  const table = restaurant?.tables.find((item) => item.accessToken === tableToken);
 
-  if (!session) {
+  if (!restaurant || !table) {
     return NextResponse.json({ message: "Table not found" }, { status: 404 });
   }
 
-  const [currentSessionId, submittedOrders, activeServiceRequests] =
-    await Promise.all([
-      getCurrentTableSessionId(restaurantSlug, session.table.number),
-      getTableSessionOrders(restaurantSlug, session.table.number),
-      getTableSessionServiceRequests(restaurantSlug, session.table.number)
-    ]);
+  const { currentSessionId, submittedOrders, activeServiceRequests } =
+    await getTableSessionSnapshot(restaurantSlug, table.number);
+  const menu = includeMenuPayload
+    ? await getAvailableMenuByRestaurant(restaurantSlug)
+    : undefined;
 
   const response = NextResponse.json({
     currentSessionId,
-    menu: session.menu,
+    ...(menu ? { menu } : {}),
     submittedOrders,
     activeServiceRequests: activeServiceRequests.map((order) => order.kind)
   });

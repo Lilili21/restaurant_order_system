@@ -208,6 +208,10 @@ type NewMenuItemDraft = {
   saving: boolean;
 };
 
+type MenuEditorProps = {
+  onOrderModeChange?: (mode: RestaurantOrderMode) => void;
+};
+
 function formatTimeInputValue(value: string | null | undefined) {
   if (!value) {
     return "";
@@ -667,7 +671,7 @@ function hasInvalidDrinkVolumeRows(value: string) {
   return false;
 }
 
-export function MenuEditor() {
+export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   const pathname = usePathname() ?? "";
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [authOpen, setAuthOpen] = useState(true);
@@ -831,6 +835,10 @@ export function MenuEditor() {
     [pathSegments]
   );
   const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
+  useEffect(() => {
+    onOrderModeChange?.(restaurantOrderMode);
+  }, [onOrderModeChange, restaurantOrderMode]);
+
   const recommendationItemOptions = useMemo(
     () =>
       items.map((item) => ({

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unstable_cache } from "next/cache";
 
 import { Cart } from "@/components/menu/Cart";
 import {
@@ -10,8 +11,27 @@ import {
 import { getMenuSettings } from "@/lib/menu-settings";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 30;
+
+function getCachedPreviewPayload(restaurantSlug: string) {
+  return unstable_cache(
+    async () => {
+      const [menuSettings, restaurant, menu] = await Promise.all([
+        getMenuSettings(restaurantSlug),
+        getRestaurantBySlug(restaurantSlug),
+        getAvailableMenuByRestaurant(restaurantSlug)
+      ]);
+
+      return {
+        menuSettings,
+        restaurant,
+        menu
+      };
+    },
+    [`menu-preview:${restaurantSlug}`],
+    { revalidate: 120 }
+  )();
+}
 
 function parseTime(value: string | null | undefined) {
   if (!value) {
@@ -87,11 +107,8 @@ export default async function MenuPage({ params }: MenuPageProps) {
   if (tableToken === "0") {
     preloadAvailableMenuByRestaurant(restaurantSlug);
 
-    const [menuSettings, restaurant, menu] = await Promise.all([
-      menuSettingsPromise,
-      getRestaurantBySlug(restaurantSlug),
-      getAvailableMenuByRestaurant(restaurantSlug)
-    ]);
+    const { menuSettings, restaurant, menu } =
+      await getCachedPreviewPayload(restaurantSlug);
 
     if (!restaurant) {
       notFound();
@@ -100,6 +117,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
     return (
       <main>
         <Cart
+          restaurantId={restaurant.id}
           restaurantSlug={restaurant.slug}
           restaurantName={restaurant.name}
           tableNumber={0}
@@ -140,6 +158,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
   return (
     <main>
       <Cart
+        restaurantId={session.restaurant.id}
         orderingEnabled={isShiftActiveNow(menuSettings)}
         orderMode={menuSettings.orderMode}
         contactRequirement={menuSettings.contactRequirement}

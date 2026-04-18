@@ -1,41 +1,17 @@
-import Link from "next/link";
-
-import { MenuEditor } from "@/components/admin/MenuEditor";
-import { getMenuSettings } from "@/lib/menu-settings";
+import { MenuPageClient } from "@/components/admin/MenuPageClient";
 
 const ADMIN_DEFAULT_RESTAURANT_SLUG =
   process.env.ADMIN_DEFAULT_RESTAURANT_SLUG ?? "olive-bistro";
+export const revalidate = 300;
 
-export default async function AdminMenuPage() {
-  const settings = await getMenuSettings(ADMIN_DEFAULT_RESTAURANT_SLUG);
-  const isCounterMode = settings.orderMode === "counter";
-
+export default function AdminMenuPage() {
   return (
-    <main className="page-shell">
-      <section className="hero hero--compact">
-        <div>
-          <h1 className="hero-title-stacked control-center-title">
-            <span>Control</span>
-            <span>Center</span>
-          </h1>
-        </div>
-        <div className="admin-nav" aria-label="Admin navigation">
-          <div className="admin-switch">
-            <Link href="/admin/orders" className="admin-switch__item">
-              Orders
-            </Link>
-            {!isCounterMode ? (
-              <Link href="/admin/tables" className="admin-switch__item">
-                Tables
-              </Link>
-            ) : null}
-          </div>
-          <Link href="/admin/menu" className="admin-menu-bubble admin-menu-bubble--active">
-            Menu
-          </Link>
-        </div>
-      </section>
-      <MenuEditor />
-    </main>
+    <MenuPageClient
+      restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+      ordersHref="/admin/orders"
+      tablesHref="/admin/tables"
+      menuHref="/admin/menu"
+      showNavigation
+    />
   );
 }

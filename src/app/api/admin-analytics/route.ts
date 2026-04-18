@@ -649,8 +649,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+    if (!restaurantSlug || !/^[a-z0-9-]+$/.test(restaurantSlug)) {
+      return NextResponse.json(
+        { message: "restaurantSlug is required" },
+        { status: 400 }
+      );
+    }
     const analyticsTimeZone = getRequestTimeZone(request);
-    const settings = await getMenuSettings(restaurantSlug ?? undefined);
+    const settings = await getMenuSettings(restaurantSlug);
     const analyticsDayBounds = getActiveShiftBounds(
       settings.workingHoursRules,
       settings.workingHoursFrom,
@@ -694,9 +700,9 @@ export async function GET(request: NextRequest) {
         : "calendar_day_fallback";
     const [allOrdersResult, closedSessionsResult, tablesResult] =
       await Promise.allSettled([
-        getAllStoredOrders(restaurantSlug ?? undefined),
-        getClosedTableSummaries(restaurantSlug ?? undefined),
-        getTableOverviews(restaurantSlug ?? undefined)
+        getAllStoredOrders(restaurantSlug),
+        getClosedTableSummaries(restaurantSlug),
+        getTableOverviews(restaurantSlug)
       ]);
     const allOrders =
       allOrdersResult.status === "fulfilled" ? allOrdersResult.value : [];

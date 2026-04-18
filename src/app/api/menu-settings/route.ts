@@ -59,10 +59,37 @@ function normalizeOrderNumberPrefix(value: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug") ?? undefined;
-  const settings = await getMenuSettings(restaurantSlug);
+  const requestedFields = new Set(
+    (request.nextUrl.searchParams.get("fields") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
+  const includeTableTokens =
+    request.nextUrl.searchParams.get("includeTableTokens") === "1";
 
-  return NextResponse.json({
+  if (includeTableTokens) {
+    const unauthorized = await requireAdminAccess(request, "secondary");
+
+    if (unauthorized) {
+      return unauthorized;
+    }
+  }
+
+  const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+  const isValidSlug =
+    typeof restaurantSlug === "string" &&
+    /^[a-z0-9-]+$/.test(restaurantSlug);
+
+  if (!isValidSlug) {
+    return NextResponse.json(
+      { message: "restaurantSlug is required" },
+      { status: 400 }
+    );
+  }
+
+  const settings = await getMenuSettings(restaurantSlug);
+  const payload = {
     kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
     workingHoursRules: settings.workingHoursRules,
     workingHoursFrom: settings.workingHoursFrom,
@@ -87,8 +114,17 @@ export async function GET(request: NextRequest) {
     orderNumberPrefix: settings.orderNumberPrefix,
     showGuestOrderHistory: settings.showGuestOrderHistory,
     tableCount: settings.tableCount,
-    tableTokens: settings.tableTokens
-  });
+    ...(includeTableTokens ? { tableTokens: settings.tableTokens } : {})
+  };
+
+  if (requestedFields.size > 0) {
+    const filteredPayload = Object.fromEntries(
+      Object.entries(payload).filter(([key]) => requestedFields.has(key))
+    );
+    return NextResponse.json(filteredPayload);
+  }
+
+  return NextResponse.json(payload);
 }
 
 export async function PATCH(request: NextRequest) {

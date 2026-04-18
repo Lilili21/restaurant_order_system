@@ -1,6 +1,10 @@
 import { randomBytes, createHash } from "node:crypto";
 import { initialOrders } from "@/lib/mock-data";
-import { getMenuSettings, PromotionSettings } from "@/lib/menu-settings";
+import {
+  getMenuSettings,
+  PromotionSettings
+} from "@/lib/menu-settings";
+import type { MenuSettings } from "@/lib/menu-settings";
 import {
   ClosedTableOrderSnapshot,
   CartItem,
@@ -185,9 +189,11 @@ const BUNDLED_ORDERS_ARCHIVE_DIR = path.join(BUNDLED_DATA_DIR, "orders-archive")
 const AUTO_PREPARING_DELAY_MS = 3 * 60 * 1000;
 const SERVICE_REQUEST_AUTO_CLOSE_MS = 10 * 60 * 1000;
 const CLOSED_SUMMARIES_RETENTION_DAYS = 14;
+const CLOSED_SESSIONS_RECONCILE_INTERVAL_MS = 2 * 60 * 1000;
+const CLOSED_SESSIONS_RECONCILE_MAX_WRITES = 25;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
-const ORDERS_STATE_CACHE_TTL_MS = 2_000;
+const ORDERS_STATE_CACHE_TTL_MS = 10_000;
 const MENU_LOOKUP_CACHE_TTL_MS = 60 * 1000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
@@ -251,6 +257,20 @@ type MenuLookupCacheEntry = {
   expiresAt: number;
 };
 
+type PersistSignatureTableCache = {
+  primed: boolean;
+  signatures: Map<string, string>;
+  lastReconcileAt: number;
+  writesSinceReconcile: number;
+};
+
+type OrdersPersistSignatureCache = {
+  orders: PersistSignatureTableCache;
+  orderItems: PersistSignatureTableCache;
+  serviceRequests: PersistSignatureTableCache;
+  closedSessions: PersistSignatureTableCache;
+};
+
 function logOrdersDebug(event: string, payload?: Record<string, unknown>) {
   if (!ORDERS_DEBUG_ENABLED) {
     return;
@@ -265,6 +285,8 @@ function logOrdersDebug(event: string, payload?: Record<string, unknown>) {
 declare global {
   // eslint-disable-next-line no-var
   var __ordersStateCache: OrdersStateCacheEntry | undefined;
+  // eslint-disable-next-line no-var
+  var __ordersStateLoadPromise: Promise<OrdersPersistence> | undefined;
   // eslint-disable-next-line no-var
   var __ordersPersistedPayload: string | undefined;
   // eslint-disable-next-line no-var
@@ -299,10 +321,107 @@ declare global {
         }
       >
     | undefined;
+  // eslint-disable-next-line no-var
+  var __ordersPersistSignatureCache: OrdersPersistSignatureCache | undefined;
 }
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
   return `${restaurantSlug}:${tableNumber}`;
+}
+
+function createPersistSignature(value: unknown) {
+  return JSON.stringify(value);
+}
+
+function createPersistSignatureTableCache(): PersistSignatureTableCache {
+  return {
+    primed: false,
+    signatures: new Map<string, string>(),
+    lastReconcileAt: 0,
+    writesSinceReconcile: 0
+  };
+}
+
+function shouldRunClosedSessionsReconcile(cache: PersistSignatureTableCache) {
+  if (!cache.primed) {
+    return true;
+  }
+
+  const now = Date.now();
+
+  if (now - cache.lastReconcileAt >= CLOSED_SESSIONS_RECONCILE_INTERVAL_MS) {
+    return true;
+  }
+
+  return cache.writesSinceReconcile >= CLOSED_SESSIONS_RECONCILE_MAX_WRITES;
+}
+
+function getOrdersPersistSignatureCache(): OrdersPersistSignatureCache {
+  if (!globalThis.__ordersPersistSignatureCache) {
+    globalThis.__ordersPersistSignatureCache = {
+      orders: createPersistSignatureTableCache(),
+      orderItems: createPersistSignatureTableCache(),
+      serviceRequests: createPersistSignatureTableCache(),
+      closedSessions: createPersistSignatureTableCache()
+    };
+  }
+
+  return globalThis.__ordersPersistSignatureCache;
+}
+
+function buildSignatureMap<Row>(
+  rows: Row[],
+  getId: (row: Row) => string
+) {
+  const signatures = new Map<string, string>();
+
+  for (const row of rows) {
+    signatures.set(getId(row), createPersistSignature(row));
+  }
+
+  return signatures;
+}
+
+function getChangedRows<Row>(
+  rows: Row[],
+  getId: (row: Row) => string,
+  tableCache: PersistSignatureTableCache
+) {
+  const nextSignatures = buildSignatureMap(rows, getId);
+
+  if (!tableCache.primed) {
+    return {
+      rowsToUpsert: rows,
+      staleIdsFromCache: [] as string[],
+      nextSignatures
+    };
+  }
+
+  const rowsToUpsert: Row[] = [];
+
+  for (const row of rows) {
+    const id = getId(row);
+    const nextSignature = nextSignatures.get(id);
+    const previousSignature = tableCache.signatures.get(id);
+
+    if (!nextSignature || nextSignature !== previousSignature) {
+      rowsToUpsert.push(row);
+    }
+  }
+
+  const staleIdsFromCache: string[] = [];
+
+  for (const previousId of tableCache.signatures.keys()) {
+    if (!nextSignatures.has(previousId)) {
+      staleIdsFromCache.push(previousId);
+    }
+  }
+
+  return {
+    rowsToUpsert,
+    staleIdsFromCache,
+    nextSignatures
+  };
 }
 
 function normalizeOrderChannelValue(
@@ -963,11 +1082,20 @@ function createOrderPayloadSignature(
       priceOverride:
         typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
           ? item.priceOverride
-          : null
+          : null,
+      sortKey: [
+        item.menuItemId,
+        item.quantity,
+        item.note?.trim() ?? "",
+        item.volumeOptionId ?? "",
+        item.volumeLabel ?? "",
+        typeof item.priceOverride === "number" && Number.isFinite(item.priceOverride)
+          ? String(item.priceOverride)
+          : ""
+      ].join("|")
     }))
-    .sort((left, right) =>
-      JSON.stringify(left).localeCompare(JSON.stringify(right))
-    );
+    .sort((left, right) => left.sortKey.localeCompare(right.sortKey))
+    .map(({ sortKey: _sortKey, ...item }) => item);
 
   return JSON.stringify({
     serveMode: serveMode ?? "all_at_once",
@@ -2264,9 +2392,19 @@ async function loadStateFromRowSupabase(
     restaurantsResult
   ] = await Promise.all([
     supabase.from("app_state").select("value").eq("key", ORDERS_META_KEY).maybeSingle(),
-    supabase.from("closed_sessions").select("*").order("closed_at", { ascending: false }),
-    supabase.from("restaurant_table_sessions").select("*"),
-    supabase.from("service_requests").select("*").order("created_at", { ascending: false }),
+    supabase
+      .from("closed_sessions")
+      .select(
+        "id, restaurant_id, table_number, session_id, closed_at, total, total_agorot, order_ids, orders_snapshot"
+      )
+      .order("closed_at", { ascending: false }),
+    supabase
+      .from("restaurant_table_sessions")
+      .select("restaurant_id, table_number, current_session_id"),
+    supabase
+      .from("service_requests")
+      .select("id, restaurant_id, table_number, session_id, kind, status, created_at, updated_at")
+      .order("created_at", { ascending: false }),
     supabase.from("restaurants").select("id, slug, name")
   ]);
 
@@ -2303,8 +2441,17 @@ async function loadStateFromRowSupabase(
 
   try {
     const [ordersResult, orderItemsResult] = await Promise.all([
-      supabase.from("orders").select("*").order("created_at", { ascending: false }),
-      supabase.from("order_items").select("*")
+      supabase
+        .from("orders")
+        .select(
+          "id, restaurant_id, table_id, table_number, session_id, kind, serve_mode, status, restaurant_name, order_channel, display_order_number, guest_token_hash, guest_contact_name, guest_contact_phone, created_at, updated_at, total, total_agorot"
+        )
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("order_items")
+        .select(
+          "id, order_id, restaurant_id, menu_item_id, category, name, volume_option_id, volume_label, price, quantity, note, served, created_at, price_agorot"
+        )
     ]);
 
     if (ordersResult.error) {
@@ -2326,8 +2473,17 @@ async function loadStateFromRowSupabase(
     }
 
     const [legacyOrdersResult, legacyOrderItemsResult] = await Promise.all([
-      supabase.from("orders_store").select("*").order("created_at", { ascending: false }),
-      supabase.from("order_items_store").select("*")
+      supabase
+        .from("orders_store")
+        .select(
+          "order_id, restaurant_slug, restaurant_name, table_number, session_id, kind, serve_mode, status, created_at, updated_at, total, total_agorot"
+        )
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("order_items_store")
+        .select(
+          "id, order_id, menu_item_id, category, name, volume_option_id, volume_label, price, price_agorot, quantity, note, served"
+        )
     ]);
 
     if (legacyOrdersResult.error) {
@@ -2436,6 +2592,7 @@ async function persistStateToRowSupabase(
     (order) => order.kind === "waiter_call" || order.kind === "bill_request"
   );
   const orderIds = standardOrders.map((order) => order.id);
+  const orderIdsSet = new Set(orderIds);
   const restaurantRowsResult = await supabase.from("restaurants").select("id, slug, name");
 
   if (restaurantRowsResult.error) {
@@ -2461,6 +2618,7 @@ async function persistStateToRowSupabase(
       ? order.items.map((item) => mapOrderItemToActiveRow(order.id, restaurantId, item))
       : [];
   });
+  const persistSignatureCache = getOrdersPersistSignatureCache();
 
   if (protectedOrderIdsWithMissingItems.size > 0) {
     logOrdersDebug("persistStateToRowSupabase.protected_orders_with_missing_items", {
@@ -2472,6 +2630,8 @@ async function persistStateToRowSupabase(
   try {
     let activeOrderRowsToPersist = [...activeOrderRows];
     let activeOrderItemRowsToPersist = [...activeOrderItemRows];
+    const nextOrderSignatures = buildSignatureMap(activeOrderRowsToPersist, (row) => row.id);
+    const nextOrderItemSignatures = buildSignatureMap(activeOrderItemRowsToPersist, (row) => row.id);
 
     if (orderIds.length === 0) {
       const { error: deleteAllItemsError } = await supabase
@@ -2491,29 +2651,40 @@ async function persistStateToRowSupabase(
       if (deleteAllOrdersError) {
         throw new Error(deleteAllOrdersError.message);
       }
+
+      persistSignatureCache.orders.signatures = new Map();
+      persistSignatureCache.orders.primed = true;
+      persistSignatureCache.orderItems.signatures = new Map();
+      persistSignatureCache.orderItems.primed = true;
     } else {
-      if (activeOrderRowsToPersist.length > 0) {
+      const changedOrderRows = getChangedRows(
+        activeOrderRowsToPersist,
+        (row) => row.id,
+        persistSignatureCache.orders
+      );
+
+      if (changedOrderRows.rowsToUpsert.length > 0) {
         let { error: upsertOrdersError } = await supabase
           .from("orders")
-          .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+          .upsert(changedOrderRows.rowsToUpsert, { onConflict: "id" });
 
         if (upsertOrdersError && isMissingOrderAdvancedColumnError(upsertOrdersError)) {
-          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+          const fallbackRows = changedOrderRows.rowsToUpsert.map(
             toLegacyCompatibleActiveOrderRow
           );
           const retryUpsert = await supabase
             .from("orders")
-            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+            .upsert(fallbackRows, { onConflict: "id" });
           upsertOrdersError = retryUpsert.error;
         }
 
         if (upsertOrdersError && isMissingMoneyColumnError(upsertOrdersError)) {
-          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+          const fallbackRows = changedOrderRows.rowsToUpsert.map(
             toLegacyCompatibleActiveOrderRow
           );
           const retryUpsert = await supabase
             .from("orders")
-            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+            .upsert(fallbackRows, { onConflict: "id" });
           upsertOrdersError = retryUpsert.error;
         }
 
@@ -2521,12 +2692,12 @@ async function persistStateToRowSupabase(
           upsertOrdersError &&
           isInvalidIntegerMoneyInputError(upsertOrdersError)
         ) {
-          activeOrderRowsToPersist = activeOrderRowsToPersist.map(
+          const fallbackRows = changedOrderRows.rowsToUpsert.map(
             toIntegerCompatibleActiveOrderRow
           );
           const retryUpsert = await supabase
             .from("orders")
-            .upsert(activeOrderRowsToPersist, { onConflict: "id" });
+            .upsert(fallbackRows, { onConflict: "id" });
           upsertOrdersError = retryUpsert.error;
         }
 
@@ -2535,17 +2706,23 @@ async function persistStateToRowSupabase(
         }
       }
 
-      const { data: existingRows, error: existingRowsError } = await supabase
-        .from("orders")
-        .select("id");
+      let staleIds = persistSignatureCache.orders.primed
+        ? [...persistSignatureCache.orders.signatures.keys()].filter((id) => !orderIdsSet.has(id))
+        : [];
 
-      if (existingRowsError) {
-        throw new Error(existingRowsError.message);
+      if (!persistSignatureCache.orders.primed) {
+        const { data: existingRows, error: existingRowsError } = await supabase
+          .from("orders")
+          .select("id");
+
+        if (existingRowsError) {
+          throw new Error(existingRowsError.message);
+        }
+
+        staleIds = (existingRows ?? [])
+          .map((row) => String((row as { id: string }).id))
+          .filter((id) => !orderIdsSet.has(id));
       }
-
-      const staleIds = (existingRows ?? [])
-        .map((row) => String((row as { id: string }).id))
-        .filter((id) => !orderIds.includes(id));
 
       if (staleIds.length > 0) {
         const { error: deleteStaleOrdersError } = await supabase
@@ -2558,18 +2735,24 @@ async function persistStateToRowSupabase(
         }
       }
 
-      if (activeOrderItemRowsToPersist.length > 0) {
+      const changedOrderItems = getChangedRows(
+        activeOrderItemRowsToPersist,
+        (row) => row.id,
+        persistSignatureCache.orderItems
+      );
+
+      if (changedOrderItems.rowsToUpsert.length > 0) {
         let { error: upsertItemsError } = await supabase
           .from("order_items")
-          .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+          .upsert(changedOrderItems.rowsToUpsert, { onConflict: "id" });
 
         if (upsertItemsError && isMissingMoneyColumnError(upsertItemsError)) {
-          activeOrderItemRowsToPersist = activeOrderItemRowsToPersist.map(
+          const fallbackRows = changedOrderItems.rowsToUpsert.map(
             toLegacyCompatibleActiveOrderItemRow
           );
           const retryUpsert = await supabase
             .from("order_items")
-            .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+            .upsert(fallbackRows, { onConflict: "id" });
           upsertItemsError = retryUpsert.error;
         }
 
@@ -2577,12 +2760,12 @@ async function persistStateToRowSupabase(
           upsertItemsError &&
           isInvalidIntegerMoneyInputError(upsertItemsError)
         ) {
-          activeOrderItemRowsToPersist = activeOrderItemRowsToPersist.map(
+          const fallbackRows = changedOrderItems.rowsToUpsert.map(
             toIntegerCompatibleActiveOrderItemRow
           );
           const retryUpsert = await supabase
             .from("order_items")
-            .upsert(activeOrderItemRowsToPersist, { onConflict: "id" });
+            .upsert(fallbackRows, { onConflict: "id" });
           upsertItemsError = retryUpsert.error;
         }
 
@@ -2591,27 +2774,39 @@ async function persistStateToRowSupabase(
         }
       }
 
-      const { data: existingItemRows, error: existingItemRowsError } = await supabase
-        .from("order_items")
-        .select("id, order_id")
-        .in("order_id", orderIds);
+      const canUseOrderItemCacheForDelete =
+        persistSignatureCache.orderItems.primed &&
+        protectedOrderIdsWithMissingItems.size === 0;
+      const staleItemIdsFromCache = canUseOrderItemCacheForDelete
+        ? [...persistSignatureCache.orderItems.signatures.keys()].filter(
+            (id) => !nextOrderItemSignatures.has(id)
+          )
+        : [];
+      let staleItemIds = staleItemIdsFromCache;
 
-      if (existingItemRowsError) {
-        throw new Error(existingItemRowsError.message);
+      if (!canUseOrderItemCacheForDelete) {
+        const { data: existingItemRows, error: existingItemRowsError } = await supabase
+          .from("order_items")
+          .select("id, order_id")
+          .in("order_id", orderIds);
+
+        if (existingItemRowsError) {
+          throw new Error(existingItemRowsError.message);
+        }
+
+        const currentItemIds = new Set(activeOrderItemRowsToPersist.map((row) => row.id));
+        staleItemIds = (existingItemRows ?? [])
+          .map((row) => ({
+            id: String((row as { id: string }).id),
+            orderId: String((row as { order_id: string }).order_id)
+          }))
+          .filter(
+            (row) =>
+              !currentItemIds.has(row.id) &&
+              !protectedOrderIdsWithMissingItems.has(row.orderId)
+          )
+          .map((row) => row.id);
       }
-
-      const currentItemIds = new Set(activeOrderItemRowsToPersist.map((row) => row.id));
-      const staleItemIds = (existingItemRows ?? [])
-        .map((row) => ({
-          id: String((row as { id: string }).id),
-          orderId: String((row as { order_id: string }).order_id)
-        }))
-        .filter(
-          (row) =>
-            !currentItemIds.has(row.id) &&
-            !protectedOrderIdsWithMissingItems.has(row.orderId)
-        )
-        .map((row) => row.id);
 
       if (staleItemIds.length > 0) {
         const { error: deleteStaleItemsError } = await supabase
@@ -2623,6 +2818,11 @@ async function persistStateToRowSupabase(
           throw new Error(deleteStaleItemsError.message);
         }
       }
+
+      persistSignatureCache.orders.signatures = nextOrderSignatures;
+      persistSignatureCache.orders.primed = true;
+      persistSignatureCache.orderItems.signatures = nextOrderItemSignatures;
+      persistSignatureCache.orderItems.primed = true;
     }
   } catch (error) {
     if (!isMissingTableError(error)) {
@@ -2692,7 +2892,7 @@ async function persistStateToRowSupabase(
 
       const staleIds = (existingRows ?? [])
         .map((row) => String((row as { order_id: string }).order_id))
-        .filter((id) => !orderIds.includes(id));
+        .filter((id) => !orderIdsSet.has(id));
 
       if (staleIds.length > 0) {
         const { error: deleteStaleOrdersError } = await supabase
@@ -2778,7 +2978,8 @@ async function persistStateToRowSupabase(
       const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
       return restaurantId ? mapServiceRequestToRow(order, restaurantId) : null;
     })
-    .filter(Boolean);
+    .filter((row): row is ServiceRequestRow => Boolean(row));
+  const nextServiceRequestSignatures = buildSignatureMap(serviceRequestRows, (row) => row.id);
 
   try {
     if (serviceRequestRows.length === 0) {
@@ -2793,10 +2994,24 @@ async function persistStateToRowSupabase(
       ) {
         throw new Error(deleteServiceRequestsError.message);
       }
+
+      persistSignatureCache.serviceRequests.signatures = new Map();
+      persistSignatureCache.serviceRequests.primed = true;
     } else {
-      const { error: upsertServiceRequestsError } = await supabase
-        .from("service_requests")
-        .upsert(serviceRequestRows, { onConflict: "id" });
+      const changedServiceRequests = getChangedRows(
+        serviceRequestRows,
+        (row) => row.id,
+        persistSignatureCache.serviceRequests
+      );
+
+      let upsertServiceRequestsError: { message: string } | null = null;
+
+      if (changedServiceRequests.rowsToUpsert.length > 0) {
+        const upsertResult = await supabase
+          .from("service_requests")
+          .upsert(changedServiceRequests.rowsToUpsert, { onConflict: "id" });
+        upsertServiceRequestsError = upsertResult.error;
+      }
 
       if (
         upsertServiceRequestsError &&
@@ -2805,20 +3020,28 @@ async function persistStateToRowSupabase(
         throw new Error(upsertServiceRequestsError.message);
       }
 
-      const { data: existingServiceRequestRows, error: existingServiceRequestsError } =
-        await supabase.from("service_requests").select("id");
+      let staleServiceRequestIds = persistSignatureCache.serviceRequests.primed
+        ? [...persistSignatureCache.serviceRequests.signatures.keys()].filter(
+            (id) => !nextServiceRequestSignatures.has(id)
+          )
+        : [];
 
-      if (
-        existingServiceRequestsError &&
-        !isMissingTableError(existingServiceRequestsError.message)
-      ) {
-        throw new Error(existingServiceRequestsError.message);
+      if (!persistSignatureCache.serviceRequests.primed) {
+        const { data: existingServiceRequestRows, error: existingServiceRequestsError } =
+          await supabase.from("service_requests").select("id");
+
+        if (
+          existingServiceRequestsError &&
+          !isMissingTableError(existingServiceRequestsError.message)
+        ) {
+          throw new Error(existingServiceRequestsError.message);
+        }
+
+        const currentServiceRequestIdsSet = new Set(serviceRequestRows.map((row) => row.id));
+        staleServiceRequestIds = (existingServiceRequestRows ?? [])
+          .map((row) => String((row as { id: string }).id))
+          .filter((id) => !currentServiceRequestIdsSet.has(id));
       }
-
-      const currentServiceRequestIds = serviceRequestRows.map((row) => row!.id);
-      const staleServiceRequestIds = (existingServiceRequestRows ?? [])
-        .map((row) => String((row as { id: string }).id))
-        .filter((id) => !currentServiceRequestIds.includes(id));
 
       if (staleServiceRequestIds.length > 0) {
         const { error: deleteStaleServiceRequestsError } = await supabase
@@ -2833,6 +3056,9 @@ async function persistStateToRowSupabase(
           throw new Error(deleteStaleServiceRequestsError.message);
         }
       }
+
+      persistSignatureCache.serviceRequests.signatures = nextServiceRequestSignatures;
+      persistSignatureCache.serviceRequests.primed = true;
     }
   } catch (error) {
     if (!isMissingTableError(error)) {
@@ -2847,27 +3073,41 @@ async function persistStateToRowSupabase(
     const closedAtTs = new Date(summary.closedAt).getTime();
     return Number.isFinite(closedAtTs) && closedAtTs >= retentionCutoffTs;
   });
-  const { data: existingClosedSessionRowsData, error: existingClosedSessionsError } =
-    await supabase.from("closed_sessions").select("*");
+  let existingClosedSessionRowsData: ClosedSessionRow[] = [];
+  const shouldReconcileClosedSessions = shouldRunClosedSessionsReconcile(
+    persistSignatureCache.closedSessions
+  );
 
-  if (existingClosedSessionsError) {
-    throw new Error(existingClosedSessionsError.message);
+  if (shouldReconcileClosedSessions) {
+    const { data: existingClosedSessionsData, error: existingClosedSessionsError } =
+      await supabase
+        .from("closed_sessions")
+        .select(
+          "id, restaurant_id, table_number, session_id, closed_at, total, total_agorot, order_ids, orders_snapshot"
+        );
+
+    if (existingClosedSessionsError) {
+      throw new Error(existingClosedSessionsError.message);
+    }
+
+    existingClosedSessionRowsData = (existingClosedSessionsData ?? []) as ClosedSessionRow[];
   }
 
-  const existingClosedSummaries = mapClosedSessionRowsToSummaries(
-    (existingClosedSessionRowsData ?? []) as ClosedSessionRow[],
-    restaurantLookup
-  );
-  const mergedClosedSummaries = mergeClosedTableSummaries(
-    existingClosedSummaries,
-    retainedStateClosedSummaries
-  );
+  const existingClosedSummaries = shouldReconcileClosedSessions
+    ? mapClosedSessionRowsToSummaries(existingClosedSessionRowsData, restaurantLookup)
+    : [];
+  const mergedClosedSummaries = shouldReconcileClosedSessions
+    ? mergeClosedTableSummaries(existingClosedSummaries, retainedStateClosedSummaries)
+    : retainedStateClosedSummaries;
   state.closedTableSummaries = mergedClosedSummaries;
 
   logOrdersDebug("persistStateToRowSupabase.closed_merge", {
+    shouldReconcileClosedSessions,
+    closedReconcileWritesSinceLast:
+      persistSignatureCache.closedSessions.writesSinceReconcile,
     stateClosedSummariesBeforeMerge,
     retainedStateClosedSummariesCount: retainedStateClosedSummaries.length,
-    existingClosedSessionRowsCount: (existingClosedSessionRowsData ?? []).length,
+    existingClosedSessionRowsCount: existingClosedSessionRowsData.length,
     mergedClosedSummariesCount: mergedClosedSummaries.length
   });
 
@@ -2877,6 +3117,13 @@ async function persistStateToRowSupabase(
       return restaurantId ? mapClosedSummaryToRow(summary, restaurantId) : null;
     })
     .filter((row): row is ClosedSessionRow => Boolean(row));
+
+  const changedClosedSessions = getChangedRows(
+    closedSessionRows,
+    (row) => row.id,
+    persistSignatureCache.closedSessions
+  );
+  const nextClosedSessionSignatures = buildSignatureMap(closedSessionRows, (row) => row.id);
 
   if (closedSessionRows.length === 0) {
     if (mergedClosedSummaries.length === 0) {
@@ -2892,20 +3139,30 @@ async function persistStateToRowSupabase(
       logOrdersDebug("persistStateToRowSupabase.closed_delete_all", {
         reason: "merged_closed_summaries_empty"
       });
+
+      persistSignatureCache.closedSessions.signatures = new Map();
+      persistSignatureCache.closedSessions.primed = true;
     }
   } else {
-    let { error: upsertClosedSessionsError } = await supabase
-      .from("closed_sessions")
-      .upsert(closedSessionRows, { onConflict: "id" });
+    let upsertClosedSessionsError: { message: string } | null = null;
+
+    if (changedClosedSessions.rowsToUpsert.length > 0) {
+      const upsertResult = await supabase
+        .from("closed_sessions")
+        .upsert(changedClosedSessions.rowsToUpsert, { onConflict: "id" });
+      upsertClosedSessionsError = upsertResult.error;
+    }
 
     if (
       upsertClosedSessionsError &&
       isMissingMoneyColumnError(upsertClosedSessionsError)
     ) {
-      closedSessionRows = closedSessionRows.map(toLegacyCompatibleClosedSessionRow);
+      const fallbackRows = changedClosedSessions.rowsToUpsert.map(
+        toLegacyCompatibleClosedSessionRow
+      );
       const retryUpsert = await supabase
         .from("closed_sessions")
-        .upsert(closedSessionRows, { onConflict: "id" });
+        .upsert(fallbackRows, { onConflict: "id" });
       upsertClosedSessionsError = retryUpsert.error;
     }
 
@@ -2913,10 +3170,12 @@ async function persistStateToRowSupabase(
       upsertClosedSessionsError &&
       isInvalidIntegerMoneyInputError(upsertClosedSessionsError)
     ) {
-      closedSessionRows = closedSessionRows.map(toIntegerCompatibleClosedSessionRow);
+      const fallbackRows = changedClosedSessions.rowsToUpsert.map(
+        toIntegerCompatibleClosedSessionRow
+      );
       const retryUpsert = await supabase
         .from("closed_sessions")
-        .upsert(closedSessionRows, { onConflict: "id" });
+        .upsert(fallbackRows, { onConflict: "id" });
       upsertClosedSessionsError = retryUpsert.error;
     }
 
@@ -2924,10 +3183,13 @@ async function persistStateToRowSupabase(
       throw new Error(upsertClosedSessionsError.message);
     }
 
-    const currentClosedSessionIds = closedSessionRows.map((row) => row.id);
-    const staleClosedSessionIds = ((existingClosedSessionRowsData ?? []) as Array<{ id: string }>)
-      .map((row) => String((row as { id: string }).id))
-      .filter((id) => !currentClosedSessionIds.includes(id));
+    let staleClosedSessionIds = persistSignatureCache.closedSessions.primed
+      ? [...persistSignatureCache.closedSessions.signatures.keys()].filter(
+          (id) => !nextClosedSessionSignatures.has(id)
+        )
+      : existingClosedSessionRowsData
+          .map((row) => String(row.id))
+          .filter((id) => !nextClosedSessionSignatures.has(id));
 
     if (staleClosedSessionIds.length > 0) {
       const { error: deleteStaleClosedSessionsError } = await supabase
@@ -2944,6 +3206,16 @@ async function persistStateToRowSupabase(
         upsertedClosedSessionRowsCount: closedSessionRows.length
       });
     }
+
+    persistSignatureCache.closedSessions.signatures = nextClosedSessionSignatures;
+    persistSignatureCache.closedSessions.primed = true;
+  }
+
+  if (shouldReconcileClosedSessions) {
+    persistSignatureCache.closedSessions.lastReconcileAt = Date.now();
+    persistSignatureCache.closedSessions.writesSinceReconcile = 0;
+  } else {
+    persistSignatureCache.closedSessions.writesSinceReconcile += 1;
   }
 
   const tableSessionRows = [...state.currentTableSessions.entries()]
@@ -3029,69 +3301,17 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
     return cloneOrdersPersistence(cached.state);
   }
 
-  const supabase = getSupabaseAdminClient();
-
-  if (!supabase) {
-    const localState = loadState();
-    logOrdersDebug("loadStateAsync.local_no_supabase", {
-      ordersCount: localState.orders.length,
-      closedSummariesCount: localState.closedTableSummaries.length,
-      tableSessionsCount: localState.currentTableSessions.length
-    });
-    setOrdersStateCache(localState);
-    return cloneOrdersPersistence(localState);
+  if (globalThis.__ordersStateLoadPromise) {
+    const inflightState = await globalThis.__ordersStateLoadPromise;
+    return cloneOrdersPersistence(inflightState);
   }
 
-  try {
-    const normalizedState = await loadStateFromRowSupabase(supabase);
+  globalThis.__ordersStateLoadPromise = (async () => {
+    const supabase = getSupabaseAdminClient();
 
-    if (normalizedState.orders.length === 0) {
-      try {
-        const legacyState = await loadStateFromLegacySupabase(supabase);
-        if (legacyState.orders.length > 0) {
-          try {
-            await persistStateToRowSupabase(supabase, toRuntimeState(legacyState));
-          } catch {
-            // ignore migration failures, keep serving legacy state
-          }
-          logOrdersDebug("loadStateAsync.legacy_fallback_after_empty_row_state", {
-            rowOrdersCount: normalizedState.orders.length,
-            rowClosedSummariesCount: normalizedState.closedTableSummaries.length,
-            legacyOrdersCount: legacyState.orders.length,
-            legacyClosedSummariesCount: legacyState.closedTableSummaries.length
-          });
-          setOrdersStateCache(legacyState);
-          return cloneOrdersPersistence(legacyState);
-        }
-      } catch {
-        // ignore and keep row-based state
-      }
-    }
-
-    logOrdersDebug("loadStateAsync.row_state", {
-      ordersCount: normalizedState.orders.length,
-      closedSummariesCount: normalizedState.closedTableSummaries.length,
-      tableSessionsCount: normalizedState.currentTableSessions.length
-    });
-    setOrdersStateCache(normalizedState);
-    return cloneOrdersPersistence(normalizedState);
-  } catch (rowLoadError) {
-    logOrdersDebug("loadStateAsync.row_state_error", {
-      message: rowLoadError instanceof Error ? rowLoadError.message : String(rowLoadError)
-    });
-
-    try {
-      const legacyState = await loadStateFromLegacySupabase(supabase);
-      logOrdersDebug("loadStateAsync.legacy_state", {
-        ordersCount: legacyState.orders.length,
-        closedSummariesCount: legacyState.closedTableSummaries.length,
-        tableSessionsCount: legacyState.currentTableSessions.length
-      });
-      setOrdersStateCache(legacyState);
-      return cloneOrdersPersistence(legacyState);
-    } catch {
+    if (!supabase) {
       const localState = loadState();
-      logOrdersDebug("loadStateAsync.local_fallback_after_legacy_error", {
+      logOrdersDebug("loadStateAsync.local_no_supabase", {
         ordersCount: localState.orders.length,
         closedSummariesCount: localState.closedTableSummaries.length,
         tableSessionsCount: localState.currentTableSessions.length
@@ -3099,6 +3319,72 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
       setOrdersStateCache(localState);
       return cloneOrdersPersistence(localState);
     }
+
+    try {
+      const normalizedState = await loadStateFromRowSupabase(supabase);
+
+      if (normalizedState.orders.length === 0) {
+        try {
+          const legacyState = await loadStateFromLegacySupabase(supabase);
+          if (legacyState.orders.length > 0) {
+            try {
+              await persistStateToRowSupabase(supabase, toRuntimeState(legacyState));
+            } catch {
+              // ignore migration failures, keep serving legacy state
+            }
+            logOrdersDebug("loadStateAsync.legacy_fallback_after_empty_row_state", {
+              rowOrdersCount: normalizedState.orders.length,
+              rowClosedSummariesCount: normalizedState.closedTableSummaries.length,
+              legacyOrdersCount: legacyState.orders.length,
+              legacyClosedSummariesCount: legacyState.closedTableSummaries.length
+            });
+            setOrdersStateCache(legacyState);
+            return cloneOrdersPersistence(legacyState);
+          }
+        } catch {
+          // ignore and keep row-based state
+        }
+      }
+
+      logOrdersDebug("loadStateAsync.row_state", {
+        ordersCount: normalizedState.orders.length,
+        closedSummariesCount: normalizedState.closedTableSummaries.length,
+        tableSessionsCount: normalizedState.currentTableSessions.length
+      });
+      setOrdersStateCache(normalizedState);
+      return cloneOrdersPersistence(normalizedState);
+    } catch (rowLoadError) {
+      logOrdersDebug("loadStateAsync.row_state_error", {
+        message: rowLoadError instanceof Error ? rowLoadError.message : String(rowLoadError)
+      });
+
+      try {
+        const legacyState = await loadStateFromLegacySupabase(supabase);
+        logOrdersDebug("loadStateAsync.legacy_state", {
+          ordersCount: legacyState.orders.length,
+          closedSummariesCount: legacyState.closedTableSummaries.length,
+          tableSessionsCount: legacyState.currentTableSessions.length
+        });
+        setOrdersStateCache(legacyState);
+        return cloneOrdersPersistence(legacyState);
+      } catch {
+        const localState = loadState();
+        logOrdersDebug("loadStateAsync.local_fallback_after_legacy_error", {
+          ordersCount: localState.orders.length,
+          closedSummariesCount: localState.closedTableSummaries.length,
+          tableSessionsCount: localState.currentTableSessions.length
+        });
+        setOrdersStateCache(localState);
+        return cloneOrdersPersistence(localState);
+      }
+    }
+  })();
+
+  try {
+    const loadedState = await globalThis.__ordersStateLoadPromise;
+    return cloneOrdersPersistence(loadedState);
+  } finally {
+    globalThis.__ordersStateLoadPromise = undefined;
   }
 }
 
@@ -3627,31 +3913,19 @@ export async function getTableSessionOrders(
   restaurantSlug: string,
   tableNumber: number
 ) {
-  const state = await readRuntimeStateAsync();
-  const { sessionId, created } = ensureCurrentSessionId(
-    state,
-    restaurantSlug,
-    tableNumber
-  );
-
-  if (created) {
-    await persistStateAsync(state);
-  }
-
-  return state.ordersStore
-    .filter(
-      (order) =>
-        order.restaurantSlug === restaurantSlug &&
-        order.tableNumber === tableNumber &&
-        order.sessionId === sessionId &&
-        order.status !== "cancelled" &&
-        order.kind !== "waiter_call" &&
-        order.kind !== "bill_request"
-    )
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const snapshot = await getTableSessionSnapshot(restaurantSlug, tableNumber);
+  return snapshot.submittedOrders;
 }
 
 export async function getTableSessionServiceRequests(
+  restaurantSlug: string,
+  tableNumber: number
+) {
+  const snapshot = await getTableSessionSnapshot(restaurantSlug, tableNumber);
+  return snapshot.activeServiceRequests;
+}
+
+export async function getTableSessionSnapshot(
   restaurantSlug: string,
   tableNumber: number
 ) {
@@ -3666,17 +3940,37 @@ export async function getTableSessionServiceRequests(
     await persistStateAsync(state);
   }
 
-  return state.ordersStore
-    .filter(
-      (order) =>
-        order.restaurantSlug === restaurantSlug &&
-        order.tableNumber === tableNumber &&
-        order.sessionId === sessionId &&
-        order.status !== "cancelled" &&
-        order.status !== "served" &&
-        (order.kind === "waiter_call" || order.kind === "bill_request")
-    )
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const submittedOrders: Order[] = [];
+  const activeServiceRequests: Order[] = [];
+
+  for (const order of state.ordersStore) {
+    if (
+      order.restaurantSlug !== restaurantSlug ||
+      order.tableNumber !== tableNumber ||
+      order.sessionId !== sessionId ||
+      order.status === "cancelled"
+    ) {
+      continue;
+    }
+
+    if (order.kind === "waiter_call" || order.kind === "bill_request") {
+      if (order.status !== "served") {
+        activeServiceRequests.push(order);
+      }
+      continue;
+    }
+
+    submittedOrders.push(order);
+  }
+
+  submittedOrders.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  activeServiceRequests.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+  return {
+    currentSessionId: sessionId,
+    submittedOrders,
+    activeServiceRequests
+  };
 }
 
 export async function createOrder(input: {
@@ -3689,10 +3983,11 @@ export async function createOrder(input: {
   guestToken?: string;
   guestContactName?: string;
   guestContactPhone?: string;
+  menuSettings?: MenuSettings;
 }) {
   const state = await readRuntimeStateAsync();
   const restaurant = await getRestaurantBySlug(input.restaurantSlug);
-  const menuSettings = await getMenuSettings(input.restaurantSlug);
+  const menuSettings = input.menuSettings ?? (await getMenuSettings(input.restaurantSlug));
   const guestToken = normalizeGuestTokenValue(input.guestToken);
   const guestTokenHash = guestToken ? hashGuestToken(guestToken) : undefined;
   const requestedOrderChannel = normalizeOrderChannelValue(
@@ -4461,8 +4756,9 @@ export async function moveTableOrders(
     throw new Error("There are no active orders on this table to move.");
   }
 
+  const movableOrderIds = new Set(movableOrders.map((order) => order.id));
   state.ordersStore = state.ordersStore.map((order) =>
-    movableOrders.some((item) => item.id === order.id)
+    movableOrderIds.has(order.id)
       ? {
           ...order,
           tableNumber: toTableNumber,

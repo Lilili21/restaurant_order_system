@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { readSessionCache, writeSessionCache } from "@/lib/client-cache";
 import { formatCurrency } from "@/lib/menu";
@@ -17,6 +17,7 @@ import {
   Order,
   TableOverview
 } from "@/lib/types";
+import type { RestaurantOrderMode } from "@/lib/menu-settings";
 
 type TablesResponse = {
   tables: TableOverview[];
@@ -42,6 +43,7 @@ type MenuSettingsResponse = {
   happyHourStartsFrom?: string | null;
   happyHourUntil?: string | null;
   workingHoursFrom?: string | null;
+  orderMode?: RestaurantOrderMode | string;
 };
 
 type SessionItemSummary = {
@@ -95,6 +97,7 @@ const TABLES_VIEW_CACHE_TTL_MS = 30 * 1000;
 const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
 const TABLES_ACTIVE_POLL_MS = 4_000;
 const TABLES_HIDDEN_POLL_MS = 12_000;
+const TABLES_MENU_SETTINGS_POLL_MS = 30_000;
 const TABLES_REQUEST_TIMEOUT_MS = 8_000;
 
 type MonthlyExportRange = {
@@ -105,7 +108,8 @@ type MonthlyExportRange = {
 };
 
 type TablesOverviewProps = {
-  restaurantSlug?: string;
+  restaurantSlug: string;
+  onOrderModeChange?: (mode: RestaurantOrderMode) => void;
 };
 
 function buildTablesViewCacheKey(restaurantSlug: string) {
@@ -516,25 +520,22 @@ function hasRenderableClosedSessionItems(session: ClosedTableSummary) {
   );
 }
 
-export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
-  const normalizedRestaurantSlug = useMemo(() => {
-    if (typeof restaurantSlug !== "string") {
-      return "";
-    }
-
-    return restaurantSlug.trim().toLowerCase();
-  }, [restaurantSlug]);
+export function TablesOverview({
+  restaurantSlug,
+  onOrderModeChange
+}: TablesOverviewProps) {
+  const normalizedRestaurantSlug = useMemo(
+    () => restaurantSlug.trim().toLowerCase(),
+    [restaurantSlug]
+  );
   const querySuffix = useMemo(() => {
-    if (!normalizedRestaurantSlug) {
-      return "";
-    }
-
     return `?restaurantSlug=${encodeURIComponent(normalizedRestaurantSlug)}`;
   }, [normalizedRestaurantSlug]);
   const tablesApiPath = useMemo(() => `/api/tables${querySuffix}`, [querySuffix]);
   const ordersApiPath = useMemo(() => `/api/orders${querySuffix}`, [querySuffix]);
   const menuSettingsApiPath = useMemo(
-    () => `/api/menu-settings${querySuffix}`,
+    () =>
+      `/api/menu-settings${querySuffix}${querySuffix ? "&" : "?"}fields=happyHourEnabled,happyHourDiscountPercent,happyHourCategories,happyHourStartsFrom,happyHourUntil,workingHoursFrom,workingHoursRules,orderMode`,
     [querySuffix]
   );
   const tablesViewCacheKey = useMemo(
@@ -593,6 +594,7 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
     );
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
   const monthlyExportRanges = useMemo(() => getMonthlyExportRanges(new Date(), 4), []);
+  const lastEmittedOrderModeRef = useRef<RestaurantOrderMode>("tables");
 
   function getPosSyncKey(table: TableOverview) {
     return `${table.restaurantSlug}:${table.tableNumber}:${table.currentSessionId}`;
@@ -657,6 +659,7 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
     let cancelled = false;
     let timeoutId: number | null = null;
     let loadingInFlight = false;
+    let lastMenuSettingsLoadAt = 0;
 
     function scheduleNextLoad() {
       if (cancelled) {
@@ -696,12 +699,18 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
       loadingInFlight = true;
 
       try {
-        const [tablesResult, ordersResult, menuSettingsResult] =
-          await Promise.allSettled([
-            fetchTablesResource(tablesApiPath, { cache: "no-store" }),
-            fetchTablesResource(ordersApiPath, { cache: "no-store" }),
-            fetchTablesResource(menuSettingsApiPath, { cache: "no-store" })
-          ]);
+        const shouldLoadMenuSettings =
+          lastMenuSettingsLoadAt === 0 ||
+          Date.now() - lastMenuSettingsLoadAt >= TABLES_MENU_SETTINGS_POLL_MS;
+        const menuSettingsRequest = shouldLoadMenuSettings
+          ? fetchTablesResource(menuSettingsApiPath, { cache: "no-store" })
+          : Promise.resolve<Response | null>(null);
+
+        const [tablesResult, ordersResult, menuSettingsResult] = await Promise.allSettled([
+          fetchTablesResource(tablesApiPath, { cache: "no-store" }),
+          fetchTablesResource(ordersApiPath, { cache: "no-store" }),
+          menuSettingsRequest
+        ]);
 
         if (cancelled) {
           return;
@@ -726,6 +735,7 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
 
         if (menuSettingsResponse?.ok) {
           const menuSettingsPayload = (await menuSettingsResponse.json()) as MenuSettingsResponse;
+          lastMenuSettingsLoadAt = Date.now();
           const parsedHappyHourDiscountPercent = Number(
             menuSettingsPayload?.happyHourDiscountPercent ?? 0
           );
@@ -757,6 +767,8 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
           )
             ? menuSettingsPayload.workingHoursRules
             : [];
+          const nextOrderMode: RestaurantOrderMode =
+            menuSettingsPayload?.orderMode === "counter" ? "counter" : "tables";
 
           setHappyHourEnabled(nextHappyHourEnabled);
           setHappyHourDiscountPercent(nextHappyHourDiscountPercent);
@@ -765,6 +777,11 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
           setHappyHourUntil(nextHappyHourUntil);
           setWorkingHoursFrom(nextWorkingHoursFrom);
           setWorkingHoursRules(nextWorkingHoursRules);
+
+          if (lastEmittedOrderModeRef.current !== nextOrderMode) {
+            lastEmittedOrderModeRef.current = nextOrderMode;
+            onOrderModeChange?.(nextOrderMode);
+          }
         }
       } finally {
         if (!cancelled) {
@@ -804,7 +821,7 @@ export function TablesOverview({ restaurantSlug }: TablesOverviewProps) {
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [menuSettingsApiPath, ordersApiPath, tablesApiPath]);
+  }, [menuSettingsApiPath, onOrderModeChange, ordersApiPath, tablesApiPath]);
 
   async function handleCloseTable(restaurantSlug: string, tableNumber: number) {
     const response = await fetch("/api/tables", {

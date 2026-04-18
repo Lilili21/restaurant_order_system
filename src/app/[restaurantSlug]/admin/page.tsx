@@ -1,7 +1,5 @@
-import { notFound } from "next/navigation";
-
-import { MenuEditor } from "@/components/admin/MenuEditor";
-import { getRestaurantBySlug } from "@/lib/restaurants";
+import { MenuPageClient } from "@/components/admin/MenuPageClient";
+export const revalidate = 300;
 
 type RestaurantAdminPageProps = {
   params: Promise<{
@@ -13,23 +11,8 @@ export default async function RestaurantAdminPage({
   params
 }: RestaurantAdminPageProps) {
   const { restaurantSlug } = await params;
-  const restaurant = await getRestaurantBySlug(restaurantSlug);
-
-  if (!restaurant) {
-    notFound();
-  }
 
   return (
-    <main className="page-shell">
-      <section className="hero hero--compact">
-        <div>
-          <h1 className="hero-title-stacked control-center-title">
-            <span>Control</span>
-            <span>Center</span>
-          </h1>
-        </div>
-      </section>
-      <MenuEditor />
-    </main>
+    <MenuPageClient restaurantSlug={restaurantSlug} showNavigation={false} />
   );
 }

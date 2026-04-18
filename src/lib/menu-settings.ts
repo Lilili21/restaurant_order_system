@@ -970,23 +970,20 @@ async function getRestaurantSettingsFromSupabase(
 
   const tableRowsSafe = Array.isArray(tableRows)
     ? tableRows.map((table) => {
+        const sourceToken =
+          typeof table.access_token === "string" ? table.access_token : "";
         const token =
-          typeof table.access_token === "string" && table.access_token.trim().length >= 12
-            ? table.access_token
-            : generateTableToken();
+          sourceToken.trim().length >= 12 ? sourceToken : generateTableToken();
 
         return {
           ...table,
-          access_token: token
+          access_token: token,
+          __tokenRefreshed: token !== sourceToken
         };
       })
     : [];
 
-  const rowsNeedingTokenRefresh = tableRowsSafe.filter(
-    (table) => table.access_token !== (tableRows as Array<{ access_token: string }>)[
-      tableRowsSafe.indexOf(table)
-    ]?.access_token
-  );
+  const rowsNeedingTokenRefresh = tableRowsSafe.filter((table) => table.__tokenRefreshed);
 
   if (rowsNeedingTokenRefresh.length > 0) {
     const { error: refreshTokensError } = await supabase.from("restaurant_tables").upsert(

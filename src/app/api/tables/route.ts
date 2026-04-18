@@ -35,15 +35,25 @@ export async function GET(request: NextRequest) {
   }
 
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
+  const isValidSlug =
+    typeof restaurantSlug === "string" &&
+    /^[a-z0-9-]+$/.test(restaurantSlug);
+
+  if (!isValidSlug) {
+    return NextResponse.json(
+      { message: "restaurantSlug is required" },
+      { status: 400 }
+    );
+  }
   const [tables, closedSessions] = await Promise.all([
-    getTableOverviews(restaurantSlug ?? undefined),
-    getClosedTableSummaries(restaurantSlug ?? undefined, {
+    getTableOverviews(restaurantSlug),
+    getClosedTableSummaries(restaurantSlug, {
       scope: "current_shift"
     })
   ]);
 
   logTablesApiDebug("GET", {
-    restaurantSlug: restaurantSlug ?? null,
+    restaurantSlug,
     tablesCount: tables.length,
     closedSessionsCount: closedSessions.length
   });

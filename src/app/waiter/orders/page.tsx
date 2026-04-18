@@ -1,50 +1,16 @@
-import Link from "next/link";
-
-import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
-import { OrdersList } from "@/components/admin/OrdersList";
-import { getMenuSettings } from "@/lib/menu-settings";
-import { getRestaurantBySlug } from "@/lib/restaurants";
+import { OrdersPageClient } from "@/components/admin/OrdersPageClient";
 
 const ADMIN_DEFAULT_RESTAURANT_SLUG =
   process.env.ADMIN_DEFAULT_RESTAURANT_SLUG ?? "olive-bistro";
+export const revalidate = 300;
 
-export default async function WaiterOrdersPage() {
-  const [settings, restaurant] = await Promise.all([
-    getMenuSettings(ADMIN_DEFAULT_RESTAURANT_SLUG),
-    getRestaurantBySlug(ADMIN_DEFAULT_RESTAURANT_SLUG)
-  ]);
-  const isCounterMode = settings.orderMode === "counter";
-
+export default function WaiterOrdersPage() {
   return (
-    <AdminAccessGate>
-      <main className="page-shell">
-        <section className="hero hero--compact">
-          <div>
-            <h1>{isCounterMode ? "Counter queue" : "Incoming orders"}</h1>
-          </div>
-          <div className="admin-nav" aria-label="Waiter navigation">
-            <div className="admin-switch">
-              <Link
-                href="/waiter/orders"
-                className="admin-switch__item admin-switch__item--active"
-              >
-                Orders
-              </Link>
-              {!isCounterMode ? (
-                <Link href="/waiter/tables" className="admin-switch__item">
-                  Tables
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        <OrdersList
-          orderMode={settings.orderMode}
-          restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
-          restaurantId={restaurant?.id}
-        />
-      </main>
-    </AdminAccessGate>
+    <OrdersPageClient
+      restaurantSlug={ADMIN_DEFAULT_RESTAURANT_SLUG}
+      ordersHref="/waiter/orders"
+      tablesHref="/waiter/tables"
+      navigationLabel="Waiter navigation"
+    />
   );
 }

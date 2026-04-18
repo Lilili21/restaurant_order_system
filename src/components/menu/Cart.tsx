@@ -14,6 +14,7 @@ import {
   shekelsToAgorot
 } from "@/lib/money";
 import { getGuestShortOrderNumber } from "@/lib/order-number-display";
+import { getSupabaseClient } from "@/lib/supabase";
 import type {
   BusinessLunchSettings,
   ContactRequirement,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/types";
 
 type CartProps = {
+  restaurantId?: string;
   restaurantSlug: string;
   restaurantName: string;
   tableNumber: number;
@@ -132,6 +134,8 @@ const drinkCategories = new Set<MenuCategory>([
 const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
+const MENU_SETTINGS_FALLBACK_POLL_MS = 60_000;
+const MENU_SETTINGS_REALTIME_DEBOUNCE_MS = 300;
 const COUNTER_CAPTCHA_SITE_KEY =
   process.env.NEXT_PUBLIC_COUNTER_CAPTCHA_SITE_KEY?.trim() ?? "";
 const COUNTER_CAPTCHA_PUBLIC_ENABLED = ["1", "true", "yes", "on"].includes(
@@ -404,6 +408,7 @@ const uiText = {
 } as const;
 
 export function Cart({
+  restaurantId,
   restaurantSlug,
   restaurantName,
   tableNumber,
@@ -479,6 +484,7 @@ export function Cart({
   const counterCaptchaContainerRef = useRef<HTMLDivElement | null>(null);
   const counterCaptchaWidgetIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
+  const sessionSyncPollCountRef = useRef(0);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
   const isCounterMode = orderMode === "counter";
   const counterRequiresPhone =
@@ -510,7 +516,40 @@ export function Cart({
     let cancelled = false;
     let inFlightAbortController: AbortController | null = null;
     let pollTimeoutId: number | null = null;
-    const POLL_INTERVAL_MS = 12_000;
+    let realtimeDebounceId: number | null = null;
+    const supabase = getSupabaseClient();
+    const realtimeChannel = supabase
+      ? supabase
+          .channel(`menu-settings-${restaurantSlug}-${Date.now()}`)
+          .on(
+            "postgres_changes",
+            restaurantId
+              ? {
+                  event: "*",
+                  schema: "public",
+                  table: "menu_settings",
+                  filter: `restaurant_id=eq.${restaurantId}`
+                }
+              : {
+                  event: "*",
+                  schema: "public",
+                  table: "menu_settings"
+                },
+            () => {
+              if (cancelled) {
+                return;
+              }
+
+              if (realtimeDebounceId !== null) {
+                window.clearTimeout(realtimeDebounceId);
+              }
+
+              realtimeDebounceId = window.setTimeout(() => {
+                void syncMenuSettings();
+              }, MENU_SETTINGS_REALTIME_DEBOUNCE_MS);
+            }
+          )
+      : null;
 
     function scheduleNextSync() {
       if (cancelled) {
@@ -519,7 +558,7 @@ export function Cart({
 
       pollTimeoutId = window.setTimeout(() => {
         void syncMenuSettings();
-      }, POLL_INTERVAL_MS);
+      }, MENU_SETTINGS_FALLBACK_POLL_MS);
     }
 
     async function syncMenuSettings() {
@@ -539,7 +578,9 @@ export function Cart({
 
       try {
         response = await fetch(
-          `/api/menu-settings?restaurantSlug=${encodeURIComponent(restaurantSlug)}`,
+          `/api/menu-settings?restaurantSlug=${encodeURIComponent(
+            restaurantSlug
+          )}&fields=promotions,businessLunches,recommendations`,
           {
             cache: "no-store",
             signal: inFlightAbortController.signal
@@ -578,6 +619,24 @@ export function Cart({
       scheduleNextSync();
     }
 
+    function handleVisibilityChange() {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (pollTimeoutId !== null) {
+        window.clearTimeout(pollTimeoutId);
+        pollTimeoutId = null;
+      }
+
+      void syncMenuSettings();
+    }
+
+    if (realtimeChannel) {
+      realtimeChannel.subscribe();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     void syncMenuSettings();
 
     return () => {
@@ -587,8 +646,18 @@ export function Cart({
       if (pollTimeoutId !== null) {
         window.clearTimeout(pollTimeoutId);
       }
+
+      if (realtimeDebounceId !== null) {
+        window.clearTimeout(realtimeDebounceId);
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      if (realtimeChannel && supabase) {
+        void supabase.removeChannel(realtimeChannel);
+      }
     };
-  }, [restaurantSlug]);
+  }, [restaurantId, restaurantSlug]);
 
   const detailedItems = useMemo(() => {
     return items
@@ -1451,10 +1520,14 @@ export function Cart({
       let response: Response;
 
       try {
+        const includeMenuPayload =
+          !isCounterMode && sessionSyncPollCountRef.current % 6 === 0;
+        sessionSyncPollCountRef.current += 1;
+        const sessionPath = isCounterMode
+          ? `/api/orders/my?restaurantSlug=${restaurantSlug}`
+          : `/api/tables/${restaurantSlug}/${tableToken}${includeMenuPayload ? "?includeMenu=1" : ""}`;
         response = await fetch(
-          isCounterMode
-            ? `/api/orders/my?restaurantSlug=${restaurantSlug}`
-            : `/api/tables/${restaurantSlug}/${tableToken}`,
+          sessionPath,
           {
             cache: "no-store",
             signal: inFlightAbortController.signal

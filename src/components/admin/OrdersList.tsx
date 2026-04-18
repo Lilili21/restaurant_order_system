@@ -23,6 +23,8 @@ const ACTIVE_POLL_MS = 4_000;
 const HIDDEN_POLL_MS = 12_000;
 const INITIAL_RENDERED_ORDERS = 24;
 const RENDER_ORDERS_CHUNK = 16;
+const SERVER_PAGE_SIZE = 80;
+const SERVER_MAX_LIMIT = 400;
 const ORDERS_CACHE_TTL_MS = 30 * 1000;
 const ORDERS_FILTERS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ORDERS_CACHE_KEY = "admin-orders-cache-v1";
@@ -305,7 +307,7 @@ function readCachedFilters(): OrdersFiltersCache {
 
 type OrdersListProps = {
   orderMode?: RestaurantOrderMode;
-  restaurantSlug?: string;
+  restaurantSlug: string;
   restaurantId?: string;
 };
 
@@ -315,21 +317,16 @@ export function OrdersList({
   restaurantId
 }: OrdersListProps) {
   const isCounterMode = orderMode === "counter";
-  const normalizedRestaurantSlug = useMemo(() => {
-    if (typeof restaurantSlug !== "string") {
-      return "";
-    }
-
-    return restaurantSlug.trim().toLowerCase();
-  }, [restaurantSlug]);
+  const normalizedRestaurantSlug = useMemo(
+    () => restaurantSlug.trim().toLowerCase(),
+    [restaurantSlug]
+  );
   const ordersApiPath = useMemo(() => {
-    if (!normalizedRestaurantSlug) {
-      return "/api/orders";
-    }
-
     return `/api/orders?restaurantSlug=${encodeURIComponent(normalizedRestaurantSlug)}`;
   }, [normalizedRestaurantSlug]);
   const [orders, setOrders] = useState<Order[]>(() => readCachedOrders() ?? []);
+  const [serverLimit, setServerLimit] = useState(SERVER_PAGE_SIZE);
+  const [hasMoreOnServer, setHasMoreOnServer] = useState(false);
   const [currentTimestamp, setCurrentTimestamp] = useState(() => Date.now());
   const [visibleOrderCount, setVisibleOrderCount] = useState(INITIAL_RENDERED_ORDERS);
   const [loading, setLoading] = useState(() => readCachedOrders() === null);
@@ -359,6 +356,10 @@ export function OrdersList({
     setSelectedZone("hall");
     setSelectedTables([]);
   }, [isCounterMode]);
+
+  useEffect(() => {
+    setServerLimit(SERVER_PAGE_SIZE);
+  }, [ordersApiPath]);
 
   function readStoredWaiterCalls() {
     try {
@@ -461,12 +462,22 @@ export function OrdersList({
       loadingInFlight = true;
 
       try {
-        const response = await fetch(ordersApiPath);
+        const separator = ordersApiPath.includes("?") ? "&" : "?";
+        const response = await fetch(
+          `${ordersApiPath}${separator}limit=${serverLimit}&offset=0`
+        );
         const payload = response.ok ? await response.json() : [];
         const data = mergeOrdersWithStoredWaiterCalls(payload);
+        const totalHeader = Number.parseInt(
+          response.headers.get("x-total-count") ?? "",
+          10
+        );
 
         if (!cancelled) {
           setOrders(data);
+          setHasMoreOnServer(
+            Number.isFinite(totalHeader) ? totalHeader > serverLimit : false
+          );
           setCurrentTimestamp(Date.now());
           setLoading(false);
         }
@@ -506,7 +517,7 @@ export function OrdersList({
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [ordersApiPath]);
+  }, [ordersApiPath, serverLimit]);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -1602,6 +1613,21 @@ export function OrdersList({
             }
           >
             Load {Math.min(RENDER_ORDERS_CHUNK, hiddenOrdersCount)} more orders
+          </button>
+        </div>
+      ) : null}
+      {hiddenOrdersCount === 0 && hasMoreOnServer && serverLimit < SERVER_MAX_LIMIT ? (
+        <div className="orders-list-more">
+          <button
+            className="button-neutral"
+            type="button"
+            onClick={() =>
+              setServerLimit((current) =>
+                Math.min(current + SERVER_PAGE_SIZE, SERVER_MAX_LIMIT)
+              )
+            }
+          >
+            Load more from server
           </button>
         </div>
       ) : null}

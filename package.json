@@ -12,6 +12,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "check:supabase": "node scripts/check-supabase.mjs",
+    "migrate:menu-images": "node scripts/migrate-menu-images-to-storage.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

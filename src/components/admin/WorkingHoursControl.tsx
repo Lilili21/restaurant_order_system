@@ -83,7 +83,7 @@ export function WorkingHoursControl({
 
     async function loadSettings() {
       const response = await fetch(
-        `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+        `/api/menu-settings?restaurantSlug=${restaurantSlug}&fields=workingHoursRules,workingHoursFrom,workingHoursUntil,orderMode,contactRequirement,requireOtp,orderNumberPrefix,showGuestOrderHistory`,
         {
           cache: "no-store"
         }

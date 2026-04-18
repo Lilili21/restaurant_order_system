@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { getRestaurants } from "@/lib/restaurants";
 
+export const revalidate = 300;
+
 export default async function HomePage() {
   const restaurants = await getRestaurants();
 

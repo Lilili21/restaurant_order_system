@@ -32,7 +32,9 @@ export function TableCountControl({
 
   async function loadSettings() {
     const response = await fetch(
-      `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+      `/api/menu-settings?restaurantSlug=${encodeURIComponent(
+        restaurantSlug
+      )}&includeTableTokens=1&fields=tableCount,tableTokens`,
       {
         cache: "no-store"
       }
