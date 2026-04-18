@@ -2,6 +2,107 @@
   "weekKey": "2026-W12",
   "orders": [
     {
+      "id": "call_1773641534057",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:12:14.057Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-16T06:12:14.057Z",
+      "tableNumber": 2,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "bill_1773641535256",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:12:15.256Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-16T06:12:15.256Z",
+      "tableNumber": 2,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "call_1773641561194",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:12:41.194Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-16T06:12:41.194Z",
+      "tableNumber": 2,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "bill_1773642581754",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:29:41.754Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-16T06:29:41.754Z",
+      "tableNumber": 2,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "bill_1773642620126",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:30:20.126Z",
+      "sessionId": 2,
+      "updatedAt": "2026-03-16T06:30:20.126Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "ord_1773642864120",
+      "items": [
+        {
+          "id": "item_1773642864120_63nn65",
+          "name": "Hummus with pita",
+          "price": 24,
+          "served": true,
+          "category": "starters",
+          "quantity": 1,
+          "menuItemId": "m1"
+        }
+      ],
+      "total": 24,
+      "status": "served",
+      "createdAt": "2026-03-16T06:34:24.120Z",
+      "serveMode": "all_at_once",
+      "sessionId": 2,
+      "updatedAt": "2026-03-16T06:34:24.120Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "call_1773643038034",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-16T06:37:18.034Z",
+      "sessionId": 2,
+      "updatedAt": "2026-03-16T06:37:18.034Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
       "id": "call_1773739463068",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -145,6 +246,45 @@
         }
       ],
       "total": 254
+    },
+    {
+      "id": "bill_1773755051387",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-17T13:44:11.387Z",
+      "sessionId": 3,
+      "updatedAt": "2026-03-17T13:44:11.387Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "call_1773755056182",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-17T13:44:16.182Z",
+      "sessionId": 3,
+      "updatedAt": "2026-03-17T13:44:16.182Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "call_1773755089480",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-17T13:44:49.480Z",
+      "sessionId": 3,
+      "updatedAt": "2026-03-17T13:44:49.480Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
     },
     {
       "id": "bill_1773755791649",
@@ -380,6 +520,19 @@
       "total": 226
     },
     {
+      "id": "bill_1773816440682",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-18T06:47:20.682Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-18T06:47:20.682Z",
+      "tableNumber": 3,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
       "id": "ord_1773817156178",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -401,6 +554,51 @@
         }
       ],
       "total": 156
+    },
+    {
+      "id": "ord_1773820708655",
+      "items": [
+        {
+          "id": "item_1773820708655_3moxmz",
+          "name": "orange juice",
+          "price": 10,
+          "served": false,
+          "category": "starters",
+          "quantity": 1,
+          "menuItemId": "m_1773740563066"
+        },
+        {
+          "id": "item_1773820708655_5tpjrv",
+          "name": "Cola",
+          "price": 10,
+          "served": false,
+          "category": "non_alcoholic_drinks",
+          "quantity": 1,
+          "menuItemId": "m_1773755363372",
+          "volumeLabel": "1l",
+          "volumeOptionId": "volume_0_1l_10"
+        },
+        {
+          "id": "item_1773820708655_h35l1o",
+          "name": "Cola",
+          "price": 10,
+          "served": false,
+          "category": "non_alcoholic_drinks",
+          "quantity": 1,
+          "menuItemId": "m_1773755363372",
+          "volumeLabel": "Glass",
+          "volumeOptionId": "volume_1_Glass_10"
+        }
+      ],
+      "total": 30,
+      "status": "cancelled",
+      "createdAt": "2026-03-18T07:58:28.655Z",
+      "serveMode": "as_ready",
+      "sessionId": 3,
+      "updatedAt": "2026-03-18T07:58:28.655Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
     },
     {
       "id": "ord_1773821100804",
@@ -437,6 +635,51 @@
       "updatedAt": "2026-03-18T08:05:08.347Z",
       "items": [],
       "total": 0
+    },
+    {
+      "id": "bill_1773821262148",
+      "kind": "bill_request",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-18T08:07:42.148Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-18T08:07:42.148Z",
+      "tableNumber": 3,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "ord_1773825504076",
+      "items": [
+        {
+          "id": "item_1773825504075_o6keo1",
+          "name": "orange juice",
+          "price": 10,
+          "served": true,
+          "category": "starters",
+          "quantity": 2,
+          "menuItemId": "m_1773740563066"
+        },
+        {
+          "id": "item_1773825504075_4b34ff",
+          "name": "Hummus with pita",
+          "price": 24,
+          "served": true,
+          "category": "starters",
+          "quantity": 2,
+          "menuItemId": "m1"
+        }
+      ],
+      "total": 68,
+      "status": "served",
+      "createdAt": "2026-03-18T09:18:24.076Z",
+      "serveMode": "as_ready",
+      "sessionId": 4,
+      "updatedAt": "2026-03-18T09:18:57.221Z",
+      "tableNumber": 4,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
     },
     {
       "id": "bill_1773842172780",

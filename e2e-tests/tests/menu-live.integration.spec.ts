@@ -302,7 +302,7 @@ async function setupSharedMenuLiveBackend(context: BrowserContext) {
     });
   });
 
-  await context.route("**/api/orders**", async (route, request) => {
+  await context.route(/\/api\/orders\/?(?:\?.*)?$/, async (route, request) => {
     if (request.method() === "GET") {
       const activeOrders = store.activeOrdersForAdmin
         .filter((order) => order.status !== "served" && order.status !== "cancelled")

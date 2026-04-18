@@ -1889,6 +1889,51 @@ export function MenuEditor() {
     }
   }, [updateNewItem]);
 
+  const uploadImageToStorageIfNeeded = useCallback(
+    async function uploadImageToStorageIfNeeded(
+      imageValue: string,
+      itemId: string
+    ) {
+      const normalizedImage = imageValue.trim();
+
+      if (!normalizedImage.startsWith("data:image/")) {
+        return normalizedImage;
+      }
+
+      const response = await fetch("/api/menu-image-upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+          "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+        },
+        body: JSON.stringify({
+          restaurantSlug,
+          itemId,
+          imageDataUrl: normalizedImage
+        })
+      });
+
+      const bodyText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          `Image upload failed: ${bodyText || response.statusText || "Unknown error"}`
+        );
+      }
+
+      const parsed = JSON.parse(bodyText) as { imageUrl?: string };
+      const uploadedImageUrl = (parsed.imageUrl ?? "").trim();
+
+      if (!uploadedImageUrl) {
+        throw new Error("Image upload failed: empty URL returned.");
+      }
+
+      return uploadedImageUrl;
+    },
+    [restaurantSlug, secondaryCredentials?.login, secondaryCredentials?.password]
+  );
+
   const toggleAvailability = useCallback(async function toggleAvailability(itemId: string) {
     const targetItem = items.find((item) => item.id === itemId);
 
@@ -2762,6 +2807,20 @@ export function MenuEditor() {
       return;
     }
 
+    let resolvedImage = currentItem.draftImage;
+
+    try {
+      resolvedImage = await uploadImageToStorageIfNeeded(currentItem.draftImage, itemId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to upload image.");
+      setItems((current) =>
+        current.map((item) =>
+          item.id === itemId ? { ...item, saving: false } : item
+        )
+      );
+      return;
+    }
+
     const response = await fetch("/api/menu", {
       method: "PATCH",
       headers: {
@@ -2791,7 +2850,7 @@ export function MenuEditor() {
           itemKind === "drinks"
             ? parseVolumeOptions(currentItem.draftVolumeOptionsText)
             : [],
-        image: currentItem.draftImage,
+        image: resolvedImage,
         showImage: currentItem.draftShowImage,
         badges: currentItem.draftBadges,
         available: currentItem.available,
@@ -2857,6 +2916,17 @@ export function MenuEditor() {
 
     setNewItem((current) => ({ ...current, saving: true }));
 
+    const temporaryItemId = `new-${Date.now()}`;
+    let resolvedImage = newItem.image;
+
+    try {
+      resolvedImage = await uploadImageToStorageIfNeeded(newItem.image, temporaryItemId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to upload image.");
+      setNewItem((current) => ({ ...current, saving: false }));
+      return;
+    }
+
     const response = await fetch("/api/menu", {
       method: "POST",
       headers: {
@@ -2882,7 +2952,7 @@ export function MenuEditor() {
           selectedKind === "drinks"
             ? parseVolumeOptions(newItem.volumeOptionsText)
             : [],
-        image: newItem.image,
+        image: resolvedImage,
         showImage: newItem.showImage,
         badges: newItem.badges,
         available: newItem.available,

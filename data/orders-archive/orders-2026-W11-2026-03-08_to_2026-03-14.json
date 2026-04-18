@@ -2,47 +2,6 @@
   "weekKey": "2026-W11",
   "orders": [
     {
-      "id": "ord_demo_1",
-      "restaurantSlug": "olive-bistro",
-      "restaurantName": "Olive Bistro",
-      "tableNumber": 3,
-      "sessionId": 1,
-      "status": "cancelled",
-      "serveMode": "all_at_once",
-      "createdAt": "2026-03-11T15:59:32.961Z",
-      "total": 92,
-      "items": [
-        {
-          "id": "ord_demo_1_item_1",
-          "menuItemId": "m1",
-          "name": "Hummus with pita",
-          "price": 24,
-          "quantity": 1,
-          "served": false,
-          "category": "drinks"
-        },
-        {
-          "id": "ord_demo_1_item_2",
-          "menuItemId": "m5",
-          "name": "Mint lemonade",
-          "price": 18,
-          "quantity": 2,
-          "served": false,
-          "category": "drinks"
-        },
-        {
-          "id": "ord_demo_1_item_3",
-          "menuItemId": "m6",
-          "name": "Kanafeh",
-          "price": 32,
-          "quantity": 1,
-          "note": "Разделить на две ложки",
-          "served": false,
-          "category": "desserts"
-        }
-      ]
-    },
-    {
       "id": "ord_1773245277391",
       "restaurantSlug": "olive-bistro",
       "restaurantName": "Olive Bistro",
@@ -2002,6 +1961,83 @@
       "updatedAt": "2026-03-15T19:07:53.105Z",
       "items": [],
       "total": 0
+    },
+    {
+      "id": "ord_demo_1",
+      "items": [
+        {
+          "id": "ord_demo_1_item_1",
+          "name": "Hummus with pita",
+          "price": 24,
+          "served": true,
+          "category": "starters",
+          "quantity": 1,
+          "menuItemId": "m1"
+        },
+        {
+          "id": "ord_demo_1_item_2",
+          "name": "Mint lemonade",
+          "price": 18,
+          "served": true,
+          "category": "drinks",
+          "quantity": 3,
+          "menuItemId": "m5"
+        },
+        {
+          "id": "ord_demo_1_item_3",
+          "name": "Kanafeh",
+          "note": "Разделить на две ложки",
+          "price": 32,
+          "served": true,
+          "category": "desserts",
+          "quantity": 1,
+          "menuItemId": "m6"
+        }
+      ],
+      "total": 110,
+      "status": "served",
+      "createdAt": "2026-03-15T21:06:56.919Z",
+      "serveMode": "all_at_once",
+      "sessionId": 1,
+      "tableNumber": 4,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "ord_1773609310053",
+      "items": [
+        {
+          "id": "item_1773609310053_5a3ug6",
+          "name": "Hummus with pita",
+          "price": 24,
+          "served": true,
+          "category": "starters",
+          "quantity": 1,
+          "menuItemId": "m1"
+        }
+      ],
+      "total": 24,
+      "status": "served",
+      "createdAt": "2026-03-15T21:15:10.053Z",
+      "serveMode": "all_at_once",
+      "sessionId": 1,
+      "updatedAt": "2026-03-15T21:15:10.053Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
+    },
+    {
+      "id": "call_1773609322453",
+      "kind": "waiter_call",
+      "items": [],
+      "total": 0,
+      "status": "served",
+      "createdAt": "2026-03-15T21:15:22.453Z",
+      "sessionId": 1,
+      "updatedAt": "2026-03-15T21:15:22.453Z",
+      "tableNumber": 1,
+      "restaurantName": "Olive Bistro",
+      "restaurantSlug": "olive-bistro"
     }
   ],
   "closedTableSummaries": []

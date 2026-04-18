@@ -2,6 +2,15 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "app: install deps (node22)",
+      "type": "shell",
+      "command": "PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm install",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "npm: install",
       "type": "shell",
       "command": "npm install",
