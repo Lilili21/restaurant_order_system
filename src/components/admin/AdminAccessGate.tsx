@@ -11,8 +11,10 @@ type AdminAccessGateProps = {
 export function AdminAccessGate({
   children,
   scope = "admin",
-  title = "Admin sign in"
+  title
 }: AdminAccessGateProps) {
+  const resolvedTitle =
+    title ?? (scope === "waiter" ? "Waiter sign in" : "User sign in");
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [login, setLogin] = useState("");
@@ -90,7 +92,7 @@ export function AdminAccessGate({
           aria-modal="true"
           aria-labelledby="admin-auth-title"
         >
-          <h2 id="admin-auth-title">{title}</h2>
+          <h2 id="admin-auth-title">{resolvedTitle}</h2>
           <div className="modal-form">
             <input
               className="modal-input"

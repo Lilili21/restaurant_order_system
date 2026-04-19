@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { AdminAccessGate } from "@/components/admin/AdminAccessGate";
 import { RestaurantLanding } from "@/components/home/RestaurantLanding";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
@@ -22,10 +23,12 @@ export default async function RestaurantLandingPage({
   }
 
   return (
-    <RestaurantLanding
-      restaurantSlug={restaurant.slug}
-      restaurantName={restaurant.name}
-      restaurantDescription={restaurant.description}
-    />
+    <AdminAccessGate scope="admin">
+      <RestaurantLanding
+        restaurantSlug={restaurant.slug}
+        restaurantName={restaurant.name}
+        restaurantDescription={restaurant.description}
+      />
+    </AdminAccessGate>
   );
 }
