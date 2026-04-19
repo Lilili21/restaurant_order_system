@@ -215,7 +215,7 @@ function validateCreateOrderPayload(
 }
 
 export async function GET(request: NextRequest) {
-  const unauthorized = await requireAdminAccess(request, "admin");
+  const unauthorized = await requireAdminAccess(request, "waiter");
 
   if (unauthorized) {
     return unauthorized;
@@ -500,6 +500,11 @@ export async function PATCH(request: NextRequest) {
     guestContactName?: string;
     guestContactPhone?: string;
   };
+  const unauthorized = await requireAdminAccess(request, "waiter");
+
+  if (unauthorized) {
+    return unauthorized;
+  }
 
   if (
     body.orderId &&
@@ -536,12 +541,6 @@ export async function PATCH(request: NextRequest) {
 
   if (limited) {
     return limited;
-  }
-
-  const unauthorized = await requireAdminAccess(request, "admin");
-
-  if (unauthorized) {
-    return unauthorized;
   }
 
   try {

@@ -13,7 +13,7 @@ import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 export const maxDuration = 3;
 
 function isScope(value: string | null): value is AdminAuthScope {
-  return value === "admin" || value === "secondary";
+  return value === "admin" || value === "waiter" || value === "secondary";
 }
 
 export async function GET(request: NextRequest) {
@@ -68,15 +68,7 @@ export async function POST(request: NextRequest) {
       body.login ?? "",
       body.password ?? ""
     );
-    const adminFromSecondary =
-      body.scope === "admin" &&
-      verifyAdminCredentials(
-        "secondary",
-        body.secondaryLogin ?? "",
-        body.secondaryPassword ?? ""
-      );
-
-    if (!directAuth && !adminFromSecondary) {
+    if (!directAuth) {
       return NextResponse.json(
         { message: "Invalid login or password." },
         { status: 401 }

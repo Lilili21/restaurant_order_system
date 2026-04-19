@@ -21,7 +21,7 @@ export default async function HomePage() {
             {restaurants.map((restaurant) => (
               <Link
                 key={restaurant.slug}
-                href={`/${restaurant.slug}/admin`}
+                href={`/${restaurant.slug}`}
                 className="button-link button-link--hero"
               >
                 {restaurant.name}

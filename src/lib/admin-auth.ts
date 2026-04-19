@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type AdminAuthScope = "admin" | "secondary";
+export type AdminAuthScope = "admin" | "waiter" | "secondary";
 
 const ADMIN_COOKIE_NAME = "admin_access";
+const WAITER_COOKIE_NAME = "waiter_access";
 const ADMIN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 const ADMIN_COOKIE_SECRET_FALLBACK =
   "dev-only-admin-cookie-secret-change-me";
@@ -14,8 +15,15 @@ const ADMIN_COOKIE_SECRET_FALLBACK =
 function getConfiguredCredentials(scope: AdminAuthScope) {
   if (scope === "admin") {
     return {
-      login: process.env.ADMIN_LOGIN ?? "waiter",
-      password: process.env.ADMIN_PASSWORD ?? "waiter"
+      login: process.env.ADMIN_LOGIN ?? "user",
+      password: process.env.ADMIN_PASSWORD ?? "Liza&Nadya"
+    };
+  }
+
+  if (scope === "waiter") {
+    return {
+      login: process.env.WAITER_LOGIN ?? "waiter",
+      password: process.env.WAITER_PASSWORD ?? "Liza&Nadya"
     };
   }
 
@@ -26,6 +34,10 @@ function getConfiguredCredentials(scope: AdminAuthScope) {
 }
 
 function getCookieName(scope: AdminAuthScope) {
+  if (scope === "waiter") {
+    return WAITER_COOKIE_NAME;
+  }
+
   return ADMIN_COOKIE_NAME;
 }
 
@@ -109,18 +121,7 @@ export function verifyAdminCredentials(
   login: string,
   password: string
 ) {
-  const configured = getConfiguredCredentials(scope);
-  const directMatch = matchCredentials(configured, login, password);
-
-  if (directMatch) {
-    return true;
-  }
-
-  if (scope === "admin") {
-    return matchCredentials(getConfiguredCredentials("secondary"), login, password);
-  }
-
-  return false;
+  return matchCredentials(getConfiguredCredentials(scope), login, password);
 }
 
 function isSafeMethod(method: string) {
@@ -171,16 +172,24 @@ export function requireSameOrigin(request: NextRequest) {
 
 export async function hasAdminAccess(scope: AdminAuthScope) {
   const cookieStore = await cookies();
-  const cookieValue = cookieStore.get(getCookieName("admin"))?.value;
+  const adminCookieValue = cookieStore.get(getCookieName("admin"))?.value;
+  const waiterCookieValue = cookieStore.get(getCookieName("waiter"))?.value;
 
   if (scope === "secondary") {
     return (
-      verifyCookieValue("admin", cookieValue) ||
-      verifyCookieValue("secondary", cookieValue)
+      verifyCookieValue("admin", adminCookieValue) ||
+      verifyCookieValue("secondary", adminCookieValue)
     );
   }
 
-  return verifyCookieValue(scope, cookieValue);
+  if (scope === "waiter") {
+    return (
+      verifyCookieValue("waiter", waiterCookieValue) ||
+      verifyCookieValue("admin", adminCookieValue)
+    );
+  }
+
+  return verifyCookieValue("admin", adminCookieValue);
 }
 
 export function setAdminAccessCookie(
@@ -253,10 +262,14 @@ export async function requireAdminAccess(
     return null;
   }
 
-  const hasAccess = verifyCookieValue(
-    scope,
-    request.cookies.get(getCookieName(scope))?.value
-  );
+  const adminCookieValue = request.cookies.get(getCookieName("admin"))?.value;
+  const waiterCookieValue = request.cookies.get(getCookieName("waiter"))?.value;
+
+  const hasAccess =
+    scope === "waiter"
+      ? verifyCookieValue("waiter", waiterCookieValue) ||
+        verifyCookieValue("admin", adminCookieValue)
+      : verifyCookieValue("admin", adminCookieValue);
 
   if (!hasAccess) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

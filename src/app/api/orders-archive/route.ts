@@ -48,7 +48,7 @@ function dedupeClosedSummaries(summaries: ClosedTableSummary[]) {
 }
 
 export async function GET(request: NextRequest) {
-  const unauthorized = await requireAdminAccess(request, "admin");
+  const unauthorized = await requireAdminAccess(request, "waiter");
 
   if (unauthorized) {
     return unauthorized;

@@ -29,7 +29,7 @@ function logTablesApiDebug(event: string, payload?: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
-  const unauthorized = await requireAdminAccess(request, "admin");
+  const unauthorized = await requireAdminAccess(request, "waiter");
 
   if (unauthorized) {
     return unauthorized;
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
     return limited;
   }
 
-  const unauthorized = await requireAdminAccess(request, "admin");
+  const unauthorized = await requireAdminAccess(request, "waiter");
 
   if (unauthorized) {
     return unauthorized;

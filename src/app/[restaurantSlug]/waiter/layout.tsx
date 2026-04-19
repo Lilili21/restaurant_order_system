@@ -9,5 +9,9 @@ type RestaurantWaiterLayoutProps = {
 export default function RestaurantWaiterLayout({
   children
 }: RestaurantWaiterLayoutProps) {
-  return <AdminAccessGate>{children}</AdminAccessGate>;
+  return (
+    <AdminAccessGate scope="waiter" title="Waiter sign in">
+      {children}
+    </AdminAccessGate>
+  );
 }

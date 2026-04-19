@@ -4,9 +4,15 @@ import { ReactNode, useEffect, useState } from "react";
 
 type AdminAccessGateProps = {
   children: ReactNode;
+  scope?: "admin" | "waiter";
+  title?: string;
 };
 
-export function AdminAccessGate({ children }: AdminAccessGateProps) {
+export function AdminAccessGate({
+  children,
+  scope = "admin",
+  title = "Admin sign in"
+}: AdminAccessGateProps) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [login, setLogin] = useState("");
@@ -18,7 +24,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
     let cancelled = false;
 
     async function checkAuth() {
-      const response = await fetch("/api/admin-auth?scope=admin", {
+      const response = await fetch(`/api/admin-auth?scope=${scope}`, {
         cache: "no-store"
       });
 
@@ -42,7 +48,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scope]);
 
   async function submitAuth() {
     const response = await fetch("/api/admin-auth", {
@@ -51,7 +57,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        scope: "admin",
+        scope,
         login,
         password,
         persist: true
@@ -84,7 +90,7 @@ export function AdminAccessGate({ children }: AdminAccessGateProps) {
           aria-modal="true"
           aria-labelledby="admin-auth-title"
         >
-          <h2 id="admin-auth-title">Admin sign in</h2>
+          <h2 id="admin-auth-title">{title}</h2>
           <div className="modal-form">
             <input
               className="modal-input"

@@ -7,5 +7,9 @@ type WaiterLayoutProps = {
 };
 
 export default function WaiterLayout({ children }: WaiterLayoutProps) {
-  return <AdminAccessGate>{children}</AdminAccessGate>;
+  return (
+    <AdminAccessGate scope="waiter" title="Waiter sign in">
+      {children}
+    </AdminAccessGate>
+  );
 }
