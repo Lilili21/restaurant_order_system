@@ -650,7 +650,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
-    if (!restaurantSlug || !/^[a-z0-9-]+$/.test(restaurantSlug)) {
+    if (!restaurantSlug || !/^[a-z0-9-]+$/i.test(restaurantSlug)) {
       return NextResponse.json(
         { message: "restaurantSlug is required" },
         { status: 400 }

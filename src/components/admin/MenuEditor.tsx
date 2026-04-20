@@ -1698,6 +1698,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
         if (!hasSuccessfulResponse) {
           setMessage("Failed to load admin data.");
+        } else {
+          setMessage((current) =>
+            current === "Failed to load admin data." ? null : current
+          );
         }
 
         setLoading(false);

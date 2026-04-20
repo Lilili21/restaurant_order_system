@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug");
   const isValidSlug =
     typeof restaurantSlug === "string" &&
-    /^[a-z0-9-]+$/.test(restaurantSlug);
+    /^[a-z0-9-]+$/i.test(restaurantSlug);
 
   if (!isValidSlug) {
     return NextResponse.json(
