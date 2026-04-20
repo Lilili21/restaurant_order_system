@@ -31,6 +31,10 @@ import type {
 const categoryLabels: Record<MenuCategory, string> = {
   starters: "🥗 Starters",
   mains: "🍲 Main courses",
+  main_dishes: "🍽️ Main dishes",
+  buters: "🥪 Buters",
+  sweet: "🥞 Sweet",
+  cakes: "🎂 Cakes",
   drinks: "🍹 Drinks",
   fluids: "🍹 Fluids",
   draft: "🍺 Draft",
@@ -94,6 +98,13 @@ const drinkBadgeOptions = badgeOptions.filter(
 const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
   (category) => category !== "drinks" && !drinkCategories.includes(category)
 );
+const simuLevDishCategories: MenuCategory[] = [
+  "main_dishes",
+  "buters",
+  "sweet",
+  "cakes"
+];
+const defaultDishCategories: MenuCategory[] = ["starters", "mains", "desserts"];
 const allDrinkCategories = [...drinkCategories];
 const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const DASHBOARD_ACTIVE_POLL_MS = 12_000;
@@ -324,6 +335,10 @@ function getPromotionValidationMessage(promotion: EditablePromotion) {
   }
 
   return null;
+}
+
+function isSimuLevRestaurantSlug(slug: string) {
+  return slug.trim().toLowerCase() === "simulev";
 }
 
 function toEditablePromotion(promotion: PromotionSettings): EditablePromotion {
@@ -810,19 +825,6 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     available: true,
     saving: false
   });
-  const preferredNewItemCategory = useMemo<MenuCategory>(() => {
-    const filteredCategory = selectedCategories.find((category) =>
-      selectedKind === "drinks"
-        ? drinkCategories.includes(category)
-        : !drinkCategories.includes(category)
-    );
-
-    if (filteredCategory) {
-      return filteredCategory;
-    }
-
-    return selectedKind === "drinks" ? drinkCategories[0] : dishCategories[0];
-  }, [selectedCategories, selectedKind]);
   const pathSegments = useMemo(
     () => pathname.split("/").filter(Boolean),
     [pathname]
@@ -835,6 +837,48 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     [pathSegments]
   );
   const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
+  const enableDishAddons = useMemo(
+    () => isSimuLevRestaurantSlug(restaurantSlug),
+    [restaurantSlug]
+  );
+  const activeDishCategories = useMemo<MenuCategory[]>(
+    () => (enableDishAddons ? simuLevDishCategories : defaultDishCategories),
+    [enableDishAddons]
+  );
+  const resolveCategoryOptions = useCallback(
+    (kind: "dishes" | "drinks") =>
+      kind === "drinks" ? allDrinkCategories : activeDishCategories,
+    [activeDishCategories]
+  );
+  const preferredNewItemCategory = useMemo<MenuCategory>(() => {
+    const filteredCategory = selectedCategories.find((category) =>
+      selectedKind === "drinks"
+        ? drinkCategories.includes(category)
+        : activeDishCategories.includes(category)
+    );
+
+    if (filteredCategory) {
+      return filteredCategory;
+    }
+
+    return selectedKind === "drinks" ? drinkCategories[0] : activeDishCategories[0];
+  }, [activeDishCategories, selectedCategories, selectedKind]);
+  useEffect(() => {
+    setNewItem((current) => {
+      if (drinkCategories.includes(current.category)) {
+        return current;
+      }
+
+      if (activeDishCategories.includes(current.category)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        category: activeDishCategories[0]
+      };
+    });
+  }, [activeDishCategories]);
   useEffect(() => {
     onOrderModeChange?.(restaurantOrderMode);
   }, [onOrderModeChange, restaurantOrderMode]);
@@ -2774,6 +2818,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     );
 
     const itemKind = getItemKind(currentItem.draftCategory);
+    const keepDishAddons =
+      enableDishAddons && itemKind === "dishes";
+    const includeVolumeOptions = itemKind === "drinks" || keepDishAddons;
     if (
       itemKind === "drinks" &&
       hasInvalidDrinkVolumeRows(currentItem.draftVolumeOptionsText)
@@ -2855,7 +2902,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           currentItem.draftDescriptionHe,
         price: basePrice,
         volumeOptions:
-          itemKind === "drinks"
+          includeVolumeOptions
             ? parseVolumeOptions(currentItem.draftVolumeOptionsText)
             : [],
         image: resolvedImage,
@@ -2891,6 +2938,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   }
 
   async function createItem() {
+    const includeVolumeOptions =
+      selectedKind === "drinks" ||
+      (enableDishAddons && selectedKind === "dishes");
+
     if (
       selectedKind === "drinks" &&
       hasInvalidDrinkVolumeRows(newItem.volumeOptionsText)
@@ -2957,7 +3008,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           newItem.descriptionHe,
         price: basePrice,
         volumeOptions:
-          selectedKind === "drinks"
+          includeVolumeOptions
             ? parseVolumeOptions(newItem.volumeOptionsText)
             : [],
         image: resolvedImage,
@@ -3092,7 +3143,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
               ...currentItem,
               draftCategory: nextCategory,
               draftVolumeOptionsText:
-                nextKind === "drinks" ? currentItem.draftVolumeOptionsText : "",
+                nextKind === "drinks" ||
+                (enableDishAddons && nextKind === "dishes")
+                  ? currentItem.draftVolumeOptionsText
+                  : "",
               draftBadges: currentItem.draftBadges.filter((badge) =>
                 allowedBadges.includes(badge)
               )
@@ -3100,7 +3154,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           : currentItem
       )
     );
-  }, []);
+  }, [enableDishAddons]);
 
   const toggleItemDescription = useCallback(function toggleItemDescription(
     itemId: string
@@ -3193,15 +3247,15 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setSelectedCategories([]);
     setNewItem((current) => ({
       ...current,
-      category: dishCategories.includes(current.category)
+      category: activeDishCategories.includes(current.category)
         ? current.category
-        : "starters",
-      volumeOptionsText: "",
+        : activeDishCategories[0],
+      volumeOptionsText: enableDishAddons ? current.volumeOptionsText : "",
       badges: current.badges.filter((badge) =>
         getBadgeOptionsForKind("dishes").some((option) => option.value === badge)
       )
     }));
-  }, []);
+  }, [activeDishCategories, enableDishAddons]);
 
   const selectDrinks = useCallback(() => {
     setRecommendationFocusItemIds(null);
@@ -3531,7 +3585,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         barOpenUntil={barOpenUntil}
         saveBarOpenSettings={saveBarOpenSettings}
         setBarOpenUntil={setBarOpenUntil}
-        dishCategories={dishCategories}
+        dishCategories={activeDishCategories}
         allDrinkCategories={allDrinkCategories}
         categoryLabels={categoryLabels}
       />
@@ -3540,6 +3594,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         showCreateForm={showCreateForm}
         onToggleCreateForm={toggleCreateForm}
         selectedKind={selectedKind}
+        enableDishAddons={enableDishAddons}
         selectedCategories={selectedCategories}
         categoryLabels={categoryLabels}
         visibleCategories={visibleCategories}
@@ -3556,7 +3611,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         uploadNewImage={uploadNewImage}
         toggleNewBadge={toggleNewBadge}
         createItem={createItem}
-        getCategoryOptions={getCategoryOptions}
+        getCategoryOptions={resolveCategoryOptions}
         getBadgeOptionsForKind={getBadgeOptionsForKind}
         parseVolumeRows={parseVolumeRows}
         addVolumeRow={addVolumeRow}

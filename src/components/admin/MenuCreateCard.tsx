@@ -14,6 +14,7 @@ import {
 
 type Props = {
   selectedKind: "dishes" | "drinks";
+  enableDishAddons: boolean;
   categoryLabels: Record<MenuCategory, string>;
   newItemLanguage: MenuLanguage;
   onSetNewItemLanguage: (language: MenuLanguage) => void;
@@ -38,6 +39,7 @@ type Props = {
 
 export function MenuCreateCard({
   selectedKind,
+  enableDishAddons,
   categoryLabels,
   newItemLanguage,
   onSetNewItemLanguage,
@@ -56,6 +58,8 @@ export function MenuCreateCard({
   removeVolumeRow,
   updateVolumeRow
 }: Props) {
+  const showVolumeEditor = selectedKind === "drinks" || (enableDishAddons && selectedKind === "dishes");
+
   return (
     <article className="order-card">
       <h3>Add new</h3>
@@ -248,11 +252,11 @@ export function MenuCreateCard({
           </div>
         ) : null}
 
-        {selectedKind === "drinks" ? (
+        {showVolumeEditor ? (
           <div className="menu-editor__volume-options">
             <div className="menu-editor__field">
               <span className="menu-editor__volume-label">
-                <span>Volumes and prices</span>
+                <span>{selectedKind === "drinks" ? "Volumes and prices" : "Add extras and prices"}</span>
                 <span className="menu-editor__volume-actions">
                   <button
                     className="menu-editor__volume-add"
@@ -289,7 +293,7 @@ export function MenuCreateCard({
                     <input
                       className="modal-input"
                       type="text"
-                      placeholder="Volume"
+                      placeholder={selectedKind === "drinks" ? "Volume" : "Add-on"}
                       value={row.label}
                       onChange={(event) =>
                         updateNewItem(

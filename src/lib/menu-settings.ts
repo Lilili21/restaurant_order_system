@@ -8,6 +8,10 @@ import type { MenuCategory } from "@/lib/types";
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
   "mains",
+  "main_dishes",
+  "buters",
+  "sweet",
+  "cakes",
   "drinks",
   "fluids",
   "draft",

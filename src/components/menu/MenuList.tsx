@@ -14,7 +14,11 @@ type MenuListProps = {
   onAdd: (
     menuItemId: string,
     sourceElement?: HTMLElement | null,
-    volumeOptionId?: string
+    volumeOptionId?: string,
+    selection?: {
+      volumeLabel?: string;
+      priceOverride?: number;
+    }
   ) => void;
   onDecrease: (
     menuItemId: string,
@@ -33,6 +37,10 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 שתייה",
     starters: "🥗 מנות פתיחה",
     mains: "🍲 עיקריות",
+    main_dishes: "🍽️ מנות עיקריות",
+    buters: "🥪 סנדוויצ'ים",
+    sweet: "🥞 מתוקים",
+    cakes: "🎂 עוגות",
     drinks: "🍹 Drinks",
     fluids: "🍹 Fluids",
     draft: "🍺 Draft",
@@ -59,6 +67,10 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 Drinks",
     starters: "🥗 Starters",
     mains: "🍲 Main courses",
+    main_dishes: "🍽️ Main dishes",
+    buters: "🥪 Buttered sandwiches",
+    sweet: "🥞 Sweets",
+    cakes: "🎂 Cakes",
     drinks: "🍹 Drinks",
     fluids: "🍹 Fluids",
     draft: "🍺 Draft",
@@ -85,6 +97,10 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 Напитки",
     starters: "🥗 Закуски",
     mains: "🍲 Основные блюда",
+    main_dishes: "🍽️ Основные блюда",
+    buters: "🥪 Бутеры",
+    sweet: "🥞 Сладкое",
+    cakes: "🎂 Торты",
     drinks: "🍹 Напитки",
     fluids: "🍹 Напитки",
     draft: "🍺 Разливное",
@@ -111,6 +127,10 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
 const categoryOrder: MenuCategory[] = [
   "starters",
   "mains",
+  "main_dishes",
+  "buters",
+  "sweet",
+  "cakes",
   "drinks",
   "fluids",
   "draft",

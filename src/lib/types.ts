@@ -19,6 +19,10 @@ export type Table = {
 export type MenuCategory =
   | "starters"
   | "mains"
+  | "main_dishes"
+  | "buters"
+  | "sweet"
+  | "cakes"
   | "drinks"
   | "fluids"
   | "draft"

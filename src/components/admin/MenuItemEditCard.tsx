@@ -15,6 +15,7 @@ import {
 
 type Props = {
   item: EditableMenuItem;
+  enableDishAddons: boolean;
   categoryLabels: Record<MenuCategory, string>;
   getItemKind: (category: MenuCategory) => "dishes" | "drinks";
   getCategoryOptions: CategoryOptionsByKind;
@@ -43,6 +44,7 @@ type Props = {
 
 export function MenuItemEditCard({
   item,
+  enableDishAddons,
   categoryLabels,
   getItemKind,
   getCategoryOptions,
@@ -65,6 +67,7 @@ export function MenuItemEditCard({
   saveItem
 }: Props) {
   const itemKind = getItemKind(item.draftCategory);
+  const showVolumeEditor = itemKind === "drinks" || (enableDishAddons && itemKind === "dishes");
   const itemCategoryOptions = getCategoryOptions(itemKind);
   const itemBadgeOptions = getBadgeOptionsForKind(itemKind);
   const itemLanguage = getItemLanguage(item.id);
@@ -270,11 +273,11 @@ export function MenuItemEditCard({
           </div>
         ) : null}
 
-        {itemKind === "drinks" ? (
+        {showVolumeEditor ? (
           <div className="menu-editor__volume-options">
             <div className="menu-editor__field">
               <span className="menu-editor__volume-label">
-                <span>Volumes and prices</span>
+                <span>{itemKind === "drinks" ? "Volumes and prices" : "Add extras and prices"}</span>
                 <span className="menu-editor__volume-actions">
                   <button
                     className="menu-editor__volume-add"
@@ -313,7 +316,7 @@ export function MenuItemEditCard({
                     <input
                       className="modal-input"
                       type="text"
-                      placeholder="Volume"
+                      placeholder={itemKind === "drinks" ? "Volume" : "Add-on"}
                       value={row.label}
                       onChange={(event) =>
                         updateDraft(

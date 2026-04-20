@@ -1,8 +1,9 @@
 import { MouseEvent } from "react";
+import { useMemo, useState } from "react";
 
 import { resolveMenuImageForRestaurant } from "@/lib/menu-images";
 import { formatCurrency } from "@/lib/menu";
-import { MenuBadge, MenuItem, MenuLanguage } from "@/lib/types";
+import { MenuBadge, MenuItem, MenuLanguage, MenuVolumeOption } from "@/lib/types";
 
 const badgeMeta: Record<
   MenuBadge,
@@ -39,7 +40,11 @@ type MenuItemCardProps = {
   onAdd: (
     menuItemId: string,
     sourceElement?: HTMLElement | null,
-    volumeOptionId?: string
+    volumeOptionId?: string,
+    selection?: {
+      volumeLabel?: string;
+      priceOverride?: number;
+    }
   ) => void;
   onDecrease: (
     menuItemId: string,
@@ -47,6 +52,52 @@ type MenuItemCardProps = {
     volumeOptionId?: string
   ) => void;
 };
+
+const drinkCategories = new Set([
+  "drinks",
+  "fluids",
+  "draft",
+  "bottled",
+  "fuel",
+  "whiskey",
+  "vodka",
+  "rum",
+  "cognac",
+  "gin",
+  "tequila",
+  "absent",
+  "ouzo",
+  "likers",
+  "alcohol",
+  "cocktails",
+  "two_component_mixture",
+  "dot4",
+  "non_alcoholic_drinks"
+]);
+
+function getAddonText(language: MenuLanguage) {
+  if (language === "he") {
+    return {
+      title: "תוספות לבחירה",
+      selected: "נבחרו",
+      mostPopular: "הכי פופולרי"
+    };
+  }
+
+  if (language === "ru") {
+    return {
+      title: "Выберите добавки",
+      selected: "Выбрано",
+      mostPopular: "Популярно"
+    };
+  }
+
+  return {
+    title: "Choose toppings",
+    selected: "Selected",
+    mostPopular: "Most popular"
+  };
+}
 
 export function MenuItemCard({
   item,
@@ -89,10 +140,41 @@ export function MenuItemCard({
         return leftPriority - rightPriority;
       });
   const hasVolumeOptions = Boolean(item.volumeOptions?.length);
+  const isSimuLevRestaurant =
+    item.restaurantSlug.trim().toLowerCase() === "simulev";
+  const allowAddons =
+    isSimuLevRestaurant &&
+    hasVolumeOptions &&
+    !drinkCategories.has(item.category);
+  const displayVolumeOptions = hasVolumeOptions && !allowAddons;
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
   const resolvedImage = resolveMenuImageForRestaurant(
     item.image,
     item.restaurantSlug
   );
+  const addonText = getAddonText(language);
+  const activeAddons = useMemo(() => {
+    if (!allowAddons) {
+      return [];
+    }
+
+    return (item.volumeOptions ?? [])
+      .filter((addon) => selectedAddonIds.includes(addon.id))
+      .sort((left, right) => left.id.localeCompare(right.id));
+  }, [allowAddons, item.volumeOptions, selectedAddonIds]);
+  const addonPrice = activeAddons.reduce(
+    (sum, addon) => sum + addon.price,
+    0
+  );
+  const hasAddonSelection = activeAddons.length > 0;
+  const addonVariantId = hasAddonSelection
+    ? `extras:${activeAddons.map((addon) => addon.id).join(",")}`
+    : undefined;
+  const addonVariantKey = getQuantityKey(addonVariantId);
+  const addonVariantQuantity = optionQuantities[addonVariantKey] ?? 0;
+  const addonVariantLabel = hasAddonSelection
+    ? `Extras: ${activeAddons.map((addon) => addon.label).join(", ")}`.slice(0, 60)
+    : undefined;
 
   function getQuantityKey(volumeOptionId?: string) {
     return `${item.id}:${volumeOptionId ?? "base"}`;
@@ -100,9 +182,13 @@ export function MenuItemCard({
 
   function handleAdd(
     event: MouseEvent<HTMLButtonElement>,
-    volumeOptionId?: string
+    volumeOptionId?: string,
+    selection?: {
+      volumeLabel?: string;
+      priceOverride?: number;
+    }
   ) {
-    onAdd(item.id, event.currentTarget, volumeOptionId);
+    onAdd(item.id, event.currentTarget, volumeOptionId, selection);
   }
 
   function handleDecrease(
@@ -114,6 +200,19 @@ export function MenuItemCard({
 
   function getBadgeLabel(badge: MenuBadge) {
     return badgeMeta[badge].label[language];
+  }
+
+  function toggleAddon(id: string) {
+    setSelectedAddonIds((current) =>
+      current.includes(id)
+        ? current.filter((candidate) => candidate !== id)
+        : [...current, id]
+    );
+  }
+
+  function isPopularAddon(addon: MenuVolumeOption) {
+    const normalized = addon.label.trim().toLowerCase();
+    return normalized.includes("popular") || normalized.includes("популяр");
   }
 
   return (
@@ -173,9 +272,9 @@ export function MenuItemCard({
           ) : null}
           <p className="muted">{description}</p>
         </div>
-        {item.volumeOptions?.length ? (
+        {displayVolumeOptions ? (
           <div className="menu-card__volume-list">
-            {item.volumeOptions.map((option) => {
+            {(item.volumeOptions ?? []).map((option) => {
               const optionQuantity = optionQuantities[getQuantityKey(option.id)] ?? 0;
 
               return (
@@ -213,25 +312,122 @@ export function MenuItemCard({
             })}
           </div>
         ) : null}
-        {!hasVolumeOptions ? (
+        {!displayVolumeOptions ? (
           <div className="menu-card__footer">
-            <strong>{formatCurrency(item.price)}</strong>
-            {!orderingEnabled ? null : quantity > 0 ? (
+            <strong>
+              {formatCurrency(
+                allowAddons && hasAddonSelection ? item.price + addonPrice : item.price
+              )}
+            </strong>
+            {!orderingEnabled ? null : (allowAddons && hasAddonSelection
+                ? addonVariantQuantity
+                : quantity) > 0 ? (
               <div className="menu-quantity-box">
-                <button type="button" onClick={(event) => handleDecrease(event)}>
+                <button
+                  type="button"
+                  onClick={(event) =>
+                    handleDecrease(
+                      event,
+                      allowAddons && hasAddonSelection ? addonVariantId : undefined
+                    )
+                  }
+                >
                   -
                 </button>
-                <span>{quantity}</span>
-                <button type="button" onClick={(event) => handleAdd(event)}>
+                <span>{allowAddons && hasAddonSelection ? addonVariantQuantity : quantity}</span>
+                <button
+                  type="button"
+                  onClick={(event) =>
+                    handleAdd(
+                      event,
+                      allowAddons && hasAddonSelection ? addonVariantId : undefined,
+                      allowAddons && hasAddonSelection
+                        ? {
+                            volumeLabel: addonVariantLabel,
+                            priceOverride: item.price + addonPrice
+                          }
+                        : undefined
+                    )
+                  }
+                >
                   +
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={(event) => handleAdd(event)}>
+              <button
+                type="button"
+                onClick={(event) =>
+                  handleAdd(
+                    event,
+                    allowAddons && hasAddonSelection ? addonVariantId : undefined,
+                    allowAddons && hasAddonSelection
+                      ? {
+                          volumeLabel: addonVariantLabel,
+                          priceOverride: item.price + addonPrice
+                        }
+                      : undefined
+                  )
+                }
+              >
                 {addLabel}
               </button>
             )}
           </div>
+        ) : null}
+        {allowAddons ? (
+          <section className="menu-card__addons" aria-label={addonText.title}>
+            <div className="menu-card__addons-header">
+              <strong>{addonText.title}</strong>
+            </div>
+            <div className="menu-card__addons-list">
+              {(item.volumeOptions ?? []).map((addon) => {
+                const selected = selectedAddonIds.includes(addon.id);
+                const label = addon.label;
+
+                return (
+                  <label
+                    key={addon.id}
+                    className={
+                      selected
+                        ? "menu-card__addon-item menu-card__addon-item--selected"
+                        : "menu-card__addon-item"
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleAddon(addon.id)}
+                    />
+                    <span className="menu-card__addon-label">
+                      {label}
+                      {isPopularAddon(addon) ? (
+                        <span className="menu-card__addon-popular">
+                          {addonText.mostPopular}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="menu-card__addon-price">
+                      +{formatCurrency(addon.price)}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {activeAddons.length ? (
+              <div className="menu-card__addons-selected">
+                <span className="menu-card__addons-selected-title">
+                  {addonText.selected}:
+                </span>
+                <div className="menu-card__addons-chips">
+                  {activeAddons.map((addon) => (
+                    <span key={addon.id} className="menu-card__addons-chip">
+                      {addon.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </section>
         ) : null}
       </div>
     </article>

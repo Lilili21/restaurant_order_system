@@ -17,6 +17,7 @@ type Props = {
   showCreateForm: boolean;
   onToggleCreateForm: () => void;
   selectedKind: "dishes" | "drinks";
+  enableDishAddons: boolean;
   selectedCategories: MenuCategory[];
   categoryLabels: Record<MenuCategory, string>;
   visibleCategories: Array<[MenuCategory, string]>;
@@ -76,6 +77,7 @@ function MenuEditPanelComponent({
   showCreateForm,
   onToggleCreateForm,
   selectedKind,
+  enableDishAddons,
   selectedCategories,
   categoryLabels,
   visibleCategories,
@@ -156,6 +158,7 @@ function MenuEditPanelComponent({
         {showCreateForm ? (
           <MenuCreateCard
             selectedKind={selectedKind}
+            enableDishAddons={enableDishAddons}
             categoryLabels={categoryLabels}
             newItemLanguage={newItemLanguage}
             onSetNewItemLanguage={onSetNewItemLanguage}
@@ -180,6 +183,7 @@ function MenuEditPanelComponent({
           <MenuItemEditCard
             key={item.id}
             item={item}
+            enableDishAddons={enableDishAddons}
             categoryLabels={categoryLabels}
             getItemKind={getItemKind}
             getCategoryOptions={getCategoryOptions}

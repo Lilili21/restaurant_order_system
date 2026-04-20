@@ -87,6 +87,10 @@ declare global {
 const categoryFlightIcons: Record<MenuCategory, string> = {
   starters: "🥗",
   mains: "🍝",
+  main_dishes: "🍽️",
+  buters: "🥪",
+  sweet: "🥞",
+  cakes: "🎂",
   drinks: "🥤",
   fluids: "🍹",
   draft: "🍺",
@@ -786,6 +790,12 @@ export function Cart({
     () => ({
       starters: language === "he" ? "מנות פתיחה" : language === "ru" ? "закуски" : "starters",
       mains: language === "he" ? "עיקריות" : language === "ru" ? "основные блюда" : "main courses",
+      main_dishes:
+        language === "he" ? "מנות עיקריות" : language === "ru" ? "основные блюда" : "main dishes",
+      buters:
+        language === "he" ? "סנדוויצ'ים" : language === "ru" ? "бутеры" : "buttered sandwiches",
+      sweet: language === "he" ? "מתוקים" : language === "ru" ? "сладкое" : "sweets",
+      cakes: language === "he" ? "עוגות" : language === "ru" ? "торты" : "cakes",
       drinks: language === "ru" ? "напитки" : "drinks",
       fluids: language === "ru" ? "напитки" : "fluids",
       draft: language === "ru" ? "разливное" : "draft",
@@ -1705,7 +1715,11 @@ export function Cart({
   function addItem(
     menuItemId: string,
     sourceElement?: HTMLElement | null,
-    volumeOptionId?: string
+    volumeOptionId?: string,
+    selection?: {
+      volumeLabel?: string;
+      priceOverride?: number;
+    }
   ) {
     animateOrderMovement(menuItemId, "to-order", sourceElement);
     const menuItem = liveMenu.find((item) => item.id === menuItemId);
@@ -1735,8 +1749,8 @@ export function Cart({
           menuItemId,
           quantity: 1,
           volumeOptionId,
-          volumeLabel: matchedVolumeOption?.label,
-          priceOverride: matchedVolumeOption?.price
+          volumeLabel: selection?.volumeLabel ?? matchedVolumeOption?.label,
+          priceOverride: selection?.priceOverride ?? matchedVolumeOption?.price
         }
       ];
     });

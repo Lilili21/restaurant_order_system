@@ -111,6 +111,22 @@ function cloneDefaultMenuItems(): MenuItem[] {
   return cloneMenuItems(defaultMenuItems);
 }
 
+function appendMissingRestaurantDefaults(items: MenuItem[]) {
+  const normalizedItems = cloneMenuItems(items);
+  const existingRestaurantSlugs = new Set(
+    normalizedItems.map((item) => item.restaurantSlug.trim().toLowerCase())
+  );
+  const missingDefaultItems = cloneDefaultMenuItems().filter(
+    (item) => !existingRestaurantSlugs.has(item.restaurantSlug.trim().toLowerCase())
+  );
+
+  if (missingDefaultItems.length === 0) {
+    return normalizedItems;
+  }
+
+  return [...normalizedItems, ...missingDefaultItems];
+}
+
 function getMenuStoreCache() {
   return globalThis.__menuStoreCache;
 }
@@ -408,7 +424,9 @@ function loadMenuItemsFromDisk(): MenuItem[] {
       return cloneDefaultMenuItems();
     }
 
-    return parsed.map((item) => normalizeMenuItem(item));
+    return appendMissingRestaurantDefaults(
+      parsed.map((item) => normalizeMenuItem(item))
+    );
   } catch {
     return cloneDefaultMenuItems();
   }
@@ -441,8 +459,9 @@ async function loadMenuItemsAsync(): Promise<MenuItem[]> {
     const supabaseItems = await loadMenuItemsFromSupabase();
 
     if (supabaseItems && supabaseItems.length > 0) {
-      setMenuStoreCache(supabaseItems);
-      return cloneMenuItems(supabaseItems);
+      const mergedItems = appendMissingRestaurantDefaults(supabaseItems);
+      setMenuStoreCache(mergedItems);
+      return cloneMenuItems(mergedItems);
     }
 
     const { data, error } = await supabase
