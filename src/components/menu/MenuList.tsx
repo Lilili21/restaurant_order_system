@@ -41,25 +41,26 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     buters: "🥪 סנדוויצ'ים",
     sweet: "🥞 מתוקים",
     cakes: "🎂 עוגות",
-    drinks: "🍹 Drinks",
-    fluids: "🍹 Fluids",
-    draft: "🍺 Draft",
-    bottled: "🍾 Bottled",
-    fuel: "⛽ Fuel",
-    whiskey: "🥃 Whiskey",
-    vodka: "🍸 Vodka",
-    rum: "🥃 Rum",
-    cognac: "🥃 Cognac",
-    gin: "🍸 GIN",
-    tequila: "🍸 Tequila",
-    absent: "🍸 Absent",
-    ouzo: "🍸 Ouzo",
-    likers: "🍷 Likers",
-    alcohol: "🍷 Alcohol",
-    cocktails: "🍸 Cocktails",
-    two_component_mixture: "🧪 2 component mixture",
+    drinks: "🍹 משקאות",
+    fluids: "🍹 משקאות קלים",
+    draft: "🍺 מהחבית",
+    bottled: "🍾 בבקבוק",
+    fuel: "⛽ חזקים",
+    whiskey: "🥃 ויסקי",
+    vodka: "🍸 וודקה",
+    rum: "🥃 רום",
+    cognac: "🥃 קוניאק",
+    gin: "🍸 ג׳ין",
+    tequila: "🍸 טקילה",
+    absent: "🍸 אבסינת",
+    ouzo: "🍸 אוזו",
+    likers: "🍷 ליקרים",
+    alcohol: "🍷 אלכוהול",
+    cocktails: "🍸 קוקטיילים",
+    chasers: "🥃 צ'ייסרים",
+    two_component_mixture: "🧪 מיקס דו-רכיבי",
     dot4: "🛢 DOT 4",
-    non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
+    non_alcoholic_drinks: "🥤 משקאות ללא אלכוהול",
     desserts: "🍰 קינוחים"
   },
   en: {
@@ -75,7 +76,7 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     fluids: "🍹 Fluids",
     draft: "🍺 Draft",
     bottled: "🍾 Bottled",
-    fuel: "⛽ Fuel",
+    fuel: "⛽ Топливо",
     whiskey: "🥃 Whiskey",
     vodka: "🍸 Vodka",
     rum: "🥃 Rum",
@@ -87,6 +88,7 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     likers: "🍷 Likers",
     alcohol: "🍷 Alcohol",
     cocktails: "🍸 Cocktails",
+    chasers: "🥃 Chasers",
     two_component_mixture: "🧪 2 component mixture",
     dot4: "🛢 DOT 4",
     non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
@@ -117,6 +119,7 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     likers: "🍷 Ликёры",
     alcohol: "🍷 Алкоголь",
     cocktails: "🍸 Коктейли",
+    chasers: "🥃 Чейсеры",
     two_component_mixture: "🧪 2-компонентный микс",
     dot4: "🛢 DOT 4",
     non_alcoholic_drinks: "🥤 Безалкогольные напитки",
@@ -147,6 +150,7 @@ const categoryOrder: MenuCategory[] = [
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks",
@@ -170,6 +174,7 @@ const drinkCategories = new Set<MenuCategory>([
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"
@@ -340,12 +345,16 @@ export function MenuList({
 
       {visibleCategories.map((category) => {
           const sectionItems = getCategoryItems(category);
+          const shouldHideSectionHeader =
+            selectedCategory === category && drinkCategories.has(category);
 
           return (
             <section key={category} className="menu-section">
-              <div className="section-header">
-                <h2>{formatCategorySectionLabel(category)}</h2>
-              </div>
+              {shouldHideSectionHeader ? null : (
+                <div className="section-header">
+                  <h2>{formatCategorySectionLabel(category)}</h2>
+                </div>
+              )}
               <div className="menu-grid">
                 {sectionItems.map((item) => (
                   <MenuItemCard

@@ -107,6 +107,7 @@ const categoryFlightIcons: Record<MenuCategory, string> = {
   likers: "🍷",
   alcohol: "🍷",
   cocktails: "🍸",
+  chasers: "🥃",
   two_component_mixture: "🧪",
   dot4: "🛢",
   non_alcoholic_drinks: "🥤",
@@ -130,6 +131,7 @@ const drinkCategories = new Set<MenuCategory>([
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"
@@ -796,27 +798,45 @@ export function Cart({
         language === "he" ? "סנדוויצ'ים" : language === "ru" ? "бутеры" : "buttered sandwiches",
       sweet: language === "he" ? "מתוקים" : language === "ru" ? "сладкое" : "sweets",
       cakes: language === "he" ? "עוגות" : language === "ru" ? "торты" : "cakes",
-      drinks: language === "ru" ? "напитки" : "drinks",
-      fluids: language === "ru" ? "напитки" : "fluids",
-      draft: language === "ru" ? "разливное" : "draft",
-      bottled: language === "ru" ? "бутылочное" : "bottled",
-      fuel: language === "ru" ? "fuel" : "fuel",
-      whiskey: language === "ru" ? "виски" : "whiskey",
-      vodka: language === "ru" ? "водка" : "vodka",
-      rum: language === "ru" ? "ром" : "rum",
-      cognac: language === "ru" ? "коньяк" : "cognac",
-      gin: language === "ru" ? "джин" : "gin",
-      tequila: language === "ru" ? "текила" : "tequila",
-      absent: language === "ru" ? "абсент" : "absent",
-      ouzo: language === "ru" ? "узо" : "ouzo",
-      likers: language === "ru" ? "ликёры" : "likers",
-      alcohol: language === "ru" ? "алкоголь" : "alcohol",
-      cocktails: language === "ru" ? "коктейли" : "cocktails",
+      drinks:
+        language === "he" ? "משקאות" : language === "ru" ? "напитки" : "drinks",
+      fluids:
+        language === "he" ? "משקאות קלים" : language === "ru" ? "напитки" : "fluids",
+      draft: language === "he" ? "מהחבית" : language === "ru" ? "разливное" : "draft",
+      bottled:
+        language === "he" ? "בבקבוק" : language === "ru" ? "бутылочное" : "bottled",
+      fuel: language === "he" ? "חזקים" : language === "ru" ? "топливо" : "fuel",
+      whiskey: language === "he" ? "ויסקי" : language === "ru" ? "виски" : "whiskey",
+      vodka: language === "he" ? "וודקה" : language === "ru" ? "водка" : "vodka",
+      rum: language === "he" ? "רום" : language === "ru" ? "ром" : "rum",
+      cognac: language === "he" ? "קוניאק" : language === "ru" ? "коньяк" : "cognac",
+      gin: language === "he" ? "ג׳ין" : language === "ru" ? "джин" : "gin",
+      tequila: language === "he" ? "טקילה" : language === "ru" ? "текила" : "tequila",
+      absent: language === "he" ? "אבסינת" : language === "ru" ? "абсент" : "absent",
+      ouzo: language === "he" ? "אוזו" : language === "ru" ? "узо" : "ouzo",
+      likers: language === "he" ? "ליקרים" : language === "ru" ? "ликёры" : "likers",
+      alcohol: language === "he" ? "אלכוהול" : language === "ru" ? "алкоголь" : "alcohol",
+      cocktails:
+        language === "he" ? "קוקטיילים" : language === "ru" ? "коктейли" : "cocktails",
+      chasers:
+        language === "he"
+          ? "צ'ייסרים"
+          : language === "ru"
+            ? "чейсеры"
+            : "Chasers",
       two_component_mixture:
-        language === "ru" ? "2-компонентный микс" : "2 component mixture",
+        language === "he"
+          ? "מיקס דו-רכיבי"
+          : language === "ru"
+            ? "2-компонентный микс"
+            : "2 component mixture",
       dot4: "DOT 4",
       non_alcoholic_drinks:
-        language === "he" ? "משקאות קלים" : language === "ru" ? "безалкогольные напитки" : "non-alcoholic drinks",
+        language === "he"
+          ? "משקאות ללא אלכוהול"
+          : language === "ru"
+            ? "безалкогольные напитки"
+            : "non-alcoholic drinks",
       desserts: language === "he" ? "קינוחים" : language === "ru" ? "десерты" : "desserts"
     }),
     [language]

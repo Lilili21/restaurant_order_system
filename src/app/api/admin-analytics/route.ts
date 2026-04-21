@@ -30,6 +30,7 @@ const DRINK_CATEGORIES = new Set<MenuCategory>([
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"

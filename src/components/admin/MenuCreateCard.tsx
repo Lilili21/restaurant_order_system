@@ -256,7 +256,15 @@ export function MenuCreateCard({
           <div className="menu-editor__volume-options">
             <div className="menu-editor__field">
               <span className="menu-editor__volume-label">
-                <span>{selectedKind === "drinks" ? "Volumes and prices" : "Add extras and prices"}</span>
+                <span>
+                  {selectedKind === "drinks"
+                    ? "Volumes and prices"
+                    : newItemLanguage === "he"
+                      ? "תוספות ומחירים"
+                      : newItemLanguage === "ru"
+                        ? "Добавки и цены"
+                        : "Add extras and prices"}
+                </span>
                 <span className="menu-editor__volume-actions">
                   <button
                     className="menu-editor__volume-add"
@@ -293,7 +301,15 @@ export function MenuCreateCard({
                     <input
                       className="modal-input"
                       type="text"
-                      placeholder={selectedKind === "drinks" ? "Volume" : "Add-on"}
+                      placeholder={
+                        selectedKind === "drinks"
+                          ? "Volume"
+                          : newItemLanguage === "he"
+                            ? "תוספת"
+                            : newItemLanguage === "ru"
+                              ? "Добавка"
+                              : "Add-on"
+                      }
                       value={row.label}
                       onChange={(event) =>
                         updateNewItem(

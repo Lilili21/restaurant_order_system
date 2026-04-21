@@ -51,6 +51,7 @@ const categoryLabels: Record<MenuCategory, string> = {
   likers: "🍷 Likers",
   alcohol: "🍷 Alcohol",
   cocktails: "🍸 Cocktails",
+  chasers: "🥃 Chasers",
   two_component_mixture: "🧪 2 component mixture",
   dot4: "🛢 DOT 4",
   non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
@@ -73,6 +74,7 @@ const drinkCategories: MenuCategory[] = [
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks"

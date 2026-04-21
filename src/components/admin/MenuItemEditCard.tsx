@@ -277,7 +277,15 @@ export function MenuItemEditCard({
           <div className="menu-editor__volume-options">
             <div className="menu-editor__field">
               <span className="menu-editor__volume-label">
-                <span>{itemKind === "drinks" ? "Volumes and prices" : "Add extras and prices"}</span>
+                <span>
+                  {itemKind === "drinks"
+                    ? "Volumes and prices"
+                    : itemLanguage === "he"
+                      ? "תוספות ומחירים"
+                      : itemLanguage === "ru"
+                        ? "Добавки и цены"
+                        : "Add extras and prices"}
+                </span>
                 <span className="menu-editor__volume-actions">
                   <button
                     className="menu-editor__volume-add"
@@ -316,7 +324,15 @@ export function MenuItemEditCard({
                     <input
                       className="modal-input"
                       type="text"
-                      placeholder={itemKind === "drinks" ? "Volume" : "Add-on"}
+                      placeholder={
+                        itemKind === "drinks"
+                          ? "Volume"
+                          : itemLanguage === "he"
+                            ? "תוספת"
+                            : itemLanguage === "ru"
+                              ? "Добавка"
+                              : "Add-on"
+                      }
                       value={row.label}
                       onChange={(event) =>
                         updateDraft(

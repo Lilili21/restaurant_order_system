@@ -28,6 +28,7 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "likers",
   "alcohol",
   "cocktails",
+  "chasers",
   "two_component_mixture",
   "dot4",
   "non_alcoholic_drinks",
