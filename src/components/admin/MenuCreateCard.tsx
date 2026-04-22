@@ -155,11 +155,11 @@ export function MenuCreateCard({
             updateNewItem("category", event.target.value as MenuCategory)
           }
         >
-          {getCategoryOptions(selectedKind).map((value) => (
-            <option key={value} value={value}>
-              {categoryLabels[value]}
-            </option>
-          ))}
+            {getCategoryOptions(selectedKind).map((value) => (
+              <option key={value} value={value}>
+              {categoryLabels[value] ?? value}
+              </option>
+            ))}
         </select>
 
         <div className="menu-editor__description-block">

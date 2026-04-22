@@ -87,7 +87,6 @@ declare global {
 const categoryFlightIcons: Record<MenuCategory, string> = {
   starters: "🥗",
   mains: "🍝",
-  main_dishes: "🍽️",
   buters: "🥪",
   sweet: "🥞",
   cakes: "🎂",
@@ -792,11 +791,18 @@ export function Cart({
     () => ({
       starters: language === "he" ? "מנות פתיחה" : language === "ru" ? "закуски" : "starters",
       mains: language === "he" ? "עיקריות" : language === "ru" ? "основные блюда" : "main courses",
-      main_dishes:
-        language === "he" ? "מנות עיקריות" : language === "ru" ? "основные блюда" : "main dishes",
       buters:
-        language === "he" ? "סנדוויצ'ים" : language === "ru" ? "бутеры" : "buttered sandwiches",
-      sweet: language === "he" ? "מתוקים" : language === "ru" ? "сладкое" : "sweets",
+        language === "he"
+          ? "סנדוויצ'ים"
+          : language === "ru"
+            ? "бутерброды"
+            : "sandwiches",
+      sweet:
+        language === "he"
+          ? "מנות מתוקות"
+          : language === "ru"
+            ? "сладкие блюда"
+            : "sweet dishes",
       cakes: language === "he" ? "עוגות" : language === "ru" ? "торты" : "cakes",
       drinks:
         language === "he" ? "משקאות" : language === "ru" ? "напитки" : "drinks",

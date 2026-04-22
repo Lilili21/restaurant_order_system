@@ -3,6 +3,7 @@
 import { ChangeEvent, memo } from "react";
 
 import { MenuBadge, MenuCategory, MenuLanguage } from "@/lib/types";
+import type { MenuCategoryKind } from "@/lib/menu-categories";
 import { MenuCreateCard } from "@/components/admin/MenuCreateCard";
 import { MenuItemEditCard } from "@/components/admin/MenuItemEditCard";
 import {
@@ -23,6 +24,23 @@ type Props = {
   visibleCategories: Array<[MenuCategory, string]>;
   onToggleCategory: (category: MenuCategory) => void;
   onClearSelectedCategories: () => void;
+  editableCategories: Array<{
+    slug: string;
+    label: string;
+    kind: "dishes" | "drinks";
+    active: boolean;
+  }>;
+  categoriesSaving: boolean;
+  categoriesMessage: string | null;
+  newCategorySlug: string;
+  newCategoryLabel: string;
+  newCategoryKind: Exclude<MenuCategoryKind, "addons">;
+  onNewCategorySlugChange: (value: string) => void;
+  onNewCategoryLabelChange: (value: string) => void;
+  onNewCategoryKindChange: (value: Exclude<MenuCategoryKind, "addons">) => void;
+  onAddCategory: () => Promise<void>;
+  onToggleCategoryActive: (slug: string) => Promise<void>;
+  onDeleteCategory: (slug: string) => Promise<void>;
   filteredItems: EditableMenuItem[];
   newItemLanguage: MenuLanguage;
   onSetNewItemLanguage: (language: MenuLanguage) => void;
@@ -83,6 +101,18 @@ function MenuEditPanelComponent({
   visibleCategories,
   onToggleCategory,
   onClearSelectedCategories,
+  editableCategories,
+  categoriesSaving,
+  categoriesMessage,
+  newCategorySlug,
+  newCategoryLabel,
+  newCategoryKind,
+  onNewCategorySlugChange,
+  onNewCategoryLabelChange,
+  onNewCategoryKindChange,
+  onAddCategory,
+  onToggleCategoryActive,
+  onDeleteCategory,
   filteredItems,
   newItemLanguage,
   onSetNewItemLanguage,
@@ -126,6 +156,65 @@ function MenuEditPanelComponent({
         </button>
       </div>
       <div className="orders-filter">
+        <div style={{ marginBottom: 12 }}>
+          <strong>Categories manager</strong>
+          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+            <input
+              value={newCategorySlug}
+              onChange={(event) => onNewCategorySlugChange(event.target.value)}
+              placeholder="New category slug (e.g. soups)"
+            />
+            <input
+              value={newCategoryLabel}
+              onChange={(event) => onNewCategoryLabelChange(event.target.value)}
+              placeholder="Label (e.g. 🍲 Soups)"
+            />
+            <select
+              value={newCategoryKind}
+              onChange={(event) =>
+                onNewCategoryKindChange(
+                  event.target.value as Exclude<MenuCategoryKind, "addons">
+                )
+              }
+            >
+              <option value="dishes">Dishes</option>
+              <option value="drinks">Drinks</option>
+            </select>
+            <button
+              type="button"
+              className="button-success"
+              onClick={() => void onAddCategory()}
+              disabled={categoriesSaving}
+            >
+              {categoriesSaving ? "Saving..." : "Add category"}
+            </button>
+          </div>
+          {categoriesMessage ? <p style={{ marginTop: 8 }}>{categoriesMessage}</p> : null}
+          <div className="orders-filter__chips" style={{ marginTop: 8 }}>
+            {editableCategories.map((category) => (
+              <div
+                key={category.slug}
+                style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
+              >
+                <button
+                  type="button"
+                  className="orders-filter__chip"
+                  onClick={() => void onToggleCategoryActive(category.slug)}
+                >
+                  {category.active ? "✅" : "🚫"} {category.label}
+                </button>
+                <button
+                  type="button"
+                  className="button-danger"
+                  onClick={() => void onDeleteCategory(category.slug)}
+                  disabled={categoriesSaving}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="orders-filter__chips">
           <button
             type="button"

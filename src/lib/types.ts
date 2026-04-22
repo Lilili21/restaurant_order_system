@@ -16,34 +16,7 @@ export type Table = {
   qrCodeValue: string;
 };
 
-export type MenuCategory =
-  | "starters"
-  | "mains"
-  | "main_dishes"
-  | "buters"
-  | "sweet"
-  | "cakes"
-  | "drinks"
-  | "fluids"
-  | "draft"
-  | "bottled"
-  | "fuel"
-  | "whiskey"
-  | "vodka"
-  | "rum"
-  | "cognac"
-  | "gin"
-  | "tequila"
-  | "absent"
-  | "ouzo"
-  | "likers"
-  | "alcohol"
-  | "cocktails"
-  | "chasers"
-  | "two_component_mixture"
-  | "dot4"
-  | "non_alcoholic_drinks"
-  | "desserts";
+export type MenuCategory = string;
 export type MenuLanguage = "he" | "en" | "ru";
 export type MenuBadge =
   | "chef_special"

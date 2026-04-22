@@ -8,7 +8,6 @@ import type { MenuCategory } from "@/lib/types";
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
   "mains",
-  "main_dishes",
   "buters",
   "sweet",
   "cakes",
@@ -34,6 +33,18 @@ const MENU_CATEGORIES: MenuCategory[] = [
   "non_alcoholic_drinks",
   "desserts"
 ];
+
+function normalizeLegacyMenuCategory(
+  value: unknown
+): MenuCategory | null {
+  if (value === "main_dishes") {
+    return "mains";
+  }
+
+  return MENU_CATEGORIES.includes(value as MenuCategory)
+    ? (value as MenuCategory)
+    : null;
+}
 
 export type PromotionSettings = {
   id: string;
@@ -341,9 +352,9 @@ function normalizeSettings(
       : DEFAULT_SETTINGS.orderNumberPrefix;
   const showGuestOrderHistory = Boolean(settings?.showGuestOrderHistory);
   const happyHourCategories = Array.isArray(settings?.happyHourCategories)
-    ? settings.happyHourCategories.filter((value): value is MenuCategory =>
-        MENU_CATEGORIES.includes(value as MenuCategory)
-      )
+    ? settings.happyHourCategories
+        .map((value) => normalizeLegacyMenuCategory(value))
+        .filter((value): value is MenuCategory => value !== null)
     : [];
   const happyHourDays = Array.isArray(settings?.happyHourDays)
     ? [...new Set(
@@ -372,9 +383,9 @@ function normalizeSettings(
     }
 
     const categories = Array.isArray(promotion.categories)
-      ? promotion.categories.filter((value): value is MenuCategory =>
-          MENU_CATEGORIES.includes(value as MenuCategory)
-        )
+      ? promotion.categories
+          .map((value) => normalizeLegacyMenuCategory(value))
+          .filter((value): value is MenuCategory => value !== null)
       : [];
     const days = Array.isArray(promotion.days)
       ? [...new Set(
@@ -418,9 +429,9 @@ function normalizeSettings(
     }
 
     const categories = Array.isArray(businessLunch.categories)
-      ? businessLunch.categories.filter((value): value is MenuCategory =>
-          MENU_CATEGORIES.includes(value as MenuCategory)
-        )
+      ? businessLunch.categories
+          .map((value) => normalizeLegacyMenuCategory(value))
+          .filter((value): value is MenuCategory => value !== null)
       : [];
     const days = Array.isArray(businessLunch.days)
       ? [...new Set(
@@ -508,11 +519,9 @@ function normalizeSettings(
               : "";
           const suggestedType =
             recommendation.suggestedType === "category" ? "category" : "item";
-          const suggestedCategory =
-            typeof recommendation.suggestedCategory === "string" &&
-            MENU_CATEGORIES.includes(recommendation.suggestedCategory as MenuCategory)
-              ? (recommendation.suggestedCategory as MenuCategory)
-              : null;
+          const suggestedCategory = normalizeLegacyMenuCategory(
+            recommendation.suggestedCategory
+          );
 
           if (
             !triggerItemId ||

@@ -8,6 +8,10 @@ import { MenuAlertsPanel } from "@/components/admin/MenuAlertsPanel";
 import { MenuEditPanel } from "@/components/admin/MenuEditPanel";
 import { MenuPreviewPanel } from "@/components/admin/MenuPreviewPanel";
 import { ControlCenterToolbar } from "@/components/admin/ControlCenterToolbar";
+import type {
+  MenuCategoryDefinition,
+  MenuCategoryKind
+} from "@/lib/menu-categories";
 import { formatCurrency } from "@/lib/menu";
 import { agorotToShekels, percentToBps, shekelsToAgorot } from "@/lib/money";
 import type {
@@ -28,58 +32,6 @@ import type {
   EditablePromotion
 } from "@/components/admin/MenuPromotionTypes";
 
-const categoryLabels: Record<MenuCategory, string> = {
-  starters: "🥗 Starters",
-  mains: "🍲 Main courses",
-  main_dishes: "🍽️ Main dishes",
-  buters: "🥪 Buters",
-  sweet: "🥞 Sweet",
-  cakes: "🎂 Cakes",
-  drinks: "🍹 Drinks",
-  fluids: "🍹 Fluids",
-  draft: "🍺 Draft",
-  bottled: "🍾 Bottled",
-  fuel: "⛽ Fuel",
-  whiskey: "🥃 Whiskey",
-  vodka: "🍸 Vodka",
-  rum: "🥃 Rum",
-  cognac: "🥃 Cognac",
-  gin: "🍸 GIN",
-  tequila: "🍸 Tequila",
-  absent: "🍸 Absent",
-  ouzo: "🍸 Ouzo",
-  likers: "🍷 Likers",
-  alcohol: "🍷 Alcohol",
-  cocktails: "🍸 Cocktails",
-  chasers: "🥃 Chasers",
-  two_component_mixture: "🧪 2 component mixture",
-  dot4: "🛢 DOT 4",
-  non_alcoholic_drinks: "🥤 Non-alcoholic drinks",
-  desserts: "🍰 Desserts"
-};
-
-const drinkCategories: MenuCategory[] = [
-  "fluids",
-  "draft",
-  "bottled",
-  "fuel",
-  "whiskey",
-  "vodka",
-  "rum",
-  "cognac",
-  "gin",
-  "tequila",
-  "absent",
-  "ouzo",
-  "likers",
-  "alcohol",
-  "cocktails",
-  "chasers",
-  "two_component_mixture",
-  "dot4",
-  "non_alcoholic_drinks"
-];
-
 const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
   { value: "chef_special", label: "🔥 Chef's special" },
   { value: "most_popular", label: "⭐ Most popular" },
@@ -97,17 +49,6 @@ const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
 const drinkBadgeOptions = badgeOptions.filter(
   (badge) => badge.value === "most_popular" || badge.value === "new"
 );
-const dishCategories = (Object.keys(categoryLabels) as MenuCategory[]).filter(
-  (category) => category !== "drinks" && !drinkCategories.includes(category)
-);
-const simuLevDishCategories: MenuCategory[] = [
-  "main_dishes",
-  "buters",
-  "sweet",
-  "cakes"
-];
-const defaultDishCategories: MenuCategory[] = ["starters", "mains", "desserts"];
-const allDrinkCategories = [...drinkCategories];
 const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const DASHBOARD_ACTIVE_POLL_MS = 12_000;
 const DASHBOARD_HIDDEN_POLL_MS = 30_000;
@@ -127,6 +68,25 @@ function normalizeDiscountPercentInput(value: string) {
 
   const normalizedBps = percentToBps(parsed);
   return normalizedBps / 100;
+}
+
+function toMenuCategory(value: string): MenuCategory {
+  return value as MenuCategory;
+}
+
+function humanizeCategorySlug(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+    .trim();
+}
+
+function normalizeCategoryLabel(value: string, slug: string) {
+  const trimmed = value.trim();
+  if (trimmed) {
+    return trimmed;
+  }
+  return humanizeCategorySlug(slug) || "Category";
 }
 
 type InsightStats = {
@@ -186,6 +146,10 @@ type RecommendationSmartSuggestion = {
   suggestedType: "item" | "category";
   suggestedItemId: string;
   suggestedCategory: MenuCategory | "";
+};
+
+type EditableCategoryDefinition = MenuCategoryDefinition & {
+  kind: Exclude<MenuCategoryKind, "addons">;
 };
 
 type EditableMenuItem = MenuItem & {
@@ -510,14 +474,6 @@ function readImageFile(file: File) {
   });
 }
 
-function getCategoryOptions(kind: "dishes" | "drinks") {
-  return kind === "drinks" ? allDrinkCategories : dishCategories;
-}
-
-function getItemKind(category: MenuCategory): "dishes" | "drinks" {
-  return drinkCategories.includes(category) ? "drinks" : "dishes";
-}
-
 function getBadgeOptionsForKind(kind: "dishes" | "drinks") {
   return kind === "drinks" ? drinkBadgeOptions : badgeOptions;
 }
@@ -789,6 +745,15 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     useState<RestaurantOrderMode>("tables");
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
+  const [categoryDefinitions, setCategoryDefinitions] = useState<
+    EditableCategoryDefinition[]
+  >([]);
+  const [categoriesSaving, setCategoriesSaving] = useState(false);
+  const [categoriesMessage, setCategoriesMessage] = useState<string | null>(null);
+  const [newCategorySlug, setNewCategorySlug] = useState("");
+  const [newCategoryLabel, setNewCategoryLabel] = useState("");
+  const [newCategoryKind, setNewCategoryKind] =
+    useState<Exclude<MenuCategoryKind, "addons">>("dishes");
   const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [recommendationsOpen, setRecommendationsOpen] = useState(false);
@@ -823,7 +788,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     image: "",
     showImage: true,
     badges: [],
-    category: "starters",
+    category: "",
     available: true,
     saving: false
   });
@@ -843,44 +808,94 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     () => isSimuLevRestaurantSlug(restaurantSlug),
     [restaurantSlug]
   );
-  const activeDishCategories = useMemo<MenuCategory[]>(
-    () => (enableDishAddons ? simuLevDishCategories : defaultDishCategories),
-    [enableDishAddons]
+  const categoryLabels = useMemo<Record<MenuCategory, string>>(() => {
+    const nextLabels: Record<MenuCategory, string> = {};
+
+    for (const category of categoryDefinitions) {
+      nextLabels[toMenuCategory(category.slug)] = normalizeCategoryLabel(
+        category.label,
+        category.slug
+      );
+    }
+
+    for (const item of items) {
+      if (!nextLabels[item.category]) {
+        nextLabels[item.category] = humanizeCategorySlug(item.category);
+      }
+    }
+
+    return nextLabels;
+  }, [categoryDefinitions, items]);
+  const activeDishCategories = useMemo<MenuCategory[]>(() => {
+    const configured = categoryDefinitions
+      .filter((category) => category.active && category.kind === "dishes")
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((category) => toMenuCategory(category.slug));
+
+    return configured;
+  }, [categoryDefinitions]);
+  const activeDrinkCategories = useMemo<MenuCategory[]>(() => {
+    const configured = categoryDefinitions
+      .filter((category) => category.active && category.kind === "drinks")
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((category) => toMenuCategory(category.slug));
+
+    return configured;
+  }, [categoryDefinitions]);
+  const isDrinkCategory = useCallback(
+    (category: MenuCategory) => activeDrinkCategories.includes(category),
+    [activeDrinkCategories]
   );
   const resolveCategoryOptions = useCallback(
     (kind: "dishes" | "drinks") =>
-      kind === "drinks" ? allDrinkCategories : activeDishCategories,
-    [activeDishCategories]
+      kind === "drinks" ? activeDrinkCategories : activeDishCategories,
+    [activeDishCategories, activeDrinkCategories]
   );
   const preferredNewItemCategory = useMemo<MenuCategory>(() => {
+    const sourceCategories =
+      selectedKind === "drinks" ? activeDrinkCategories : activeDishCategories;
     const filteredCategory = selectedCategories.find((category) =>
-      selectedKind === "drinks"
-        ? drinkCategories.includes(category)
-        : activeDishCategories.includes(category)
+      sourceCategories.includes(category)
     );
 
     if (filteredCategory) {
       return filteredCategory;
     }
 
-    return selectedKind === "drinks" ? drinkCategories[0] : activeDishCategories[0];
-  }, [activeDishCategories, selectedCategories, selectedKind]);
-  useEffect(() => {
-    setNewItem((current) => {
-      if (drinkCategories.includes(current.category)) {
-        return current;
-      }
+    if (filteredCategory) {
+      return filteredCategory;
+    }
 
-      if (activeDishCategories.includes(current.category)) {
+    if (sourceCategories.length > 0) {
+      return sourceCategories[0];
+    }
+
+    return "";
+  }, [
+    activeDishCategories,
+    activeDrinkCategories,
+    selectedCategories,
+    selectedKind
+  ]);
+  useEffect(() => {
+    const sourceCategories =
+      selectedKind === "drinks" ? activeDrinkCategories : activeDishCategories;
+
+    if (sourceCategories.length === 0) {
+      return;
+    }
+
+    setNewItem((current) => {
+      if (sourceCategories.includes(current.category)) {
         return current;
       }
 
       return {
         ...current,
-        category: activeDishCategories[0]
+        category: sourceCategories[0]
       };
     });
-  }, [activeDishCategories]);
+  }, [activeDishCategories, activeDrinkCategories, selectedKind]);
   useEffect(() => {
     onOrderModeChange?.(restaurantOrderMode);
   }, [onOrderModeChange, restaurantOrderMode]);
@@ -917,15 +932,18 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       recommendationRules.map((rule) => {
         const triggerItem = items.find((item) => item.id === rule.triggerItemId);
         const triggerIsDrink = triggerItem
-          ? drinkCategories.includes(triggerItem.draftCategory)
+          ? isDrinkCategory(triggerItem.draftCategory)
           : false;
-        const candidateCategories = triggerItem
-          ? triggerItem.draftCategory === "desserts"
-            ? (["non_alcoholic_drinks", "drinks"] as MenuCategory[])
-            : triggerIsDrink
-              ? (["starters", "mains", "desserts"] as MenuCategory[])
-              : (["desserts", "non_alcoholic_drinks", "drinks"] as MenuCategory[])
-          : (["desserts", "non_alcoholic_drinks", "starters", "mains"] as MenuCategory[]);
+        const orderedCandidates = triggerItem
+          ? triggerIsDrink
+            ? [...activeDishCategories, ...activeDrinkCategories]
+            : [...activeDrinkCategories, ...activeDishCategories]
+          : [...activeDishCategories, ...activeDrinkCategories];
+        const candidateCategories = orderedCandidates.filter(
+          (category, index, current) =>
+            current.indexOf(category) === index &&
+            category !== triggerItem?.draftCategory
+        );
 
         const nextSuggestions: RecommendationSmartSuggestion[] = [];
 
@@ -940,7 +958,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
           nextSuggestions.push({
             id: `${rule.id}-category-${category}`,
-            label: `Suggest ${categoryLabels[category]}`,
+            label: `Suggest ${categoryLabels[category] ?? humanizeCategorySlug(category)}`,
             suggestedType: "category",
             suggestedItemId: "",
             suggestedCategory: category
@@ -967,7 +985,14 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         return [rule.id, dedupedSuggestions.slice(0, 6)];
       })
     );
-  }, [items, recommendationRules]);
+  }, [
+    activeDishCategories,
+    activeDrinkCategories,
+    categoryLabels,
+    isDrinkCategory,
+    items,
+    recommendationRules
+  ]);
   const recommendations = useMemo<RecommendationItem[]>(() => {
     const normalizeAdviceName = (value: string) =>
       value
@@ -979,20 +1004,20 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     const unavailableDishes = items
       .filter(
         (item) =>
-          !item.available && !drinkCategories.includes(item.draftCategory)
+          !item.available && !isDrinkCategory(item.draftCategory)
       )
       .slice(0, 3);
     const unavailableDrinks = items
       .filter(
         (item) =>
-          !item.available && drinkCategories.includes(item.draftCategory)
+          !item.available && isDrinkCategory(item.draftCategory)
       )
       .slice(0, 3);
     const availableDishes = availableItems.filter(
-      (item) => !drinkCategories.includes(item.draftCategory)
+      (item) => !isDrinkCategory(item.draftCategory)
     );
     const availableDrinks = availableItems.filter((item) =>
-      drinkCategories.includes(item.draftCategory)
+      isDrinkCategory(item.draftCategory)
     );
     const dishesWithoutDescription = availableDishes
       .filter(
@@ -1013,19 +1038,19 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       (item) => !item.draftImage.trim() || !item.draftShowImage
     );
     const imageDishes = itemsWithoutImage
-      .filter((item) => !drinkCategories.includes(item.draftCategory))
+      .filter((item) => !isDrinkCategory(item.draftCategory))
       .slice(0, 3);
     const imageDrinks = itemsWithoutImage
-      .filter((item) => drinkCategories.includes(item.draftCategory))
+      .filter((item) => isDrinkCategory(item.draftCategory))
       .slice(0, 3);
     const itemsWithoutBadges = availableItems.filter(
       (item) => (item.draftBadges ?? []).length === 0
     );
     const badgeDishes = itemsWithoutBadges
-      .filter((item) => !drinkCategories.includes(item.draftCategory))
+      .filter((item) => !isDrinkCategory(item.draftCategory))
       .slice(0, 3);
     const badgeDrinks = itemsWithoutBadges
-      .filter((item) => drinkCategories.includes(item.draftCategory))
+      .filter((item) => isDrinkCategory(item.draftCategory))
       .slice(0, 3);
     const hiddenImageDishes = availableDishes
       .filter((item) => item.draftImage.trim() && !item.draftShowImage)
@@ -1057,12 +1082,14 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         );
       })
       .slice(0, 3);
-    const startersAvailable = availableDishes.some(
-      (item) => item.draftCategory === "starters"
-    );
-    const mainsAvailable = availableDishes.some(
-      (item) => item.draftCategory === "mains"
-    );
+    const primaryDishCategory = activeDishCategories[0] ?? null;
+    const secondaryDishCategory = activeDishCategories[1] ?? null;
+    const startersAvailable = primaryDishCategory
+      ? availableDishes.some((item) => item.draftCategory === primaryDishCategory)
+      : true;
+    const mainsAvailable = secondaryDishCategory
+      ? availableDishes.some((item) => item.draftCategory === secondaryDishCategory)
+      : true;
     const hasEnabledBusinessLunch = businessLunches.some(
       (businessLunch) => businessLunch.enabled
     );
@@ -1287,11 +1314,11 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     if (!startersAvailable || !mainsAvailable) {
       const missingCategories = [
-        !startersAvailable ? "starters" : null,
-        !mainsAvailable ? "mains" : null
+        !startersAvailable ? primaryDishCategory : null,
+        !mainsAvailable ? secondaryDishCategory : null
       ].filter(Boolean) as MenuCategory[];
       const missingCategoryLabels = missingCategories.map(
-        (category) => categoryLabels[category]
+        (category) => categoryLabels[category] ?? humanizeCategorySlug(category)
       );
 
       nextRecommendations.push({
@@ -1383,10 +1410,13 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     return nextRecommendations.slice(0, 10);
   }, [
+    activeDishCategories,
     businessLunches,
+    categoryLabels,
     insightStats.lowDish,
     insightStats.peakHour,
     insightStats.topDish,
+    isDrinkCategory,
     items,
     promotions
   ]);
@@ -1444,7 +1474,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       loadingInFlight = true;
 
       try {
-        const [menuResult, settingsResult, analyticsResult] =
+        const [menuResult, settingsResult, analyticsResult, categoriesResult] =
           await Promise.allSettled([
             fetchDashboardResource(`/api/menu?restaurantSlug=${restaurantSlug}`, {
               cache: "no-store",
@@ -1455,6 +1485,13 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
             }),
             fetchDashboardResource(
               `/api/admin-analytics?restaurantSlug=${restaurantSlug}`,
+              {
+                cache: "no-store",
+                headers: authHeaders
+              }
+            ),
+            fetchDashboardResource(
+              `/api/menu-categories?restaurantSlug=${restaurantSlug}`,
               {
                 cache: "no-store",
                 headers: authHeaders
@@ -1472,6 +1509,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           settingsResult.status === "fulfilled" ? settingsResult.value : null;
         const analyticsResponse =
           analyticsResult.status === "fulfilled" ? analyticsResult.value : null;
+        const categoriesResponse =
+          categoriesResult.status === "fulfilled" ? categoriesResult.value : null;
 
         if (menuResponse?.ok) {
           const data = (await menuResponse.json()) as MenuItem[];
@@ -1588,6 +1627,34 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           setRestaurantOrderMode(
             settings.orderMode === "counter" ? "counter" : "tables"
           );
+          hasSuccessfulResponse = true;
+        }
+
+        if (categoriesResponse?.ok) {
+          const categoriesData = (await categoriesResponse.json()) as
+            | MenuCategoryDefinition[]
+            | null;
+
+          const normalized = Array.isArray(categoriesData)
+            ? categoriesData
+                .filter(
+                  (category): category is EditableCategoryDefinition =>
+                    Boolean(category?.slug) &&
+                    (category.kind === "dishes" || category.kind === "drinks")
+                )
+                .map((category, index) => ({
+                  slug: String(category.slug),
+                  label: String(category.label ?? ""),
+                  kind: category.kind,
+                  active: category.active !== false,
+                  linkedSlug: category.linkedSlug ?? null,
+                  sortOrder: Number.isFinite(Number(category.sortOrder))
+                    ? Number(category.sortOrder)
+                    : (index + 1) * 10
+                }))
+            : [];
+
+          setCategoryDefinitions(normalized);
           hasSuccessfulResponse = true;
         }
 
@@ -2823,7 +2890,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       )
     );
 
-    const itemKind = getItemKind(currentItem.draftCategory);
+    const itemKind = getItemKindByCategory(currentItem.draftCategory);
     const keepDishAddons =
       enableDishAddons && itemKind === "dishes";
     const includeVolumeOptions = itemKind === "drinks" || keepDishAddons;
@@ -3078,10 +3145,23 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       (Object.entries(categoryLabels) as Array<[MenuCategory, string]>).filter(
         ([value]) =>
           selectedKind === "drinks"
-            ? drinkCategories.includes(value)
-            : value !== "drinks" && !drinkCategories.includes(value)
+            ? activeDrinkCategories.includes(value)
+            : value !== "drinks" && !activeDrinkCategories.includes(value)
       ),
-    [selectedKind]
+    [activeDrinkCategories, categoryLabels, selectedKind]
+  );
+  const editableCategories = useMemo(
+    () =>
+      categoryDefinitions
+        .filter((category) => category.kind === selectedKind)
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    [categoryDefinitions, selectedKind]
+  );
+
+  const getItemKindByCategory = useCallback(
+    (category: MenuCategory): "dishes" | "drinks" =>
+      isDrinkCategory(category) ? "drinks" : "dishes",
+    [isDrinkCategory]
   );
 
   const filteredItems = useMemo(
@@ -3089,14 +3169,20 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       items.filter(
         (item) =>
           (selectedKind === "drinks"
-            ? drinkCategories.includes(item.category)
-            : !drinkCategories.includes(item.category)) &&
+            ? isDrinkCategory(item.category)
+            : !isDrinkCategory(item.category)) &&
           (!recommendationFocusItemIds ||
             recommendationFocusItemIds.includes(item.id)) &&
           (selectedCategories.length === 0 ||
             selectedCategories.includes(item.category))
       ),
-    [items, recommendationFocusItemIds, selectedCategories, selectedKind]
+    [
+      isDrinkCategory,
+      items,
+      recommendationFocusItemIds,
+      selectedCategories,
+      selectedKind
+    ]
   );
 
   useEffect(() => {
@@ -3137,7 +3223,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     itemId: string,
     nextCategory: MenuCategory
   ) {
-    const nextKind = getItemKind(nextCategory);
+    const nextKind = getItemKindByCategory(nextCategory);
     const allowedBadges = getBadgeOptionsForKind(nextKind).map(
       (badge) => badge.value
     );
@@ -3160,7 +3246,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           : currentItem
       )
     );
-  }, [enableDishAddons]);
+  }, [enableDishAddons, getItemKindByCategory]);
 
   const toggleItemDescription = useCallback(function toggleItemDescription(
     itemId: string
@@ -3251,6 +3337,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setRecommendationFocusItemIds(null);
     setSelectedKind("dishes");
     setSelectedCategories([]);
+    if (activeDishCategories.length === 0) {
+      return;
+    }
     setNewItem((current) => ({
       ...current,
       category: activeDishCategories.includes(current.category)
@@ -3267,16 +3356,145 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setRecommendationFocusItemIds(null);
     setSelectedKind("drinks");
     setSelectedCategories([]);
+    if (activeDrinkCategories.length === 0) {
+      return;
+    }
     setNewItem((current) => ({
       ...current,
-      category: drinkCategories.includes(current.category)
+      category: activeDrinkCategories.includes(current.category)
         ? current.category
-        : drinkCategories[0],
+        : activeDrinkCategories[0],
       badges: current.badges.filter((badge) =>
         getBadgeOptionsForKind("drinks").some((option) => option.value === badge)
       )
     }));
-  }, []);
+  }, [activeDrinkCategories]);
+
+  const saveCategoryDefinitions = useCallback(
+    async (nextDefinitions: EditableCategoryDefinition[]) => {
+      setCategoriesSaving(true);
+      setCategoriesMessage(null);
+
+      const response = await fetch("/api/menu-categories", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+          "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+        },
+        body: JSON.stringify({
+          restaurantSlug,
+          categories: nextDefinitions
+        })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        setCategoriesSaving(false);
+        setCategoriesMessage(payload?.message || "Failed to save categories.");
+        return null;
+      }
+
+      const saved = (await response.json()) as MenuCategoryDefinition[];
+      const normalizedSaved = Array.isArray(saved)
+        ? saved
+            .filter(
+              (category): category is EditableCategoryDefinition =>
+                Boolean(category?.slug) &&
+                (category.kind === "dishes" || category.kind === "drinks")
+            )
+            .map((category, index) => ({
+              slug: String(category.slug),
+              label: String(category.label ?? ""),
+              kind: category.kind,
+              active: category.active !== false,
+              linkedSlug: category.linkedSlug ?? null,
+              sortOrder: Number.isFinite(Number(category.sortOrder))
+                ? Number(category.sortOrder)
+                : (index + 1) * 10
+            }))
+        : [];
+      setCategoryDefinitions(normalizedSaved);
+      setCategoriesSaving(false);
+      setCategoriesMessage("Categories saved.");
+      return normalizedSaved;
+    },
+    [restaurantSlug, secondaryCredentials?.login, secondaryCredentials?.password]
+  );
+
+  const addCategoryDefinition = useCallback(async () => {
+    const normalizedSlug = newCategorySlug
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_-]/g, "");
+
+    if (!normalizedSlug) {
+      setCategoriesMessage("Category slug is required.");
+      return;
+    }
+
+    if (categoryDefinitions.some((category) => category.slug === normalizedSlug)) {
+      setCategoriesMessage("This category already exists.");
+      return;
+    }
+
+    const nextDefinitions = [
+      ...categoryDefinitions,
+      {
+        slug: normalizedSlug,
+        label: newCategoryLabel.trim() || humanizeCategorySlug(normalizedSlug),
+        kind: newCategoryKind,
+        active: true,
+        linkedSlug: null,
+        sortOrder: (categoryDefinitions.length + 1) * 10
+      }
+    ];
+
+    const saved = await saveCategoryDefinitions(nextDefinitions);
+    if (saved) {
+      setNewCategorySlug("");
+      setNewCategoryLabel("");
+    }
+  }, [
+    categoryDefinitions,
+    newCategoryKind,
+    newCategoryLabel,
+    newCategorySlug,
+    saveCategoryDefinitions
+  ]);
+
+  const toggleCategoryDefinitionActive = useCallback(
+    async (slug: string) => {
+      const nextDefinitions = categoryDefinitions.map((category) =>
+        category.slug === slug
+          ? { ...category, active: !category.active }
+          : category
+      );
+      await saveCategoryDefinitions(nextDefinitions);
+    },
+    [categoryDefinitions, saveCategoryDefinitions]
+  );
+
+  const deleteCategoryDefinition = useCallback(
+    async (slug: string) => {
+      const hasLinkedItems = items.some((item) => item.category === slug);
+      if (hasLinkedItems) {
+        setCategoriesMessage(
+          "Cannot delete category with existing menu items. Move items first."
+        );
+        return;
+      }
+
+      const nextDefinitions = categoryDefinitions.filter(
+        (category) => category.slug !== slug
+      );
+      await saveCategoryDefinitions(nextDefinitions);
+    },
+    [categoryDefinitions, items, saveCategoryDefinitions]
+  );
 
   const togglePreview = useCallback(() => {
     setPreviewOpen((current) => {
@@ -3592,7 +3810,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         saveBarOpenSettings={saveBarOpenSettings}
         setBarOpenUntil={setBarOpenUntil}
         dishCategories={activeDishCategories}
-        allDrinkCategories={allDrinkCategories}
+        allDrinkCategories={activeDrinkCategories}
         categoryLabels={categoryLabels}
       />
       <MenuEditPanel
@@ -3606,6 +3824,18 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         visibleCategories={visibleCategories}
         onToggleCategory={toggleCategory}
         onClearSelectedCategories={clearSelectedCategories}
+        editableCategories={editableCategories}
+        categoriesSaving={categoriesSaving}
+        categoriesMessage={categoriesMessage}
+        newCategorySlug={newCategorySlug}
+        newCategoryLabel={newCategoryLabel}
+        newCategoryKind={newCategoryKind}
+        onNewCategorySlugChange={setNewCategorySlug}
+        onNewCategoryLabelChange={setNewCategoryLabel}
+        onNewCategoryKindChange={setNewCategoryKind}
+        onAddCategory={addCategoryDefinition}
+        onToggleCategoryActive={toggleCategoryDefinitionActive}
+        onDeleteCategory={deleteCategoryDefinition}
         filteredItems={filteredItems}
         newItemLanguage={newItemLanguage}
         onSetNewItemLanguage={setNewItemLanguage}
@@ -3623,7 +3853,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         addVolumeRow={addVolumeRow}
         removeVolumeRow={removeVolumeRow}
         updateVolumeRow={updateVolumeRow}
-        getItemKind={getItemKind}
+        getItemKind={getItemKindByCategory}
         getItemLanguage={getItemLanguage}
         setItemLanguage={setItemLanguage}
         expandedDescriptions={expandedDescriptions}

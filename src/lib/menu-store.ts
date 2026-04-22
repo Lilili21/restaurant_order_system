@@ -73,6 +73,10 @@ type MenuItemRow = {
   sort_order: number | null;
 };
 
+function normalizeLegacyMenuCategory(value: string): MenuCategory {
+  return value === "main_dishes" ? "mains" : (value as MenuCategory);
+}
+
 function isMissingPriceAgorotColumnError(error: unknown) {
   const message =
     error instanceof Error
@@ -180,7 +184,7 @@ function mapMenuItemRowToMenuItem(
   return normalizeMenuItem({
     id: row.id,
     restaurantSlug,
-    category: row.category as MenuCategory,
+    category: normalizeLegacyMenuCategory(row.category),
     name: row.name_he ?? row.name_en ?? row.name_ru ?? "",
     description:
       row.description_he ?? row.description_en ?? row.description_ru ?? "",
@@ -206,7 +210,7 @@ function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
   return {
     id: item.id,
     restaurant_id: restaurantId,
-    category: item.category,
+    category: normalizeLegacyMenuCategory(item.category),
     name_he: item.nameHe,
     name_en: item.nameEn,
     name_ru: item.nameRu ?? item.nameEn,
@@ -388,6 +392,7 @@ function normalizeMenuItem(item: MenuItem): MenuItem {
 
   return {
     ...item,
+    category: normalizeLegacyMenuCategory(item.category),
     name: nameHe,
     description: descriptionHe,
     nameHe,

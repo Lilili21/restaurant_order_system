@@ -23,7 +23,6 @@ export const maxDuration = 8;
 const MENU_CATEGORIES: MenuCategory[] = [
   "starters",
   "mains",
-  "main_dishes",
   "buters",
   "sweet",
   "cakes",

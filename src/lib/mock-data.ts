@@ -133,7 +133,7 @@ export const menuItems: MenuItem[] = [
   {
     id: "simulev_main_1",
     restaurantSlug: "simuLev",
-    category: "main_dishes",
+    category: "mains",
     nameHe: "דרניקי",
     name: "דרניקי",
     description: "לביבות תפוחי אדמה. וריאציית קישוא זמינה במחיר 42 ₪.",
@@ -162,7 +162,7 @@ export const menuItems: MenuItem[] = [
   {
     id: "simulev_main_2",
     restaurantSlug: "simuLev",
-    category: "main_dishes",
+    category: "mains",
     nameHe: "קולדוני עם פטריות",
     name: "קולדוני עם פטריות",
     description: "כיסוני תפוחי אדמה ממולאים בפטריות.",
@@ -191,7 +191,7 @@ export const menuItems: MenuItem[] = [
   {
     id: "simulev_main_3",
     restaurantSlug: "simuLev",
-    category: "main_dishes",
+    category: "mains",
     nameHe: "פלמני בקר",
     name: "פלמני בקר",
     description: "פלמני ביתיים במילוי בקר עסיסי.",
@@ -220,7 +220,7 @@ export const menuItems: MenuItem[] = [
   {
     id: "simulev_main_4",
     restaurantSlug: "simuLev",
-    category: "main_dishes",
+    category: "mains",
     nameHe: "וורניקי תפוחי אדמה ופטריות",
     name: "וורניקי תפוחי אדמה ופטריות",
     description: "וורניקי קלאסיים במילוי תפוחי אדמה ופטריות.",
@@ -249,7 +249,7 @@ export const menuItems: MenuItem[] = [
   {
     id: "simulev_main_5",
     restaurantSlug: "simuLev",
-    category: "main_dishes",
+    category: "mains",
     nameHe: "חינקלי",
     name: "חינקלי",
     description: "כיסוני בצק גאורגיים עסיסיים במתכון קלאסי.",

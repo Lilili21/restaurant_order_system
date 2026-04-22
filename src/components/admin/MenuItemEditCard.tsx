@@ -175,7 +175,7 @@ export function MenuItemEditCard({
         >
           {itemCategoryOptions.map((value) => (
             <option key={value} value={value}>
-              {categoryLabels[value]}
+              {categoryLabels[value] ?? value}
             </option>
           ))}
         </select>

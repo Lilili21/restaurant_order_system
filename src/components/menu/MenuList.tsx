@@ -37,9 +37,8 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 שתייה",
     starters: "🥗 מנות פתיחה",
     mains: "🍲 עיקריות",
-    main_dishes: "🍽️ מנות עיקריות",
     buters: "🥪 סנדוויצ'ים",
-    sweet: "🥞 מתוקים",
+    sweet: "🥞 מנות מתוקות",
     cakes: "🎂 עוגות",
     drinks: "🍹 משקאות",
     fluids: "🍹 משקאות קלים",
@@ -68,9 +67,8 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 Drinks",
     starters: "🥗 Starters",
     mains: "🍲 Main courses",
-    main_dishes: "🍽️ Main dishes",
-    buters: "🥪 Buttered sandwiches",
-    sweet: "🥞 Sweets",
+    buters: "🥪 Sandwiches",
+    sweet: "🥞 Sweet Dishes",
     cakes: "🎂 Cakes",
     drinks: "🍹 Drinks",
     fluids: "🍹 Fluids",
@@ -99,9 +97,8 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
     drinks_group: "🍹 Напитки",
     starters: "🥗 Закуски",
     mains: "🍲 Основные блюда",
-    main_dishes: "🍽️ Основные блюда",
-    buters: "🥪 Бутеры",
-    sweet: "🥞 Сладкое",
+    buters: "🥪 Бутерброды",
+    sweet: "🥞 Сладкие блюда",
     cakes: "🎂 Торты",
     drinks: "🍹 Напитки",
     fluids: "🍹 Напитки",
@@ -130,7 +127,6 @@ const categoryLabels: Record<MenuLanguage, Record<string, string>> = {
 const categoryOrder: MenuCategory[] = [
   "starters",
   "mains",
-  "main_dishes",
   "buters",
   "sweet",
   "cakes",
@@ -345,8 +341,7 @@ export function MenuList({
 
       {visibleCategories.map((category) => {
           const sectionItems = getCategoryItems(category);
-          const shouldHideSectionHeader =
-            selectedCategory === category && drinkCategories.has(category);
+          const shouldHideSectionHeader = selectedCategory === category;
 
           return (
             <section key={category} className="menu-section">

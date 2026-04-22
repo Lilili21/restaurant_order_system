@@ -32,7 +32,9 @@ function formatPromotionCategorySummary(
   }
 
   if (categories.length <= 2) {
-    return categories.map((category) => categoryLabels[category]).join(", ");
+    return categories
+      .map((category) => categoryLabels[category] ?? category)
+      .join(", ");
   }
 
   return `${categories.length} cats`;
@@ -316,7 +318,7 @@ function MenuAlertsPanelComponent({
                           onClick={() => toggleBusinessLunchDraftCategory(category)}
                           disabled={businessLunchSaving}
                         >
-                          {categoryLabels[category]}
+                          {categoryLabels[category] ?? category}
                         </button>
                       ))}
                     </div>
@@ -336,7 +338,7 @@ function MenuAlertsPanelComponent({
                           onClick={() => toggleBusinessLunchDraftCategory(category)}
                           disabled={businessLunchSaving}
                         >
-                          {categoryLabels[category]}
+                          {categoryLabels[category] ?? category}
                         </button>
                       ))}
                     </div>
@@ -482,7 +484,7 @@ function MenuAlertsPanelComponent({
                           onClick={() => togglePromotionDraftCategory(category)}
                           disabled={promotionSaving}
                         >
-                          {categoryLabels[category]}
+                          {categoryLabels[category] ?? category}
                         </button>
                       ))}
                     </div>
@@ -502,7 +504,7 @@ function MenuAlertsPanelComponent({
                           onClick={() => togglePromotionDraftCategory(category)}
                           disabled={promotionSaving}
                         >
-                          {categoryLabels[category]}
+                          {categoryLabels[category] ?? category}
                         </button>
                       ))}
                     </div>
@@ -974,7 +976,7 @@ function MenuAlertsPanelComponent({
                           key={`suggested-category-${recommendation.id}-${category}`}
                           value={category}
                         >
-                          {categoryLabels[category]}
+                          {categoryLabels[category] ?? category}
                         </option>
                       ))}
                     </select>
@@ -1018,7 +1020,8 @@ function MenuAlertsPanelComponent({
                       }, suggest ${
                         recommendation.suggestedType === "category"
                           ? recommendation.suggestedCategory
-                            ? categoryLabels[recommendation.suggestedCategory]
+                            ? (categoryLabels[recommendation.suggestedCategory] ??
+                              recommendation.suggestedCategory)
                             : "a category"
                           : recommendationItemLabelById[
                               recommendation.suggestedItemId
