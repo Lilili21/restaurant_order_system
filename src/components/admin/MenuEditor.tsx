@@ -81,12 +81,125 @@ function humanizeCategorySlug(value: string) {
     .trim();
 }
 
+function isLikelyDrinkCategorySlug(value: string) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+
+  if (!normalized) {
+    return false;
+  }
+
+  return /drink|alcohol|cocktail|draft|beer|wine|vodka|rum|whisk|tequila|gin|cognac|liker|liqueur|ouzo|absent|chaser|fluid|juice|soda|coffee|tea|kompot|kvas/.test(
+    normalized
+  );
+}
+
 function normalizeCategoryLabel(value: string, slug: string) {
   const trimmed = value.trim();
   if (trimmed) {
     return trimmed;
   }
   return humanizeCategorySlug(slug) || "Category";
+}
+
+function chooseCategoryDisplayLabel(category: Partial<MenuCategoryDefinition>) {
+  const labelEn = String(category.labelEn ?? "").trim();
+
+  if (labelEn) {
+    return labelEn;
+  }
+
+  const fallbackLabel = String(category.label ?? "").trim();
+
+  if (/^[a-z0-9 _-]+$/i.test(fallbackLabel)) {
+    return fallbackLabel;
+  }
+
+  return humanizeCategorySlug(String(category.slug ?? ""));
+}
+
+function slugifyCategoryLabel(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_-]/g, "");
+}
+
+function detectCategoryLabelLanguage(value: string): "he" | "ru" | "en" {
+  if (/[\u0590-\u05FF]/.test(value)) {
+    return "he";
+  }
+
+  if (/[\u0400-\u04FF]/.test(value)) {
+    return "ru";
+  }
+
+  return "en";
+}
+
+function deriveEditorCategoryLabels(
+  category: Partial<MenuCategoryDefinition>,
+  fallbackLabel: string
+) {
+  const labelHe = String(category.labelHe ?? "").trim();
+  const labelEn = String(category.labelEn ?? "").trim();
+  const labelRu = String(category.labelRu ?? "").trim();
+
+  if (labelHe || labelEn || labelRu) {
+    return {
+      labelHe,
+      labelEn,
+      labelRu
+    };
+  }
+
+  const baseLabel = String(category.label ?? "").trim() || fallbackLabel.trim();
+  const language = detectCategoryLabelLanguage(baseLabel);
+
+  return {
+    labelHe: language === "he" ? baseLabel : "",
+    labelEn: language === "en" ? baseLabel : "",
+    labelRu: language === "ru" ? baseLabel : ""
+  };
+}
+
+function mergeDefinitionsWithMenuItems(
+  definitions: EditableCategoryDefinition[],
+  menuItems: MenuItem[]
+) {
+  const existing = new Map(
+    definitions.map((category) => [category.slug, category] as const)
+  );
+  let sortOrder = definitions.reduce(
+    (max, category) => Math.max(max, Number(category.sortOrder) || 0),
+    0
+  );
+
+  for (const item of menuItems) {
+    const slug = String(item.category ?? "").trim().toLowerCase();
+    if (!slug || existing.has(slug)) {
+      continue;
+    }
+
+    sortOrder += 10;
+    existing.set(slug, {
+      slug,
+      label: humanizeCategorySlug(slug),
+      kind: isLikelyDrinkCategorySlug(slug) ? "drinks" : "dishes",
+      active: true,
+      linkedSlug: null,
+      sortOrder
+    });
+  }
+
+  const merged = [...existing.values()].sort(
+    (left, right) => left.sortOrder - right.sortOrder
+  );
+
+  return {
+    merged,
+    changed: merged.length !== definitions.length
+  };
 }
 
 type InsightStats = {
@@ -149,8 +262,43 @@ type RecommendationSmartSuggestion = {
 };
 
 type EditableCategoryDefinition = MenuCategoryDefinition & {
-  kind: Exclude<MenuCategoryKind, "addons">;
+  kind: MenuCategoryKind;
 };
+
+function normalizeEditorCategoryDefinitions(
+  categoriesData: MenuCategoryDefinition[] | null
+): EditableCategoryDefinition[] {
+  if (!Array.isArray(categoriesData)) {
+    return [];
+  }
+
+  return categoriesData
+    .filter(
+      (category): category is EditableCategoryDefinition =>
+        Boolean(category?.slug) &&
+        (category.kind === "dishes" ||
+          category.kind === "drinks" ||
+          category.kind === "addons")
+    )
+    .map((category, index) => ({
+      slug: String(category.slug),
+      label: chooseCategoryDisplayLabel(category),
+      labelHe: String(category.labelHe ?? "").trim() || undefined,
+      labelEn: String(category.labelEn ?? "").trim() || undefined,
+      labelRu: String(category.labelRu ?? "").trim() || undefined,
+      kind: category.kind,
+      active: category.active !== false,
+      linkedSlug: category.linkedSlug ?? null,
+      linkedSlugs: Array.isArray(category.linkedSlugs)
+        ? category.linkedSlugs
+            .map((entry) => String(entry ?? "").trim().toLowerCase())
+            .filter(Boolean)
+        : undefined,
+      sortOrder: Number.isFinite(Number(category.sortOrder))
+        ? Number(category.sortOrder)
+        : (index + 1) * 10
+    }));
+}
 
 type EditableMenuItem = MenuItem & {
   draftNameHe: string;
@@ -750,10 +898,19 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   >([]);
   const [categoriesSaving, setCategoriesSaving] = useState(false);
   const [categoriesMessage, setCategoriesMessage] = useState<string | null>(null);
-  const [newCategorySlug, setNewCategorySlug] = useState("");
-  const [newCategoryLabel, setNewCategoryLabel] = useState("");
+  const [newCategoryLabelHe, setNewCategoryLabelHe] = useState("");
+  const [newCategoryLabelEn, setNewCategoryLabelEn] = useState("");
+  const [newCategoryLabelRu, setNewCategoryLabelRu] = useState("");
+  const [editingCategorySlug, setEditingCategorySlug] = useState<string | null>(null);
   const [newCategoryKind, setNewCategoryKind] =
     useState<Exclude<MenuCategoryKind, "addons">>("dishes");
+  const [toppingsManagerOpen, setToppingsManagerOpen] = useState(false);
+  const [toppingsSaving, setToppingsSaving] = useState(false);
+  const [toppingsMessage, setToppingsMessage] = useState<string | null>(null);
+  const [newToppingLabelEn, setNewToppingLabelEn] = useState("");
+  const [selectedToppingCategories, setSelectedToppingCategories] = useState<
+    MenuCategory[]
+  >([]);
   const [recommendationFocusItemIds, setRecommendationFocusItemIds] = useState<string[] | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [recommendationsOpen, setRecommendationsOpen] = useState(false);
@@ -766,6 +923,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   const [settingsButtonsOpen, setSettingsButtonsOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [promotionModalOpen, setPromotionModalOpen] = useState(false);
   const [promotionDraft, setPromotionDraft] =
     useState<EditablePromotion | null>(null);
@@ -812,10 +970,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     const nextLabels: Record<MenuCategory, string> = {};
 
     for (const category of categoryDefinitions) {
-      nextLabels[toMenuCategory(category.slug)] = normalizeCategoryLabel(
-        category.label,
-        category.slug
-      );
+      nextLabels[toMenuCategory(category.slug)] = chooseCategoryDisplayLabel(category);
     }
 
     for (const item of items) {
@@ -827,33 +982,51 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     return nextLabels;
   }, [categoryDefinitions, items]);
   const activeDishCategories = useMemo<MenuCategory[]>(() => {
-    const configured = categoryDefinitions
+    return categoryDefinitions
       .filter((category) => category.active && category.kind === "dishes")
       .sort((left, right) => left.sortOrder - right.sortOrder)
       .map((category) => toMenuCategory(category.slug));
-
-    return configured;
   }, [categoryDefinitions]);
   const activeDrinkCategories = useMemo<MenuCategory[]>(() => {
-    const configured = categoryDefinitions
+    return categoryDefinitions
       .filter((category) => category.active && category.kind === "drinks")
       .sort((left, right) => left.sortOrder - right.sortOrder)
       .map((category) => toMenuCategory(category.slug));
-
-    return configured;
   }, [categoryDefinitions]);
+  const activeAddonCategories = useMemo<MenuCategory[]>(() => {
+    return categoryDefinitions
+      .filter((category) => category.active && category.kind === "addons")
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .map((category) => toMenuCategory(category.slug));
+  }, [categoryDefinitions]);
+  const toppingCategoryOptions = useMemo<Array<[MenuCategory, string]>>(
+    () =>
+      categoryDefinitions
+        .filter((category) => category.active && category.kind !== "addons")
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((category) => [
+          toMenuCategory(category.slug),
+          categoryLabels[toMenuCategory(category.slug)] ??
+            humanizeCategorySlug(category.slug)
+        ]),
+    [categoryDefinitions, categoryLabels]
+  );
   const isDrinkCategory = useCallback(
     (category: MenuCategory) => activeDrinkCategories.includes(category),
     [activeDrinkCategories]
   );
   const resolveCategoryOptions = useCallback(
     (kind: "dishes" | "drinks") =>
-      kind === "drinks" ? activeDrinkCategories : activeDishCategories,
-    [activeDishCategories, activeDrinkCategories]
+      kind === "drinks"
+        ? activeDrinkCategories
+        : [...activeDishCategories, ...activeAddonCategories],
+    [activeAddonCategories, activeDishCategories, activeDrinkCategories]
   );
   const preferredNewItemCategory = useMemo<MenuCategory>(() => {
     const sourceCategories =
-      selectedKind === "drinks" ? activeDrinkCategories : activeDishCategories;
+      selectedKind === "drinks"
+        ? activeDrinkCategories
+        : [...activeDishCategories, ...activeAddonCategories];
     const filteredCategory = selectedCategories.find((category) =>
       sourceCategories.includes(category)
     );
@@ -872,6 +1045,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     return "";
   }, [
+    activeAddonCategories,
     activeDishCategories,
     activeDrinkCategories,
     selectedCategories,
@@ -879,7 +1053,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   ]);
   useEffect(() => {
     const sourceCategories =
-      selectedKind === "drinks" ? activeDrinkCategories : activeDishCategories;
+      selectedKind === "drinks"
+        ? activeDrinkCategories
+        : [...activeDishCategories, ...activeAddonCategories];
 
     if (sourceCategories.length === 0) {
       return;
@@ -895,7 +1071,12 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         category: sourceCategories[0]
       };
     });
-  }, [activeDishCategories, activeDrinkCategories, selectedKind]);
+  }, [
+    activeAddonCategories,
+    activeDishCategories,
+    activeDrinkCategories,
+    selectedKind
+  ]);
   useEffect(() => {
     onOrderModeChange?.(restaurantOrderMode);
   }, [onOrderModeChange, restaurantOrderMode]);
@@ -1512,8 +1693,11 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         const categoriesResponse =
           categoriesResult.status === "fulfilled" ? categoriesResult.value : null;
 
+        let loadedMenuItems: MenuItem[] | null = null;
+
         if (menuResponse?.ok) {
           const data = (await menuResponse.json()) as MenuItem[];
+          loadedMenuItems = data;
           setItems((current) => mergeMenuItemsWithLocalDrafts(current, data));
           hasSuccessfulResponse = true;
           setMessage((current) => (current === "Failed to load menu." ? null : current));
@@ -1634,27 +1818,29 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           const categoriesData = (await categoriesResponse.json()) as
             | MenuCategoryDefinition[]
             | null;
+          const normalized = normalizeEditorCategoryDefinitions(categoriesData);
 
-          const normalized = Array.isArray(categoriesData)
-            ? categoriesData
-                .filter(
-                  (category): category is EditableCategoryDefinition =>
-                    Boolean(category?.slug) &&
-                    (category.kind === "dishes" || category.kind === "drinks")
-                )
-                .map((category, index) => ({
-                  slug: String(category.slug),
-                  label: String(category.label ?? ""),
-                  kind: category.kind,
-                  active: category.active !== false,
-                  linkedSlug: category.linkedSlug ?? null,
-                  sortOrder: Number.isFinite(Number(category.sortOrder))
-                    ? Number(category.sortOrder)
-                    : (index + 1) * 10
-                }))
-            : [];
+          const mergeResult = mergeDefinitionsWithMenuItems(
+            normalized,
+            loadedMenuItems ?? items
+          );
 
-          setCategoryDefinitions(normalized);
+          setCategoryDefinitions(mergeResult.merged);
+
+          if (mergeResult.changed) {
+            await fetch("/api/menu-categories", {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                ...authHeaders
+              },
+              body: JSON.stringify({
+                restaurantSlug,
+                categories: mergeResult.merged
+              })
+            }).catch(() => null);
+          }
+
           hasSuccessfulResponse = true;
         }
 
@@ -3011,6 +3197,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   }
 
   async function createItem() {
+    const sourceCategories =
+      selectedKind === "drinks"
+        ? activeDrinkCategories
+        : [...activeDishCategories, ...activeAddonCategories];
     const includeVolumeOptions =
       selectedKind === "drinks" ||
       (enableDishAddons && selectedKind === "dishes");
@@ -3113,7 +3303,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       image: "",
       showImage: true,
       badges: [],
-      category: preferredNewItemCategory,
+      category: sourceCategories.includes(newItem.category)
+        ? newItem.category
+        : preferredNewItemCategory,
       available: true,
       saving: false
     });
@@ -3141,19 +3333,33 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   }
 
   const visibleCategories = useMemo(
-    () =>
-      (Object.entries(categoryLabels) as Array<[MenuCategory, string]>).filter(
-        ([value]) =>
-          selectedKind === "drinks"
-            ? activeDrinkCategories.includes(value)
-            : value !== "drinks" && !activeDrinkCategories.includes(value)
-      ),
-    [activeDrinkCategories, categoryLabels, selectedKind]
+    () => {
+      const sourceCategories =
+        selectedKind === "drinks"
+          ? activeDrinkCategories
+          : [...activeDishCategories, ...activeAddonCategories];
+
+      return sourceCategories.map((value) => [
+        value,
+        categoryLabels[value] ?? humanizeCategorySlug(value)
+      ] as [MenuCategory, string]);
+    },
+    [
+      activeAddonCategories,
+      activeDishCategories,
+      activeDrinkCategories,
+      categoryLabels,
+      selectedKind
+    ]
   );
   const editableCategories = useMemo(
     () =>
       categoryDefinitions
-        .filter((category) => category.kind === selectedKind)
+        .filter(
+          (category): category is EditableCategoryDefinition & {
+            kind: "dishes" | "drinks";
+          } => category.kind === selectedKind
+        )
         .sort((left, right) => left.sortOrder - right.sortOrder),
     [categoryDefinitions, selectedKind]
   );
@@ -3263,6 +3469,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setSettingsButtonsOpen(false);
     setPreviewOpen(false);
     setMenuOpen(false);
+    setCategoryManagerOpen(false);
+    setToppingsManagerOpen(false);
     setNotificationsOpen(false);
     setRecommendationsOpen(false);
     setSettingsRecommendationsOpen(false);
@@ -3276,6 +3484,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       if (!nextOpen) {
         setPreviewOpen(false);
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
@@ -3287,6 +3497,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         setSettingsRecommendationsOpen(false);
         setPreviewOpen(true);
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
       }
 
       return nextOpen;
@@ -3301,11 +3513,15 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
       } else {
         setDashboardOpen(false);
         setMenuButtonsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setNotificationsOpen(true);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
@@ -3324,6 +3540,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         setSettingsButtonsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setNotificationsOpen(false);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
@@ -3337,20 +3555,21 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setRecommendationFocusItemIds(null);
     setSelectedKind("dishes");
     setSelectedCategories([]);
-    if (activeDishCategories.length === 0) {
+    const dishAndAddonCategories = [...activeDishCategories, ...activeAddonCategories];
+    if (dishAndAddonCategories.length === 0) {
       return;
     }
     setNewItem((current) => ({
       ...current,
-      category: activeDishCategories.includes(current.category)
+      category: dishAndAddonCategories.includes(current.category)
         ? current.category
-        : activeDishCategories[0],
+        : dishAndAddonCategories[0],
       volumeOptionsText: enableDishAddons ? current.volumeOptionsText : "",
       badges: current.badges.filter((badge) =>
         getBadgeOptionsForKind("dishes").some((option) => option.value === badge)
       )
     }));
-  }, [activeDishCategories, enableDishAddons]);
+  }, [activeAddonCategories, activeDishCategories, enableDishAddons]);
 
   const selectDrinks = useCallback(() => {
     setRecommendationFocusItemIds(null);
@@ -3398,24 +3617,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       }
 
       const saved = (await response.json()) as MenuCategoryDefinition[];
-      const normalizedSaved = Array.isArray(saved)
-        ? saved
-            .filter(
-              (category): category is EditableCategoryDefinition =>
-                Boolean(category?.slug) &&
-                (category.kind === "dishes" || category.kind === "drinks")
-            )
-            .map((category, index) => ({
-              slug: String(category.slug),
-              label: String(category.label ?? ""),
-              kind: category.kind,
-              active: category.active !== false,
-              linkedSlug: category.linkedSlug ?? null,
-              sortOrder: Number.isFinite(Number(category.sortOrder))
-                ? Number(category.sortOrder)
-                : (index + 1) * 10
-            }))
-        : [];
+      const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
       setCategoryDefinitions(normalizedSaved);
       setCategoriesSaving(false);
       setCategoriesMessage("Categories saved.");
@@ -3425,14 +3627,27 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   );
 
   const addCategoryDefinition = useCallback(async () => {
-    const normalizedSlug = newCategorySlug
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "_")
-      .replace(/[^a-z0-9_-]/g, "");
+    const labelHe = newCategoryLabelHe.trim();
+    const labelEn = newCategoryLabelEn.trim();
+    const labelRu = newCategoryLabelRu.trim();
+    const primaryLabel = labelHe || labelEn || labelRu;
+
+    if (!primaryLabel) {
+      setCategoriesMessage("Fill in at least one label (HE, EN, or RU).");
+      return;
+    }
+
+    if (!labelEn) {
+      setCategoriesMessage("Fill in English label (EN) — slug is generated from it.");
+      return;
+    }
+
+    const normalizedSlug = slugifyCategoryLabel(labelEn);
 
     if (!normalizedSlug) {
-      setCategoriesMessage("Category slug is required.");
+      setCategoriesMessage(
+        "Could not generate slug from English label. Use Latin characters."
+      );
       return;
     }
 
@@ -3445,7 +3660,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       ...categoryDefinitions,
       {
         slug: normalizedSlug,
-        label: newCategoryLabel.trim() || humanizeCategorySlug(normalizedSlug),
+        label: labelEn || primaryLabel,
+        labelHe: labelHe || undefined,
+        labelEn: labelEn || undefined,
+        labelRu: labelRu || undefined,
         kind: newCategoryKind,
         active: true,
         linkedSlug: null,
@@ -3455,14 +3673,134 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     const saved = await saveCategoryDefinitions(nextDefinitions);
     if (saved) {
-      setNewCategorySlug("");
-      setNewCategoryLabel("");
+      setNewCategoryLabelHe("");
+      setNewCategoryLabelEn("");
+      setNewCategoryLabelRu("");
+      setEditingCategorySlug(null);
     }
   }, [
     categoryDefinitions,
     newCategoryKind,
-    newCategoryLabel,
-    newCategorySlug,
+    newCategoryLabelEn,
+    newCategoryLabelHe,
+    newCategoryLabelRu,
+    saveCategoryDefinitions
+  ]);
+
+  const openCategoryEditor = useCallback(
+    (categorySlug: MenuCategory) => {
+      const normalizedSlug = String(categorySlug ?? "").trim().toLowerCase();
+      if (!normalizedSlug) {
+        return;
+      }
+
+      const target =
+        categoryDefinitions.find((category) => category.slug === normalizedSlug) ?? null;
+
+      const fallbackLabel =
+        categoryLabels[normalizedSlug] ?? humanizeCategorySlug(normalizedSlug);
+      const resolved = target ?? {
+        slug: normalizedSlug,
+        label: fallbackLabel,
+        labelHe: undefined,
+        labelEn: undefined,
+        labelRu: undefined,
+        kind: selectedKind === "drinks" ? "drinks" : "dishes",
+        active: true,
+        linkedSlug: null,
+        sortOrder: (categoryDefinitions.length + 1) * 10
+      };
+      const editorLabels = deriveEditorCategoryLabels(resolved, fallbackLabel);
+
+      if (!target) {
+        setCategoryDefinitions((current) => {
+          if (current.some((category) => category.slug === normalizedSlug)) {
+            return current;
+          }
+          return [...current, resolved];
+        });
+      }
+
+      setEditingCategorySlug(resolved.slug);
+      setNewCategoryKind(resolved.kind === "drinks" ? "drinks" : "dishes");
+      setNewCategoryLabelHe(editorLabels.labelHe);
+      setNewCategoryLabelEn(editorLabels.labelEn);
+      setNewCategoryLabelRu(editorLabels.labelRu);
+      setCategoriesMessage(null);
+      setCategoryManagerOpen(true);
+    },
+    [categoryDefinitions, categoryLabels, selectedKind]
+  );
+
+  const saveEditedCategoryDefinition = useCallback(async () => {
+    if (!editingCategorySlug) {
+      return;
+    }
+
+    const labelHe = newCategoryLabelHe.trim();
+    const labelEn = newCategoryLabelEn.trim();
+    const labelRu = newCategoryLabelRu.trim();
+    const primaryLabel = labelHe || labelEn || labelRu;
+
+    if (!primaryLabel) {
+      setCategoriesMessage("Fill in at least one label (HE, EN, or RU).");
+      return;
+    }
+
+    const nextDefinitions = categoryDefinitions.map((category) =>
+      category.slug === editingCategorySlug
+        ? {
+            ...category,
+            label: labelEn || primaryLabel,
+            labelHe: labelHe || undefined,
+            labelEn: labelEn || undefined,
+            labelRu: labelRu || undefined,
+            kind: newCategoryKind
+          }
+        : category
+    );
+
+    const saved = await saveCategoryDefinitions(nextDefinitions);
+    if (saved) {
+      setCategoriesMessage("Category saved.");
+    }
+  }, [
+    categoryDefinitions,
+    editingCategorySlug,
+    newCategoryKind,
+    newCategoryLabelEn,
+    newCategoryLabelHe,
+    newCategoryLabelRu,
+    saveCategoryDefinitions
+  ]);
+
+  const deleteEditedCategoryDefinition = useCallback(async () => {
+    if (!editingCategorySlug) {
+      return;
+    }
+    const hasLinkedItems = items.some((item) => item.category === editingCategorySlug);
+    if (hasLinkedItems) {
+      setCategoriesMessage(
+        "Cannot delete category with existing menu items. Move items first."
+      );
+      return;
+    }
+
+    const nextDefinitions = categoryDefinitions.filter(
+      (category) => category.slug !== editingCategorySlug
+    );
+    const saved = await saveCategoryDefinitions(nextDefinitions);
+    if (saved) {
+      setEditingCategorySlug(null);
+      setNewCategoryLabelHe("");
+      setNewCategoryLabelEn("");
+      setNewCategoryLabelRu("");
+      setCategoriesMessage("Category deleted.");
+    }
+  }, [
+    categoryDefinitions,
+    editingCategorySlug,
+    items,
     saveCategoryDefinitions
   ]);
 
@@ -3491,7 +3829,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       const nextDefinitions = categoryDefinitions.filter(
         (category) => category.slug !== slug
       );
-      await saveCategoryDefinitions(nextDefinitions);
+      const saved = await saveCategoryDefinitions(nextDefinitions);
+      if (saved) {
+        setCategoriesMessage("Category deleted.");
+      }
     },
     [categoryDefinitions, items, saveCategoryDefinitions]
   );
@@ -3502,6 +3843,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       if (nextOpen) {
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
         setRecommendationFocusItemIds(null);
@@ -3519,6 +3862,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         setNotificationsOpen(false);
         setPreviewOpen(false);
         setMenuOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setSettingsRecommendationsOpen(false);
       } else {
         setRecommendationFocusItemIds(null);
@@ -3536,7 +3881,12 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         setPreviewOpen(false);
         setRecommendationsOpen(false);
         setSettingsRecommendationsOpen(false);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
         setRecommendationFocusItemIds(null);
+      } else {
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(false);
       }
 
       return nextOpen;
@@ -3547,6 +3897,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     () => {
       setRecommendationFocusItemIds(null);
       setSettingsRecommendationsOpen(false);
+      setCategoryManagerOpen(false);
+      setToppingsManagerOpen(false);
       setNotificationsOpen((current) => !current);
     },
     []
@@ -3555,6 +3907,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   const toggleSettingsRecommendations = useCallback(() => {
     setRecommendationFocusItemIds(null);
     setNotificationsOpen(false);
+    setCategoryManagerOpen(false);
+    setToppingsManagerOpen(false);
     setSettingsRecommendationsOpen((current) => !current);
   }, []);
 
@@ -3563,20 +3917,143 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       const next = !current;
 
       if (next) {
+        const sourceCategories =
+          selectedKind === "drinks"
+            ? activeDrinkCategories
+            : [...activeDishCategories, ...activeAddonCategories];
         setNewItem((draft) => ({
           ...draft,
-          category: preferredNewItemCategory
+          category: sourceCategories.includes(draft.category)
+            ? draft.category
+            : preferredNewItemCategory
         }));
       }
 
       return next;
     });
-  }, [preferredNewItemCategory]);
+  }, [
+    activeAddonCategories,
+    activeDishCategories,
+    activeDrinkCategories,
+    preferredNewItemCategory,
+    selectedKind
+  ]);
 
   const clearSelectedCategories = useCallback(() => {
     setRecommendationFocusItemIds(null);
     setSelectedCategories([]);
   }, []);
+
+  const toggleCategoryManager = useCallback(() => {
+    setCategoryManagerOpen((current) => {
+      const next = !current;
+
+      if (next) {
+        setToppingsManagerOpen(false);
+        setEditingCategorySlug(null);
+        setNewCategoryLabelHe("");
+        setNewCategoryLabelEn("");
+        setNewCategoryLabelRu("");
+        setNewCategoryKind(selectedKind === "drinks" ? "drinks" : "dishes");
+        setCategoriesMessage(null);
+      } else {
+        setEditingCategorySlug(null);
+      }
+
+      return next;
+    });
+  }, [selectedKind]);
+
+  const toggleToppingsManager = useCallback(() => {
+    setToppingsManagerOpen((current) => {
+      const next = !current;
+
+      if (next) {
+        setCategoryManagerOpen(false);
+        setNewToppingLabelEn("");
+        setSelectedToppingCategories([]);
+        setToppingsMessage(null);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const toggleToppingCategory = useCallback((category: MenuCategory) => {
+    setSelectedToppingCategories((current) =>
+      current.includes(category)
+        ? current.filter((value) => value !== category)
+        : [...current, category]
+    );
+  }, []);
+
+  const saveToppingDefinition = useCallback(async () => {
+    const labelEn = newToppingLabelEn.trim();
+
+    if (!labelEn) {
+      setToppingsMessage("Fill in topping name in English.");
+      return;
+    }
+
+    if (selectedToppingCategories.length === 0) {
+      setToppingsMessage("Select at least one category.");
+      return;
+    }
+
+    const baseSlug = slugifyCategoryLabel(labelEn);
+
+    if (!baseSlug) {
+      setToppingsMessage("Could not generate slug. Use Latin characters.");
+      return;
+    }
+
+    const toppingSlug = `addon_${baseSlug}`;
+
+    if (categoryDefinitions.some((category) => category.slug === toppingSlug)) {
+      setToppingsMessage("This topping already exists.");
+      return;
+    }
+
+    const maxSortOrder = categoryDefinitions.reduce(
+      (max, category) => Math.max(max, Number(category.sortOrder) || 0),
+      0
+    );
+
+    const nextDefinitions: EditableCategoryDefinition[] = [
+      ...categoryDefinitions,
+      {
+        slug: toppingSlug,
+        label: labelEn,
+        labelEn,
+        kind: "addons",
+        active: true,
+        linkedSlug: selectedToppingCategories[0] ?? null,
+        linkedSlugs: selectedToppingCategories,
+        sortOrder: maxSortOrder + 10
+      }
+    ];
+
+    setToppingsSaving(true);
+    setToppingsMessage(null);
+
+    const saved = await saveCategoryDefinitions(nextDefinitions);
+    setToppingsSaving(false);
+
+    if (!saved) {
+      setToppingsMessage("Failed to save topping.");
+      return;
+    }
+
+    setToppingsMessage("Topping saved.");
+    setNewToppingLabelEn("");
+    setSelectedToppingCategories([]);
+    setToppingsManagerOpen(false);
+  }, [
+    categoryDefinitions,
+    newToppingLabelEn,
+    saveCategoryDefinitions,
+    selectedToppingCategories
+  ]);
 
   const runRecommendationAction = useCallback(
     (recommendationId: string) => {
@@ -3594,6 +4071,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       setNotificationsOpen(false);
       setRecommendationsOpen(false);
       setSettingsRecommendationsOpen(false);
+      setCategoryManagerOpen(false);
+      setToppingsManagerOpen(false);
 
       if (recommendationId === "timed-promo") {
         setMenuButtonsOpen(false);
@@ -3741,6 +4220,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         selectedKind={selectedKind}
         onSelectDishes={selectDishes}
         onSelectDrinks={selectDrinks}
+        categoryManagerOpen={categoryManagerOpen}
+        onToggleCategoryManager={toggleCategoryManager}
+        toppingsManagerOpen={toppingsManagerOpen}
+        onToggleToppingsManager={toggleToppingsManager}
         orderMode={restaurantOrderMode}
       />
       {dashboardOpen ? (
@@ -3817,23 +4300,42 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         menuOpen={menuOpen}
         showCreateForm={showCreateForm}
         onToggleCreateForm={toggleCreateForm}
+        categoryManagerOpen={categoryManagerOpen}
+        onToggleCategoryManager={() => setCategoryManagerOpen(false)}
+        toppingsManagerOpen={toppingsManagerOpen}
+        onToggleToppingsManager={() => setToppingsManagerOpen(false)}
         selectedKind={selectedKind}
         enableDishAddons={enableDishAddons}
         selectedCategories={selectedCategories}
         categoryLabels={categoryLabels}
         visibleCategories={visibleCategories}
         onToggleCategory={toggleCategory}
+        onEditCategoryFromChip={openCategoryEditor}
         onClearSelectedCategories={clearSelectedCategories}
         editableCategories={editableCategories}
+        editableCategorySlugs={editableCategories.map((category) => category.slug)}
         categoriesSaving={categoriesSaving}
         categoriesMessage={categoriesMessage}
-        newCategorySlug={newCategorySlug}
-        newCategoryLabel={newCategoryLabel}
+        newCategoryLabelHe={newCategoryLabelHe}
+        newCategoryLabelEn={newCategoryLabelEn}
+        newCategoryLabelRu={newCategoryLabelRu}
         newCategoryKind={newCategoryKind}
-        onNewCategorySlugChange={setNewCategorySlug}
-        onNewCategoryLabelChange={setNewCategoryLabel}
+        onNewCategoryLabelHeChange={setNewCategoryLabelHe}
+        onNewCategoryLabelEnChange={setNewCategoryLabelEn}
+        onNewCategoryLabelRuChange={setNewCategoryLabelRu}
         onNewCategoryKindChange={setNewCategoryKind}
         onAddCategory={addCategoryDefinition}
+        onSaveCategory={saveEditedCategoryDefinition}
+        onDeleteEditedCategory={deleteEditedCategoryDefinition}
+        editingCategorySlug={editingCategorySlug}
+        toppingsSaving={toppingsSaving}
+        toppingsMessage={toppingsMessage}
+        newToppingLabelEn={newToppingLabelEn}
+        onNewToppingLabelEnChange={setNewToppingLabelEn}
+        toppingCategoryOptions={toppingCategoryOptions}
+        selectedToppingCategories={selectedToppingCategories}
+        onToggleToppingCategory={toggleToppingCategory}
+        onSaveTopping={saveToppingDefinition}
         onToggleCategoryActive={toggleCategoryDefinitionActive}
         onDeleteCategory={deleteCategoryDefinition}
         filteredItems={filteredItems}

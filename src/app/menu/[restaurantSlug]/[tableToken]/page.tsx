@@ -8,6 +8,7 @@ import {
   preloadAvailableMenuByRestaurant,
   preloadTableSession
 } from "@/lib/menu-store";
+import { getRestaurantMenuCategories } from "@/lib/menu-categories";
 import { getMenuSettings } from "@/lib/menu-settings";
 import { getRestaurantBySlug } from "@/lib/restaurants";
 
@@ -16,16 +17,18 @@ export const revalidate = 30;
 function getCachedPreviewPayload(restaurantSlug: string) {
   return unstable_cache(
     async () => {
-      const [menuSettings, restaurant, menu] = await Promise.all([
+      const [menuSettings, restaurant, menu, categoryDefinitions] = await Promise.all([
         getMenuSettings(restaurantSlug),
         getRestaurantBySlug(restaurantSlug),
-        getAvailableMenuByRestaurant(restaurantSlug)
+        getAvailableMenuByRestaurant(restaurantSlug),
+        getRestaurantMenuCategories(restaurantSlug)
       ]);
 
       return {
         menuSettings,
         restaurant,
-        menu
+        menu,
+        categoryDefinitions
       };
     },
     [`menu-preview:${restaurantSlug}`],
@@ -107,7 +110,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
   if (tableToken === "0") {
     preloadAvailableMenuByRestaurant(restaurantSlug);
 
-    const { menuSettings, restaurant, menu } =
+    const { menuSettings, restaurant, menu, categoryDefinitions } =
       await getCachedPreviewPayload(restaurantSlug);
 
     if (!restaurant) {
@@ -134,6 +137,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
           promotions={menuSettings.promotions}
           businessLunches={menuSettings.businessLunches}
           recommendations={menuSettings.recommendations}
+          categoryDefinitions={categoryDefinitions}
           showKitchenOpen={menuSettings.kitchenOpenEnabled}
           kitchenOpenUntil={menuSettings.kitchenOpenUntil}
           showBarOpen={menuSettings.barOpenEnabled}
@@ -146,9 +150,10 @@ export default async function MenuPage({ params }: MenuPageProps) {
 
   preloadTableSession(restaurantSlug, tableToken);
 
-  const [menuSettings, session] = await Promise.all([
+  const [menuSettings, session, categoryDefinitions] = await Promise.all([
     menuSettingsPromise,
-    getTableSession(restaurantSlug, tableToken)
+    getTableSession(restaurantSlug, tableToken),
+    getRestaurantMenuCategories(restaurantSlug)
   ]);
 
   if (!session) {
@@ -173,6 +178,7 @@ export default async function MenuPage({ params }: MenuPageProps) {
         promotions={menuSettings.promotions}
         businessLunches={menuSettings.businessLunches}
         recommendations={menuSettings.recommendations}
+        categoryDefinitions={categoryDefinitions}
         showKitchenOpen={menuSettings.kitchenOpenEnabled}
         kitchenOpenUntil={menuSettings.kitchenOpenUntil}
         showBarOpen={menuSettings.barOpenEnabled}

@@ -6,6 +6,7 @@ import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuList } from "@/components/menu/MenuList";
 import type { MenuFilter } from "@/components/menu/MenuList";
+import type { MenuCategoryDefinition } from "@/lib/menu-categories";
 import { formatCurrency } from "@/lib/menu";
 import {
   agorotToShekels,
@@ -53,6 +54,7 @@ type CartProps = {
   showBarOpen: boolean;
   barOpenUntil: string | null;
   initialSubmittedOrders: Order[];
+  categoryDefinitions?: MenuCategoryDefinition[];
 };
 
 type FlyingOrderItem = {
@@ -432,7 +434,8 @@ export function Cart({
   kitchenOpenUntil,
   showBarOpen,
   barOpenUntil,
-  initialSubmittedOrders
+  initialSubmittedOrders,
+  categoryDefinitions = []
 }: CartProps) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -2717,6 +2720,7 @@ export function Cart({
             <MenuList
               items={visibleMenu}
               language={language}
+              categoryDefinitions={categoryDefinitions}
               quantities={quantities}
               orderingEnabled={orderingEnabled}
               dishesClosed={showKitchenClosedBanner}

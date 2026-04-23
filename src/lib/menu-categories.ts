@@ -8,15 +8,32 @@ export type MenuCategoryKind = "dishes" | "drinks" | "addons";
 export type MenuCategoryDefinition = {
   slug: string;
   label: string;
+  labelHe?: string;
+  labelEn?: string;
+  labelRu?: string;
   kind: MenuCategoryKind;
   active: boolean;
   linkedSlug: string | null;
+  linkedSlugs?: string[];
   sortOrder: number;
 };
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_CATEGORIES_PATH = path.join(DATA_DIR, "menu-categories.json");
 const MENU_CATEGORIES_KEY_PREFIX = "menu-categories:";
+const CATEGORY_TYPE_REGULAR = "regular";
+
+type RestaurantRow = {
+  id: string;
+  slug: string;
+};
+
+type MenuCategoryRow = {
+  id: string;
+  restaurant_id: string;
+  slug: string;
+  kind: string;
+};
 
 function normalizeSlug(value: unknown) {
   return String(value ?? "")
@@ -57,12 +74,30 @@ function normalizeCategoryDefinition(
     return null;
   }
 
+  const labelHe = String(value.labelHe ?? "").trim();
+  const labelEn = String(value.labelEn ?? "").trim();
+  const labelRu = String(value.labelRu ?? "").trim();
+  const fallbackLabel =
+    labelEn ||
+    String(value.label ?? "").trim() ||
+    labelHe ||
+    labelRu ||
+    toLabelFromSlug(slug);
+
   return {
     slug,
-    label: String(value.label ?? "").trim() || toLabelFromSlug(slug),
+    label: fallbackLabel,
+    labelHe: labelHe || undefined,
+    labelEn: labelEn || undefined,
+    labelRu: labelRu || undefined,
     kind: normalizeKind(value.kind),
     active: value.active !== false,
     linkedSlug: normalizeSlug(value.linkedSlug) || null,
+    linkedSlugs: Array.isArray(value.linkedSlugs)
+      ? value.linkedSlugs
+          .map((entry) => normalizeSlug(entry))
+          .filter(Boolean)
+      : undefined,
     sortOrder: Number.isFinite(Number(value.sortOrder)) ? Number(value.sortOrder) : (index + 1) * 10
   };
 }
@@ -164,5 +199,117 @@ export async function saveRestaurantMenuCategories(
     throw new Error(`Failed to save categories: ${error.message}`);
   }
 
+  await syncMenuCategoriesTable(supabase, normalizedSlug, normalizedCategories);
+
   return normalizedCategories;
+}
+
+async function syncMenuCategoriesTable(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantSlug: string,
+  categories: MenuCategoryDefinition[]
+) {
+  try {
+    const { data: restaurantData, error: restaurantError } = await supabase
+      .from("restaurants")
+      .select("id, slug")
+      .eq("slug", restaurantSlug)
+      .maybeSingle();
+
+    if (restaurantError || !restaurantData) {
+      return;
+    }
+
+    const restaurant = restaurantData as RestaurantRow;
+    const { data: existingData, error: existingError } = await supabase
+      .from("menu_categories")
+      .select("id, restaurant_id, slug, kind")
+      .eq("restaurant_id", restaurant.id);
+
+    if (existingError) {
+      return;
+    }
+
+    const existingRows = Array.isArray(existingData)
+      ? (existingData as MenuCategoryRow[])
+      : [];
+    const existingBySlug = new Map(
+      existingRows.map((row) => [normalizeSlug(row.slug), row] as const)
+    );
+    const kindBySlug = new Map(
+      existingRows.map((row) => [normalizeSlug(row.slug), String(row.kind || "")] as const)
+    );
+
+    for (const category of categories) {
+      const slug = normalizeSlug(category.slug);
+      if (!slug) {
+        continue;
+      }
+
+      const linkedSlugCandidate = Array.isArray(category.linkedSlugs)
+        ? normalizeSlug(category.linkedSlugs.find(Boolean))
+        : normalizeSlug(category.linkedSlug);
+      const linkedKind = linkedSlugCandidate ? kindBySlug.get(linkedSlugCandidate) : null;
+      const resolvedKind =
+        category.kind === "drinks"
+          ? "drinks"
+          : category.kind === "addons"
+            ? (linkedKind === "drinks" ? "drinks" : "dishes")
+            : "dishes";
+
+      const payload = {
+        restaurant_id: restaurant.id,
+        slug,
+        kind: resolvedKind,
+        category_type: CATEGORY_TYPE_REGULAR,
+        name_he: category.labelHe ?? null,
+        name_en: category.labelEn ?? category.label ?? slug,
+        name_ru: category.labelRu ?? null,
+        sort_order: Number.isFinite(Number(category.sortOrder))
+          ? Number(category.sortOrder)
+          : 0,
+        is_active: category.active !== false,
+        updated_at: new Date().toISOString()
+      };
+
+      const existing = existingBySlug.get(slug);
+      if (existing) {
+        const { error: updateError } = await supabase
+          .from("menu_categories")
+          .update(payload)
+          .eq("id", existing.id);
+        if (updateError) {
+          return;
+        }
+      } else {
+        const { error: insertError } = await supabase
+          .from("menu_categories")
+          .insert({
+            ...payload,
+            created_at: new Date().toISOString()
+          });
+        if (insertError) {
+          return;
+        }
+      }
+    }
+
+    const desiredSlugs = new Set(categories.map((entry) => normalizeSlug(entry.slug)));
+    for (const existing of existingRows) {
+      const existingSlug = normalizeSlug(existing.slug);
+      if (!existingSlug || desiredSlugs.has(existingSlug)) {
+        continue;
+      }
+
+      await supabase
+        .from("menu_categories")
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", existing.id);
+    }
+  } catch {
+    // Keep app_state write as source-of-truth fallback when table sync is unavailable.
+  }
 }

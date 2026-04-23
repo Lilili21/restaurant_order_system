@@ -17,28 +17,50 @@ type Props = {
   menuOpen: boolean;
   showCreateForm: boolean;
   onToggleCreateForm: () => void;
+  categoryManagerOpen: boolean;
+  onToggleCategoryManager: () => void;
+  toppingsManagerOpen: boolean;
+  onToggleToppingsManager: () => void;
   selectedKind: "dishes" | "drinks";
   enableDishAddons: boolean;
   selectedCategories: MenuCategory[];
   categoryLabels: Record<MenuCategory, string>;
   visibleCategories: Array<[MenuCategory, string]>;
   onToggleCategory: (category: MenuCategory) => void;
+  onEditCategoryFromChip: (category: MenuCategory) => void;
   onClearSelectedCategories: () => void;
   editableCategories: Array<{
     slug: string;
     label: string;
+    labelHe?: string;
+    labelEn?: string;
+    labelRu?: string;
     kind: "dishes" | "drinks";
     active: boolean;
   }>;
+  editableCategorySlugs: string[];
   categoriesSaving: boolean;
   categoriesMessage: string | null;
-  newCategorySlug: string;
-  newCategoryLabel: string;
+  newCategoryLabelHe: string;
+  newCategoryLabelEn: string;
+  newCategoryLabelRu: string;
   newCategoryKind: Exclude<MenuCategoryKind, "addons">;
-  onNewCategorySlugChange: (value: string) => void;
-  onNewCategoryLabelChange: (value: string) => void;
+  onNewCategoryLabelHeChange: (value: string) => void;
+  onNewCategoryLabelEnChange: (value: string) => void;
+  onNewCategoryLabelRuChange: (value: string) => void;
   onNewCategoryKindChange: (value: Exclude<MenuCategoryKind, "addons">) => void;
   onAddCategory: () => Promise<void>;
+  onSaveCategory: () => Promise<void>;
+  onDeleteEditedCategory: () => Promise<void>;
+  editingCategorySlug: string | null;
+  toppingsSaving: boolean;
+  toppingsMessage: string | null;
+  newToppingLabelEn: string;
+  onNewToppingLabelEnChange: (value: string) => void;
+  toppingCategoryOptions: Array<[MenuCategory, string]>;
+  selectedToppingCategories: MenuCategory[];
+  onToggleToppingCategory: (category: MenuCategory) => void;
+  onSaveTopping: () => Promise<void>;
   onToggleCategoryActive: (slug: string) => Promise<void>;
   onDeleteCategory: (slug: string) => Promise<void>;
   filteredItems: EditableMenuItem[];
@@ -94,23 +116,42 @@ function MenuEditPanelComponent({
   menuOpen,
   showCreateForm,
   onToggleCreateForm,
+  categoryManagerOpen,
+  onToggleCategoryManager,
+  toppingsManagerOpen,
+  onToggleToppingsManager,
   selectedKind,
   enableDishAddons,
   selectedCategories,
   categoryLabels,
   visibleCategories,
   onToggleCategory,
+  onEditCategoryFromChip,
   onClearSelectedCategories,
   editableCategories,
+  editableCategorySlugs,
   categoriesSaving,
   categoriesMessage,
-  newCategorySlug,
-  newCategoryLabel,
+  newCategoryLabelHe,
+  newCategoryLabelEn,
+  newCategoryLabelRu,
   newCategoryKind,
-  onNewCategorySlugChange,
-  onNewCategoryLabelChange,
+  onNewCategoryLabelHeChange,
+  onNewCategoryLabelEnChange,
+  onNewCategoryLabelRuChange,
   onNewCategoryKindChange,
   onAddCategory,
+  onSaveCategory,
+  onDeleteEditedCategory,
+  editingCategorySlug,
+  toppingsSaving,
+  toppingsMessage,
+  newToppingLabelEn,
+  onNewToppingLabelEnChange,
+  toppingCategoryOptions,
+  selectedToppingCategories,
+  onToggleToppingCategory,
+  onSaveTopping,
   onToggleCategoryActive,
   onDeleteCategory,
   filteredItems,
@@ -150,71 +191,155 @@ function MenuEditPanelComponent({
 
   return (
     <>
+      {categoryManagerOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card modal-card--form category-manager-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Categories manager"
+          >
+            <button
+              type="button"
+              className="modal-card__close"
+              aria-label="Close"
+              onClick={onToggleCategoryManager}
+            >
+              ×
+            </button>
+            <h2>Categories manager</h2>
+            <div className="category-manager-modal__form">
+              <input
+                className="modal-input"
+                value={newCategoryLabelHe}
+                onChange={(event) => onNewCategoryLabelHeChange(event.target.value)}
+                placeholder="תווית בעברית (HE)"
+              />
+              <input
+                className="modal-input"
+                value={newCategoryLabelEn}
+                onChange={(event) => onNewCategoryLabelEnChange(event.target.value)}
+                placeholder="English label (EN)"
+              />
+              <input
+                className="modal-input"
+                value={newCategoryLabelRu}
+                onChange={(event) => onNewCategoryLabelRuChange(event.target.value)}
+                placeholder="Ярлык на русском (RU)"
+              />
+              <select
+                className="modal-input"
+                value={newCategoryKind}
+                onChange={(event) =>
+                  onNewCategoryKindChange(
+                    event.target.value as Exclude<MenuCategoryKind, "addons">
+                  )
+                }
+              >
+                <option value="dishes">Dishes</option>
+                <option value="drinks">Drinks</option>
+              </select>
+              {editingCategorySlug ? (
+                <div className="modal-actions category-manager-modal__actions">
+                  <button
+                    type="button"
+                    className="button-success category-manager-modal__submit"
+                    onClick={() => void onSaveCategory()}
+                    disabled={categoriesSaving}
+                  >
+                    {categoriesSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button-danger"
+                    onClick={() => void onDeleteEditedCategory()}
+                    disabled={categoriesSaving}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="button-success category-manager-modal__submit"
+                  onClick={() => void onAddCategory()}
+                  disabled={categoriesSaving}
+                >
+                  {categoriesSaving ? "Saving..." : "Save"}
+                </button>
+              )}
+            </div>
+            {categoriesMessage ? (
+              <p className="category-manager-modal__message">{categoriesMessage}</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {toppingsManagerOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-card modal-card--form category-manager-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Toppings manager"
+          >
+            <button
+              type="button"
+              className="modal-card__close"
+              aria-label="Close"
+              onClick={onToggleToppingsManager}
+            >
+              ×
+            </button>
+            <h2>Add toppings</h2>
+            <div className="category-manager-modal__form">
+              <input
+                className="modal-input"
+                value={newToppingLabelEn}
+                onChange={(event) => onNewToppingLabelEnChange(event.target.value)}
+                placeholder="English name (e.g. Sour cream)"
+              />
+              <details className="category-manager-modal__dropdown">
+                <summary className="category-manager-modal__dropdown-summary">
+                  Categories ({selectedToppingCategories.length} selected)
+                </summary>
+                <div className="category-manager-modal__dropdown-list">
+                  {toppingCategoryOptions.map(([category, label]) => (
+                    <label
+                      key={category}
+                      className="category-manager-modal__dropdown-item"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedToppingCategories.includes(category)}
+                        onChange={() => onToggleToppingCategory(category)}
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </details>
+              <button
+                type="button"
+                className="button-success category-manager-modal__submit"
+                onClick={() => void onSaveTopping()}
+                disabled={toppingsSaving}
+              >
+                {toppingsSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+            {toppingsMessage ? (
+              <p className="category-manager-modal__message">{toppingsMessage}</p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="menu-editor__create">
         <button className="button-success" type="button" onClick={onToggleCreateForm}>
           {showCreateForm ? "Hide form" : "Add new"}
         </button>
       </div>
       <div className="orders-filter">
-        <div style={{ marginBottom: 12 }}>
-          <strong>Categories manager</strong>
-          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-            <input
-              value={newCategorySlug}
-              onChange={(event) => onNewCategorySlugChange(event.target.value)}
-              placeholder="New category slug (e.g. soups)"
-            />
-            <input
-              value={newCategoryLabel}
-              onChange={(event) => onNewCategoryLabelChange(event.target.value)}
-              placeholder="Label (e.g. 🍲 Soups)"
-            />
-            <select
-              value={newCategoryKind}
-              onChange={(event) =>
-                onNewCategoryKindChange(
-                  event.target.value as Exclude<MenuCategoryKind, "addons">
-                )
-              }
-            >
-              <option value="dishes">Dishes</option>
-              <option value="drinks">Drinks</option>
-            </select>
-            <button
-              type="button"
-              className="button-success"
-              onClick={() => void onAddCategory()}
-              disabled={categoriesSaving}
-            >
-              {categoriesSaving ? "Saving..." : "Add category"}
-            </button>
-          </div>
-          {categoriesMessage ? <p style={{ marginTop: 8 }}>{categoriesMessage}</p> : null}
-          <div className="orders-filter__chips" style={{ marginTop: 8 }}>
-            {editableCategories.map((category) => (
-              <div
-                key={category.slug}
-                style={{ display: "inline-flex", gap: 6, alignItems: "center" }}
-              >
-                <button
-                  type="button"
-                  className="orders-filter__chip"
-                  onClick={() => void onToggleCategoryActive(category.slug)}
-                >
-                  {category.active ? "✅" : "🚫"} {category.label}
-                </button>
-                <button
-                  type="button"
-                  className="button-danger"
-                  onClick={() => void onDeleteCategory(category.slug)}
-                  disabled={categoriesSaving}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
         <div className="orders-filter__chips">
           <button
             type="button"
@@ -227,20 +352,26 @@ function MenuEditPanelComponent({
           >
             {selectedKind === "drinks" ? "All drinks" : "All dishes"}
           </button>
-          {visibleCategories.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={
+            {visibleCategories.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={
                 selectedCategories.includes(value)
                   ? "orders-filter__chip orders-filter__chip--active"
                   : "orders-filter__chip"
-              }
-              onClick={() => onToggleCategory(value)}
-            >
-              {label}
-            </button>
-          ))}
+                }
+                onClick={() => onToggleCategory(value)}
+                onDoubleClick={() => {
+                  if (editableCategorySlugs.includes(String(value))) {
+                    onEditCategoryFromChip(value);
+                  }
+                }}
+                title="Double click to edit category"
+              >
+                {label}
+              </button>
+            ))}
         </div>
       </div>
       <div className="orders-grid">

@@ -35,6 +35,10 @@ type Props = {
   selectedKind: "dishes" | "drinks";
   onSelectDishes: () => void;
   onSelectDrinks: () => void;
+  categoryManagerOpen: boolean;
+  onToggleCategoryManager: () => void;
+  toppingsManagerOpen: boolean;
+  onToggleToppingsManager: () => void;
   orderMode?: RestaurantOrderMode;
 };
 
@@ -62,12 +66,12 @@ function ControlCenterToolbarComponent({
   selectedKind,
   onSelectDishes,
   onSelectDrinks,
+  categoryManagerOpen,
+  onToggleCategoryManager,
+  toppingsManagerOpen,
+  onToggleToppingsManager,
   orderMode = "tables"
 }: Props) {
-  const simuLevSlug = "simuLev";
-  const normalizedRestaurantSlug = restaurantSlug.trim().toLowerCase();
-  const isSimuLevRestaurant = normalizedRestaurantSlug === simuLevSlug.toLowerCase();
-  const showLinkToOrderButton = orderMode === "counter" || isSimuLevRestaurant;
   const linkToOrderHref = `/${restaurantSlug}/menu/0`;
 
   function openLinkToOrder() {
@@ -194,7 +198,7 @@ function ControlCenterToolbarComponent({
           </button>
           {settingsButtonsOpen ? (
             <div className="menu-editor__toolbar-subrow">
-              {showLinkToOrderButton ? (
+              {orderMode === "counter" ? (
                 <button
                   className="admin-menu-bubble"
                   type="button"
@@ -202,13 +206,12 @@ function ControlCenterToolbarComponent({
                 >
                   Link 2Order
                 </button>
-              ) : null}
-              {orderMode !== "counter" ? (
+              ) : (
                 <TableCountControl
                   credentials={secondaryCredentials}
                   restaurantSlug={restaurantSlug}
                 />
-              ) : null}
+              )}
               <WorkingHoursControl
                 credentials={secondaryCredentials}
                 restaurantSlug={restaurantSlug}
@@ -241,6 +244,28 @@ function ControlCenterToolbarComponent({
       </div>
       {menuOpen ? (
         <div className="menu-editor__toolbar-row">
+          <button
+            type="button"
+            className={
+              toppingsManagerOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            onClick={onToggleToppingsManager}
+          >
+            Add toppings
+          </button>
+          <button
+            type="button"
+            className={
+              categoryManagerOpen
+                ? "admin-menu-bubble admin-menu-bubble--active"
+                : "admin-menu-bubble"
+            }
+            onClick={onToggleCategoryManager}
+          >
+            Add category
+          </button>
           <div className="admin-switch menu-editor__kind-switch">
             <button
               type="button"

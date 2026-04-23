@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { MenuItemCard } from "@/components/menu/MenuItemCard";
+import type { MenuCategoryDefinition } from "@/lib/menu-categories";
 import { MenuCategory, MenuItem, MenuLanguage } from "@/lib/types";
 
 type MenuListProps = {
   items: MenuItem[];
   language: MenuLanguage;
+  categoryDefinitions?: MenuCategoryDefinition[];
   quantities: Record<string, number>;
   orderingEnabled?: boolean;
   dishesClosed?: boolean;
@@ -176,11 +178,10 @@ const drinkCategories = new Set<MenuCategory>([
   "non_alcoholic_drinks"
 ]);
 
-const dishCategories = categoryOrder.filter((category) => !drinkCategories.has(category));
-
 export function MenuList({
   items,
   language,
+  categoryDefinitions = [],
   quantities,
   orderingEnabled = true,
   dishesClosed = false,
@@ -190,11 +191,63 @@ export function MenuList({
   onDecrease,
   selectedFilter
 }: MenuListProps) {
+  const activeCategoryDefinitions = useMemo(
+    () =>
+      categoryDefinitions
+        .filter((category) => category.active !== false)
+        .sort((left, right) => left.sortOrder - right.sortOrder),
+    [categoryDefinitions]
+  );
+  const activeAddonDefinitions = useMemo(
+    () =>
+      activeCategoryDefinitions.filter((category) => category.kind === "addons"),
+    [activeCategoryDefinitions]
+  );
+  const activeBaseDefinitions = useMemo(
+    () =>
+      activeCategoryDefinitions.filter((category) => category.kind !== "addons"),
+    [activeCategoryDefinitions]
+  );
+  const definedDrinkCategories = useMemo(
+    () =>
+      new Set<MenuCategory>(
+        activeBaseDefinitions
+          .filter((category) => category.kind === "drinks")
+          .map((category) => category.slug)
+      ),
+    [activeBaseDefinitions]
+  );
+  const dynamicDrinkCategories =
+    activeBaseDefinitions.length > 0 ? definedDrinkCategories : drinkCategories;
+  const dynamicCategoryOrder: MenuCategory[] = useMemo(() => {
+    const preferred = activeBaseDefinitions.map((category) => category.slug);
+    if (preferred.length > 0) {
+      return preferred;
+    }
+    return categoryOrder;
+  }, [activeBaseDefinitions]);
+  const categoryLabelsBySlug = useMemo(() => {
+    const map: Record<string, string> = {};
+
+    for (const category of activeCategoryDefinitions) {
+      const localized =
+        language === "he"
+          ? String(category.labelHe ?? "").trim()
+          : language === "ru"
+            ? String(category.labelRu ?? "").trim()
+            : String(category.labelEn ?? "").trim();
+
+      map[category.slug] = localized || category.label || category.slug;
+    }
+
+    return map;
+  }, [activeCategoryDefinitions, language]);
   const [selectedCategory, setSelectedCategory] = useState<MenuFilter>(
     selectedFilter ?? "dishes"
   );
   const [openGroup, setOpenGroup] = useState<MenuFilterGroup>(
-    selectedFilter === "drinks" || drinkCategories.has(selectedFilter as MenuCategory)
+    selectedFilter === "drinks" ||
+      dynamicDrinkCategories.has(selectedFilter as MenuCategory)
       ? "drinks"
       : "dishes"
   );
@@ -211,20 +264,22 @@ export function MenuList({
   );
   const getCategoryItems = (category: MenuCategory) =>
     category === "drinks"
-      ? categoryOrder.flatMap((candidate) =>
-          drinkCategories.has(candidate) ? grouped[candidate] ?? [] : []
+      ? dynamicCategoryOrder.flatMap((candidate) =>
+          dynamicDrinkCategories.has(candidate) ? grouped[candidate] ?? [] : []
         )
       : grouped[category] ?? [];
-  const visibleDishCategories = dishCategories.filter(
-    (category) => getCategoryItems(category).length > 0
-  );
-  const visibleDrinkCategories = categoryOrder.filter(
+  const visibleDishCategories = dynamicCategoryOrder.filter(
     (category) =>
-      category !== "drinks" &&
-      drinkCategories.has(category) &&
+      !dynamicDrinkCategories.has(category) &&
       getCategoryItems(category).length > 0
   );
-  const visibleCategories = categoryOrder.filter((category) => {
+  const visibleDrinkCategories = dynamicCategoryOrder.filter(
+    (category) =>
+      category !== "drinks" &&
+      dynamicDrinkCategories.has(category) &&
+      getCategoryItems(category).length > 0
+  );
+  const visibleCategories = dynamicCategoryOrder.filter((category) => {
     const hasItems = getCategoryItems(category).length > 0;
 
     if (!hasItems) {
@@ -232,26 +287,53 @@ export function MenuList({
     }
 
     if (selectedCategory === "dishes") {
-      return !drinkCategories.has(category);
+      return !dynamicDrinkCategories.has(category);
     }
 
     if (selectedCategory === "drinks") {
-      return category !== "drinks" && drinkCategories.has(category);
+      return category !== "drinks" && dynamicDrinkCategories.has(category);
     }
 
     return selectedCategory === category;
   });
+  const addonDefinitionsByCategory = useMemo(() => {
+    return visibleCategories.reduce<Record<string, MenuCategoryDefinition[]>>(
+      (acc, category) => {
+        const linkedAddons = activeAddonDefinitions.filter((addon) => {
+          const linked = Array.isArray(addon.linkedSlugs) ? addon.linkedSlugs : [];
+          if (linked.includes(category)) {
+            return true;
+          }
+          return addon.linkedSlug === category;
+        });
+
+        if (linkedAddons.length > 0) {
+          acc[category] = linkedAddons;
+        }
+
+        return acc;
+      },
+      {}
+    );
+  }, [activeAddonDefinitions, visibleCategories]);
+  const toppingsTitle =
+    language === "he"
+      ? "תוספות"
+      : language === "ru"
+        ? "Добавки"
+        : "Toppings";
 
   useEffect(() => {
     if (selectedFilter) {
       setSelectedCategory(selectedFilter);
       setOpenGroup(
-        selectedFilter === "drinks" || drinkCategories.has(selectedFilter as MenuCategory)
+        selectedFilter === "drinks" ||
+          dynamicDrinkCategories.has(selectedFilter as MenuCategory)
           ? "drinks"
           : "dishes"
       );
     }
-  }, [selectedFilter]);
+  }, [dynamicDrinkCategories, selectedFilter]);
 
   function handleGroupSelect(group: Exclude<MenuFilterGroup, null>) {
     setOpenGroup((current) => (current === group ? null : group));
@@ -260,13 +342,18 @@ export function MenuList({
 
   function handleCategorySelect(category: MenuCategory) {
     setSelectedCategory(category);
-    setOpenGroup(drinkCategories.has(category) ? "drinks" : "dishes");
+    setOpenGroup(dynamicDrinkCategories.has(category) ? "drinks" : "dishes");
   }
 
   const formatCategoryLabel = (category: MenuCategory) =>
-    categoryLabels[language][category] ?? category;
+    categoryLabelsBySlug[category] ??
+    categoryLabels[language][category] ??
+    category;
   const formatCategorySectionLabel = (category: MenuCategory) => {
-    const baseLabel = categoryLabels[language][category] ?? category;
+    const baseLabel =
+      categoryLabelsBySlug[category] ??
+      categoryLabels[language][category] ??
+      category;
     const categoryDiscount = categoryDiscounts[category] ?? 0;
     const showDiscountTag = Number.isFinite(categoryDiscount) && categoryDiscount > 0;
 
@@ -341,6 +428,10 @@ export function MenuList({
 
       {visibleCategories.map((category) => {
           const sectionItems = getCategoryItems(category);
+          const linkedAddonDefinitions = addonDefinitionsByCategory[category] ?? [];
+          const toppingsItems = linkedAddonDefinitions.flatMap(
+            (addon) => grouped[addon.slug] ?? []
+          );
           const shouldHideSectionHeader = selectedCategory === category;
 
           return (
@@ -364,6 +455,27 @@ export function MenuList({
                   />
                 ))}
               </div>
+              {toppingsItems.length > 0 ? (
+                <div className="menu-section__toppings">
+                  <div className="section-header">
+                    <h3>{toppingsTitle}</h3>
+                  </div>
+                  <div className="menu-grid">
+                    {toppingsItems.map((item) => (
+                      <MenuItemCard
+                        key={item.id}
+                        item={item}
+                        language={language}
+                        quantity={quantities[getQuantityKey(item.id)] ?? 0}
+                        optionQuantities={quantities}
+                        orderingEnabled={orderingEnabled}
+                        onAdd={onAdd}
+                        onDecrease={onDecrease}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </section>
           );
         })}
