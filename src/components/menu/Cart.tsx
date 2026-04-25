@@ -7,7 +7,7 @@ import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { MenuList } from "@/components/menu/MenuList";
 import type { MenuFilter } from "@/components/menu/MenuList";
 import type { MenuCategoryDefinition } from "@/lib/menu-categories";
-import { formatCurrency } from "@/lib/menu";
+import { formatCurrency, getLocalizedVolumeOptionLabel } from "@/lib/menu";
 import {
   agorotToShekels,
   calculateCartTotal,
@@ -1456,7 +1456,13 @@ export function Cart({
                 ? item.volumeOptionId
                 : undefined,
             volumeLabel:
-              matchedVolumeOption?.label ??
+              (matchedVolumeOption
+                ? getLocalizedVolumeOptionLabel(
+                    matchedVolumeOption,
+                    language,
+                    menuItem?.restaurantSlug
+                  )
+                : undefined) ??
               (typeof item.volumeLabel === "string" && item.volumeLabel.trim()
                 ? item.volumeLabel
                 : undefined),
@@ -1778,7 +1784,15 @@ export function Cart({
           menuItemId,
           quantity: 1,
           volumeOptionId,
-          volumeLabel: selection?.volumeLabel ?? matchedVolumeOption?.label,
+          volumeLabel:
+            selection?.volumeLabel ??
+            (matchedVolumeOption
+              ? getLocalizedVolumeOptionLabel(
+                  matchedVolumeOption,
+                  language,
+                  menuItem?.restaurantSlug
+                )
+              : undefined),
           priceOverride: selection?.priceOverride ?? matchedVolumeOption?.price
         }
       ];

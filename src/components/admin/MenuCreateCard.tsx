@@ -260,10 +260,10 @@ export function MenuCreateCard({
                   {selectedKind === "drinks"
                     ? "Volumes and prices"
                     : newItemLanguage === "he"
-                      ? "תוספות ומחירים"
+                      ? "סוגים ומחירים"
                       : newItemLanguage === "ru"
-                        ? "Добавки и цены"
-                        : "Add extras and prices"}
+                        ? "Типы и цены"
+                        : "Types and prices"}
                 </span>
                 <span className="menu-editor__volume-actions">
                   <button
@@ -305,10 +305,10 @@ export function MenuCreateCard({
                         selectedKind === "drinks"
                           ? "Volume"
                           : newItemLanguage === "he"
-                            ? "תוספת"
+                            ? "סוג"
                             : newItemLanguage === "ru"
-                              ? "Добавка"
-                              : "Add-on"
+                              ? "Тип"
+                              : "Type"
                       }
                       value={row.label}
                       onChange={(event) =>

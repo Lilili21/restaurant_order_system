@@ -55,12 +55,14 @@ type Props = {
   editingCategorySlug: string | null;
   toppingsSaving: boolean;
   toppingsMessage: string | null;
+  editingToppingSlug: string | null;
   newToppingLabelEn: string;
   onNewToppingLabelEnChange: (value: string) => void;
   toppingCategoryOptions: Array<[MenuCategory, string]>;
   selectedToppingCategories: MenuCategory[];
   onToggleToppingCategory: (category: MenuCategory) => void;
   onSaveTopping: () => Promise<void>;
+  onDeleteEditedTopping: () => Promise<void>;
   onToggleCategoryActive: (slug: string) => Promise<void>;
   onDeleteCategory: (slug: string) => Promise<void>;
   filteredItems: EditableMenuItem[];
@@ -146,12 +148,14 @@ function MenuEditPanelComponent({
   editingCategorySlug,
   toppingsSaving,
   toppingsMessage,
+  editingToppingSlug,
   newToppingLabelEn,
   onNewToppingLabelEnChange,
   toppingCategoryOptions,
   selectedToppingCategories,
   onToggleToppingCategory,
   onSaveTopping,
+  onDeleteEditedTopping,
   onToggleCategoryActive,
   onDeleteCategory,
   filteredItems,
@@ -319,14 +323,35 @@ function MenuEditPanelComponent({
                   ))}
                 </div>
               </details>
-              <button
-                type="button"
-                className="button-success category-manager-modal__submit"
-                onClick={() => void onSaveTopping()}
-                disabled={toppingsSaving}
-              >
-                {toppingsSaving ? "Saving..." : "Save"}
-              </button>
+              {editingToppingSlug ? (
+                <div className="modal-actions category-manager-modal__actions">
+                  <button
+                    type="button"
+                    className="button-success category-manager-modal__submit"
+                    onClick={() => void onSaveTopping()}
+                    disabled={toppingsSaving}
+                  >
+                    {toppingsSaving ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button-danger"
+                    onClick={() => void onDeleteEditedTopping()}
+                    disabled={toppingsSaving}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="button-success category-manager-modal__submit"
+                  onClick={() => void onSaveTopping()}
+                  disabled={toppingsSaving}
+                >
+                  {toppingsSaving ? "Saving..." : "Save"}
+                </button>
+              )}
             </div>
             {toppingsMessage ? (
               <p className="category-manager-modal__message">{toppingsMessage}</p>

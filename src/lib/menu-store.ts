@@ -18,6 +18,7 @@ const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_STORE_PATH = path.join(DATA_DIR, "menu-store.json");
 const MENU_STORE_KEY = "menu-store";
 const MENU_STORE_CACHE_TTL_MS = 5_000;
+const RESTAURANT_LOOKUP_CACHE_TTL_MS = 5 * 60_000;
 const ALLOWED_BADGES: MenuBadge[] = [
   "chef_special",
   "most_popular",
@@ -53,9 +54,15 @@ type RestaurantRow = {
   slug: string;
 };
 
+type RestaurantLookupCacheEntry = {
+  restaurant: RestaurantRow;
+  expiresAt: number;
+};
+
 type MenuItemRow = {
   id: string;
   restaurant_id: string;
+  category_id?: string | null;
   category: string;
   name_he: string | null;
   name_en: string | null;
@@ -72,6 +79,39 @@ type MenuItemRow = {
   volume_options: unknown;
   sort_order: number | null;
 };
+
+type MenuCategoryRow = {
+  id: string;
+  slug: string;
+};
+
+function toCategoryLabelFromSlug(slug: string) {
+  if (!slug) {
+    return "Category";
+  }
+
+  return slug
+    .replace(/^addon_/i, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+    .trim();
+}
+
+function guessMenuCategoryKindBySlug(slug: string) {
+  if (slug.startsWith("addon_")) {
+    return "dishes";
+  }
+
+  if (
+    /drink|alcohol|cocktail|draft|beer|wine|vodka|rum|whisk|tequila|gin|cognac|liker|liqueur|ouzo|absent|chaser|fluid|juice|soda|coffee|tea|kompot|kvas/.test(
+      slug
+    )
+  ) {
+    return "drinks";
+  }
+
+  return "dishes";
+}
 
 function normalizeLegacyMenuCategory(value: string): MenuCategory {
   return value === "main_dishes" ? "mains" : (value as MenuCategory);
@@ -99,6 +139,10 @@ declare global {
   var __availableMenuCache: Map<string, AvailableMenuCacheEntry> | undefined;
   // eslint-disable-next-line no-var
   var __tableSessionCache: Map<string, TableSessionCacheEntry> | undefined;
+  // eslint-disable-next-line no-var
+  var __restaurantLookupCache:
+    | Map<string, RestaurantLookupCacheEntry>
+    | undefined;
 }
 
 function cloneMenuItems(items: MenuItem[]): MenuItem[] {
@@ -142,6 +186,18 @@ function setMenuStoreCache(items: MenuItem[]) {
   };
 }
 
+function getRestaurantLookupCache() {
+  globalThis.__restaurantLookupCache ??= new Map();
+
+  for (const [key, entry] of globalThis.__restaurantLookupCache.entries()) {
+    if (entry.expiresAt <= Date.now()) {
+      globalThis.__restaurantLookupCache.delete(key);
+    }
+  }
+
+  return globalThis.__restaurantLookupCache;
+}
+
 async function getRestaurantSlugMap(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
 ) {
@@ -159,17 +215,120 @@ async function getRestaurantIdBySlug(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
   restaurantSlug: string
 ) {
-  const { data, error } = await supabase
+  const normalizedSlug = restaurantSlug.trim().toLowerCase();
+  const lookupCache = getRestaurantLookupCache();
+  const cached = lookupCache.get(normalizedSlug);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.restaurant;
+  }
+
+  const exactMatch = await supabase
     .from("restaurants")
     .select("id, slug")
     .eq("slug", restaurantSlug)
     .maybeSingle();
 
-  if (error || !data) {
+  if (!exactMatch.error && exactMatch.data) {
+    const restaurant = exactMatch.data as RestaurantRow;
+    lookupCache.set(normalizedSlug, {
+      restaurant,
+      expiresAt: Date.now() + RESTAURANT_LOOKUP_CACHE_TTL_MS
+    });
+    return restaurant;
+  }
+
+  const fallbackMatch = await supabase
+    .from("restaurants")
+    .select("id, slug")
+    .ilike("slug", restaurantSlug)
+    .maybeSingle();
+
+  if (fallbackMatch.error || !fallbackMatch.data) {
     return null;
   }
 
-  return data as RestaurantRow;
+  const restaurant = fallbackMatch.data as RestaurantRow;
+  lookupCache.set(normalizedSlug, {
+    restaurant,
+    expiresAt: Date.now() + RESTAURANT_LOOKUP_CACHE_TTL_MS
+  });
+  return restaurant;
+}
+
+async function getMenuCategoryIdBySlug(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantId: string,
+  categorySlug: string
+) {
+  const normalizedSlug = normalizeLegacyMenuCategory(categorySlug).trim().toLowerCase();
+
+  if (!normalizedSlug) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("menu_categories")
+    .select("id, slug")
+    .eq("restaurant_id", restaurantId)
+    .eq("slug", normalizedSlug)
+    .maybeSingle();
+
+  if (!error && data) {
+    return (data as MenuCategoryRow).id;
+  }
+
+  const fallback = await supabase
+    .from("menu_categories")
+    .select("id, slug")
+    .eq("restaurant_id", restaurantId)
+    .ilike("slug", normalizedSlug)
+    .maybeSingle();
+
+  if (!fallback.error && fallback.data) {
+    return (fallback.data as MenuCategoryRow).id;
+  }
+
+  const nowIso = new Date().toISOString();
+  const label = toCategoryLabelFromSlug(normalizedSlug);
+  const inferredKind = guessMenuCategoryKindBySlug(normalizedSlug);
+
+  const { error: insertError } = await supabase.from("menu_categories").insert({
+    restaurant_id: restaurantId,
+    slug: normalizedSlug,
+    kind: inferredKind,
+    category_type: "regular",
+    name_en: label,
+    name_he: label,
+    name_ru: label,
+    sort_order: 0,
+    is_active: true,
+    created_at: nowIso,
+    updated_at: nowIso
+  });
+
+  if (insertError) {
+    const duplicateConflict =
+      insertError.message.includes("duplicate key") ||
+      insertError.message.includes("already exists");
+
+    if (!duplicateConflict) {
+      return null;
+    }
+  }
+
+  const retry = await supabase
+    .from("menu_categories")
+    .select("id, slug")
+    .eq("restaurant_id", restaurantId)
+    .eq("slug", normalizedSlug)
+    .maybeSingle();
+
+  if (retry.error || !retry.data) {
+    return null;
+  }
+
+  return (retry.data as MenuCategoryRow).id;
 }
 
 function mapMenuItemRowToMenuItem(
@@ -210,6 +369,7 @@ function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
   return {
     id: item.id,
     restaurant_id: restaurantId,
+    category_id: null as string | null,
     category: normalizeLegacyMenuCategory(item.category),
     name_he: item.nameHe,
     name_en: item.nameEn,
@@ -228,12 +388,16 @@ function mapMenuItemToRow(item: MenuItem, restaurantId: string) {
 }
 
 type MenuItemUpsertRow = ReturnType<typeof mapMenuItemToRow>;
-type LegacyMenuItemUpsertRow = Omit<MenuItemUpsertRow, "price_agorot">;
+type LegacyMenuItemUpsertRow = Omit<MenuItemUpsertRow, "price_agorot" | "category_id">;
 
 function toLegacyCompatibleMenuItemRow(
   row: ReturnType<typeof mapMenuItemToRow>
 ): LegacyMenuItemUpsertRow {
-  const { price_agorot: _priceAgorot, ...legacyCompatibleRow } = row;
+  const {
+    price_agorot: _priceAgorot,
+    category_id: _categoryId,
+    ...legacyCompatibleRow
+  } = row;
   return legacyCompatibleRow;
 }
 
@@ -374,6 +538,9 @@ function normalizeVolumeOptions(
             shekelsToAgorot(price)
           )}`,
         label,
+        labelHe: option?.labelHe?.trim() || undefined,
+        labelEn: option?.labelEn?.trim() || undefined,
+        labelRu: option?.labelRu?.trim() || undefined,
         price: Math.max(0, normalizedPrice)
       };
     })
@@ -621,30 +788,43 @@ export async function createMenuItem(
   const supabase = getSupabaseAdminClient();
 
   if (supabase) {
-    try {
-      const restaurant = await getRestaurantIdBySlug(supabase, nextItem.restaurantSlug);
+    const restaurant = await getRestaurantIdBySlug(supabase, nextItem.restaurantSlug);
 
-      if (restaurant) {
-        const row = mapMenuItemToRow(nextItem, restaurant.id);
-        let { error } = await supabase.from("menu_items").insert(row);
-
-        if (error && isMissingPriceAgorotColumnError(error.message)) {
-          const retryInsert = await supabase
-            .from("menu_items")
-            .insert(toLegacyCompatibleMenuItemRow(row));
-          error = retryInsert.error;
-        }
-
-        if (!error) {
-          const current = getMenuStoreCache()?.items ?? [];
-          setMenuStoreCache([nextItem, ...current.filter((item) => item.id !== nextItem.id)]);
-          clearDerivedMenuCaches(nextItem.restaurantSlug);
-          return nextItem;
-        }
-      }
-    } catch {
-      // Fall back to legacy storage while migration is in progress.
+    if (!restaurant) {
+      throw new Error(`Restaurant "${nextItem.restaurantSlug}" not found.`);
     }
+
+    const row = mapMenuItemToRow(nextItem, restaurant.id);
+    const categoryId = await getMenuCategoryIdBySlug(
+      supabase,
+      restaurant.id,
+      nextItem.category
+    );
+
+    if (!categoryId) {
+      throw new Error(
+        `Category "${nextItem.category}" is not registered in menu_categories for ${nextItem.restaurantSlug}.`
+      );
+    }
+
+    row.category_id = categoryId;
+    let { error } = await supabase.from("menu_items").insert(row);
+
+    if (error && isMissingPriceAgorotColumnError(error.message)) {
+      const retryInsert = await supabase
+        .from("menu_items")
+        .insert(toLegacyCompatibleMenuItemRow(row));
+      error = retryInsert.error;
+    }
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const current = getMenuStoreCache()?.items ?? [];
+    setMenuStoreCache([nextItem, ...current.filter((item) => item.id !== nextItem.id)]);
+    clearDerivedMenuCaches(nextItem.restaurantSlug);
+    return nextItem;
   }
 
   const items = await loadMenuItemsAsync();
@@ -677,7 +857,11 @@ export async function updateMenuItem(
     >
   >
 ) {
-  const items = await loadMenuItemsAsync();
+  const cachedItems = getMenuStoreCache()?.items;
+  const items =
+    cachedItems && cachedItems.some((item) => item.id === menuItemId)
+      ? cloneMenuItems(cachedItems)
+      : await loadMenuItemsAsync();
   const index = items.findIndex((item) => item.id === menuItemId);
 
   if (index === -1) {
@@ -695,32 +879,45 @@ export async function updateMenuItem(
   const supabase = getSupabaseAdminClient();
 
   if (supabase) {
-    try {
-      const restaurant = await getRestaurantIdBySlug(supabase, current.restaurantSlug);
+    const restaurant = await getRestaurantIdBySlug(supabase, current.restaurantSlug);
 
-      if (restaurant) {
-        const row = mapMenuItemToRow(next, restaurant.id);
-        let { error } = await supabase
-          .from("menu_items")
-          .upsert(row, { onConflict: "id" });
-
-        if (error && isMissingPriceAgorotColumnError(error.message)) {
-          const retryUpsert = await supabase
-            .from("menu_items")
-            .upsert(toLegacyCompatibleMenuItemRow(row), { onConflict: "id" });
-          error = retryUpsert.error;
-        }
-
-        if (!error) {
-          items[index] = next;
-          setMenuStoreCache(items);
-          clearDerivedMenuCaches(current.restaurantSlug);
-          return next;
-        }
-      }
-    } catch {
-      // Fall back to legacy storage while migration is in progress.
+    if (!restaurant) {
+      throw new Error(`Restaurant "${current.restaurantSlug}" not found.`);
     }
+
+    const row = mapMenuItemToRow(next, restaurant.id);
+    const categoryId = await getMenuCategoryIdBySlug(
+      supabase,
+      restaurant.id,
+      next.category
+    );
+
+    if (!categoryId) {
+      throw new Error(
+        `Category "${next.category}" is not registered in menu_categories for ${current.restaurantSlug}.`
+      );
+    }
+
+    row.category_id = categoryId;
+    let { error } = await supabase
+      .from("menu_items")
+      .upsert(row, { onConflict: "id" });
+
+    if (error && isMissingPriceAgorotColumnError(error.message)) {
+      const retryUpsert = await supabase
+        .from("menu_items")
+        .upsert(toLegacyCompatibleMenuItemRow(row), { onConflict: "id" });
+      error = retryUpsert.error;
+    }
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    items[index] = next;
+    setMenuStoreCache(items);
+    clearDerivedMenuCaches(current.restaurantSlug);
+    return next;
   }
 
   items[index] = next;

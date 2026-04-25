@@ -35,6 +35,9 @@ export type MenuBadge =
 export type MenuVolumeOption = {
   id: string;
   label: string;
+  labelHe?: string;
+  labelEn?: string;
+  labelRu?: string;
   price: number;
 };
 

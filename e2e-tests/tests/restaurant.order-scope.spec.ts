@@ -1,6 +1,6 @@
 import { APIRequestContext, expect, Page, test } from "@playwright/test";
 
-import { createMockOrder } from "./fixtures";
+import { createMockMenuItem, createMockOrder } from "./fixtures";
 
 type OrderRecord = ReturnType<typeof createMockOrder>;
 
@@ -13,6 +13,8 @@ const SECONDARY_LOGIN =
 const SECONDARY_PASSWORD =
   process.env.E2E_ADMIN_SECONDARY_PASSWORD ?? process.env.ADMIN_SECONDARY_PASSWORD ?? "admin";
 const SIMULEV_SLUG = "simuLev";
+const SIMULEV_MENU_PATH =
+  process.env.E2E_SIMULEV_ORDERING_MENU_PATH?.trim() || `/${SIMULEV_SLUG}/menu/0`;
 
 type CounterSettingsSnapshot = {
   orderMode: "tables" | "counter";
@@ -150,6 +152,96 @@ async function submitOrderFromReviewDialog(page: Page) {
   const reviewDialog = page.locator(".modal-card--review");
   await expect(reviewDialog).toBeVisible();
   await reviewDialog.getByRole("button", { name: "OK" }).first().click({ force: true });
+}
+
+async function setupNeutralTablesPolling(page: Page) {
+  await page.route("**/api/tables/**", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        currentSessionId: 1,
+        submittedOrders: [],
+        activeServiceRequests: []
+      })
+    });
+  });
+}
+
+async function setupSimuLevTypeMenu(page: Page) {
+  const menuItems = [
+    createMockMenuItem({
+      id: "simulev-type-item-1",
+      restaurantSlug: SIMULEV_SLUG,
+      category: "starters",
+      name: "Draniki",
+      nameHe: "דרניקי",
+      nameEn: "Draniki",
+      nameRu: "Драники",
+      description: "Potato pancakes",
+      descriptionHe: "לביבות תפוחי אדמה",
+      descriptionEn: "Potato pancakes",
+      descriptionRu: "Картофельные оладьи",
+      price: 38,
+      volumeOptions: [
+        { id: "type-classic", label: "Classic", price: 38 },
+        { id: "type-salmon", label: "With salmon", price: 42 }
+      ]
+    })
+  ];
+
+  await page.route("**/api/menu-settings**", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        orderMode: "tables",
+        kitchenOpenEnabled: false,
+        kitchenOpenUntil: null,
+        barOpenEnabled: false,
+        barOpenUntil: null,
+        happyHourEnabled: false,
+        happyHourDiscountPercent: 0,
+        happyHourCategories: [],
+        happyHourStartsFrom: null,
+        happyHourUntil: null,
+        promotions: [],
+        businessLunches: [],
+        recommendations: []
+      })
+    });
+  });
+
+  await page.route("**/api/menu?**", async (route, request) => {
+    if (request.method() !== "GET") {
+      await route.continue();
+      return;
+    }
+
+    const url = new URL(request.url());
+    if ((url.searchParams.get("restaurantSlug") ?? "").toLowerCase() !== SIMULEV_SLUG.toLowerCase()) {
+      await route.continue();
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(menuItems)
+    });
+  });
+
+  await setupNeutralTablesPolling(page);
 }
 
 async function fetchCounterSettingsSnapshot(
@@ -562,5 +654,111 @@ test.describe("Restaurant order scoping", () => {
     } finally {
       await patchCounterSettings(request, restaurantSlug, originalSettings);
     }
+  });
+
+  test("SCOPE-05 SimuLev dishes render type rows instead of multi-select toppings", async ({
+    page
+  }) => {
+    await setupSimuLevTypeMenu(page);
+
+    await openMenuInEnglish(page, SIMULEV_MENU_PATH);
+    await page.getByRole("button", { name: /Dishes/i }).first().click();
+    await page.getByRole("button", { name: /Starters/i }).first().click();
+
+    const card = page.locator(".menu-card").filter({
+      has: page.getByRole("heading", { name: "Draniki" })
+    }).first();
+
+    await expect(card).toBeVisible();
+    await expect(card.locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(card.locator(".menu-card__addons")).toHaveCount(0);
+    await expect(card.locator(".menu-card__volume-row")).toHaveCount(2);
+    await expect(card.getByText("Classic")).toBeVisible();
+    await expect(card.getByText("With salmon")).toBeVisible();
+    await expect(
+      card.locator(".menu-card__volume-row button").filter({ hasText: /^Add$/ })
+    ).toHaveCount(2);
+    await expect(
+      card.locator(".menu-card__footer button").filter({ hasText: /^Add$/ })
+    ).toHaveCount(0);
+  });
+
+  test("SCOPE-06 SimuLev order sends only the chosen dish type", async ({ page }) => {
+    await setupSimuLevTypeMenu(page);
+
+    type SimuLevSubmittedPayload = {
+      items?: Array<{
+        menuItemId?: string;
+        quantity?: number;
+        volumeOptionId?: string;
+        volumeLabel?: string;
+        priceOverride?: number;
+      }>;
+    };
+
+    let submittedPayload: SimuLevSubmittedPayload | null = null;
+
+    await page.route("**/api/orders**", async (route, request) => {
+      if (request.method() !== "POST") {
+        await route.continue();
+        return;
+      }
+
+      submittedPayload = JSON.parse(request.postData() ?? "{}") as SimuLevSubmittedPayload;
+      const submittedItem = submittedPayload?.items?.[0];
+
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "simulev-type-order-1",
+          restaurantSlug: SIMULEV_SLUG,
+          restaurantName: "SimuLev",
+          tableNumber: 1,
+          sessionId: 1,
+          status: "new",
+          kind: "order",
+          serveMode: "as_ready",
+          createdAt: new Date().toISOString(),
+          total: submittedItem?.priceOverride ?? 42,
+          items: [
+            {
+              id: "simulev-type-order-item-1",
+              menuItemId: submittedItem?.menuItemId ?? "simulev-type-item-1",
+              name: "Draniki",
+              price: submittedItem?.priceOverride ?? 42,
+              quantity: submittedItem?.quantity ?? 1,
+              served: false,
+              volumeOptionId: submittedItem?.volumeOptionId,
+              volumeLabel: submittedItem?.volumeLabel
+            }
+          ]
+        })
+      });
+    });
+
+    await openMenuInEnglish(page, SIMULEV_MENU_PATH);
+    await page.getByRole("button", { name: /Dishes/i }).first().click();
+    await page.getByRole("button", { name: /Starters/i }).first().click();
+
+    const salmonRow = page.locator(".menu-card__volume-row").filter({
+      has: page.getByText("With salmon")
+    }).first();
+    await expect(salmonRow).toBeVisible();
+    await salmonRow.getByRole("button", { name: "Add" }).click();
+
+    await expect(page.locator(".cart-row")).toHaveCount(1);
+    await expect(page.locator(".cart-row")).toContainText("With salmon");
+
+    await submitOrderFromReviewDialog(page);
+    await expect(page.locator(".modal-card__message")).toContainText("Your order has been sent.");
+
+    const submittedItems = submittedPayload?.items ?? [];
+    expect(submittedItems).toHaveLength(1);
+    expect(submittedItems[0]?.menuItemId).toBe("simulev-type-item-1");
+    expect(submittedItems[0]?.quantity).toBe(1);
+    expect(submittedItems[0]?.volumeOptionId).toBe("type-salmon");
+    expect(submittedItems[0]?.volumeLabel).toBe("With salmon");
+    expect(submittedItems[0]?.priceOverride).toBe(42);
   });
 });

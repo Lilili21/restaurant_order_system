@@ -281,10 +281,10 @@ export function MenuItemEditCard({
                   {itemKind === "drinks"
                     ? "Volumes and prices"
                     : itemLanguage === "he"
-                      ? "תוספות ומחירים"
+                      ? "סוגים ומחירים"
                       : itemLanguage === "ru"
-                        ? "Добавки и цены"
-                        : "Add extras and prices"}
+                        ? "Типы и цены"
+                        : "Types and prices"}
                 </span>
                 <span className="menu-editor__volume-actions">
                   <button
@@ -328,10 +328,10 @@ export function MenuItemEditCard({
                         itemKind === "drinks"
                           ? "Volume"
                           : itemLanguage === "he"
-                            ? "תוספת"
+                            ? "סוג"
                             : itemLanguage === "ru"
-                              ? "Добавка"
-                              : "Add-on"
+                              ? "Тип"
+                              : "Type"
                       }
                       value={row.label}
                       onChange={(event) =>

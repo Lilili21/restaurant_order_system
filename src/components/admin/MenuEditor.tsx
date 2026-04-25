@@ -908,6 +908,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   const [toppingsSaving, setToppingsSaving] = useState(false);
   const [toppingsMessage, setToppingsMessage] = useState<string | null>(null);
   const [newToppingLabelEn, setNewToppingLabelEn] = useState("");
+  const [editingToppingSlug, setEditingToppingSlug] = useState<string | null>(null);
   const [selectedToppingCategories, setSelectedToppingCategories] = useState<
     MenuCategory[]
   >([]);
@@ -1602,6 +1603,27 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     promotions
   ]);
 
+  const shouldLoadSettings = useMemo(
+    () =>
+      dashboardOpen ||
+      menuOpen ||
+      notificationsOpen ||
+      recommendationsOpen ||
+      settingsRecommendationsOpen,
+    [
+      dashboardOpen,
+      menuOpen,
+      notificationsOpen,
+      recommendationsOpen,
+      settingsRecommendationsOpen
+    ]
+  );
+  const shouldLoadCategories = useMemo(
+    () => menuOpen || categoryManagerOpen || toppingsManagerOpen,
+    [menuOpen, categoryManagerOpen, toppingsManagerOpen]
+  );
+  const shouldLoadAnalytics = useMemo(() => dashboardOpen, [dashboardOpen]);
+
   useEffect(() => {
     if (!isAuthorized) {
       return;
@@ -1661,23 +1683,32 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
               cache: "no-store",
               headers: authHeaders
             }),
-            fetchDashboardResource(`/api/menu-settings?restaurantSlug=${restaurantSlug}`, {
-              cache: "no-store"
-            }),
-            fetchDashboardResource(
-              `/api/admin-analytics?restaurantSlug=${restaurantSlug}`,
-              {
-                cache: "no-store",
-                headers: authHeaders
-              }
-            ),
-            fetchDashboardResource(
-              `/api/menu-categories?restaurantSlug=${restaurantSlug}`,
-              {
-                cache: "no-store",
-                headers: authHeaders
-              }
-            )
+            shouldLoadSettings
+              ? fetchDashboardResource(
+                  `/api/menu-settings?restaurantSlug=${restaurantSlug}`,
+                  {
+                    cache: "no-store"
+                  }
+                )
+              : Promise.resolve(null),
+            shouldLoadAnalytics
+              ? fetchDashboardResource(
+                  `/api/admin-analytics?restaurantSlug=${restaurantSlug}`,
+                  {
+                    cache: "no-store",
+                    headers: authHeaders
+                  }
+                )
+              : Promise.resolve(null),
+            shouldLoadCategories
+              ? fetchDashboardResource(
+                  `/api/menu-categories?restaurantSlug=${restaurantSlug}`,
+                  {
+                    cache: "no-store",
+                    headers: authHeaders
+                  }
+                )
+              : Promise.resolve(null)
           ]);
 
         if (cancelled) {
@@ -1709,7 +1740,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           setMessage("Failed to load menu.");
         }
 
-        if (settingsResponse?.ok) {
+        if (shouldLoadSettings && settingsResponse?.ok) {
           const settings = (await settingsResponse.json()) as {
             kitchenLoadWarningEnabled?: boolean;
             workingHoursRules?: WorkingHoursRule[];
@@ -1814,7 +1845,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           hasSuccessfulResponse = true;
         }
 
-        if (categoriesResponse?.ok) {
+        if (shouldLoadCategories && categoriesResponse?.ok) {
           const categoriesData = (await categoriesResponse.json()) as
             | MenuCategoryDefinition[]
             | null;
@@ -1827,24 +1858,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
           setCategoryDefinitions(mergeResult.merged);
 
-          if (mergeResult.changed) {
-            await fetch("/api/menu-categories", {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                ...authHeaders
-              },
-              body: JSON.stringify({
-                restaurantSlug,
-                categories: mergeResult.merged
-              })
-            }).catch(() => null);
-          }
-
           hasSuccessfulResponse = true;
         }
 
-        if (analyticsResponse?.ok) {
+        if (shouldLoadAnalytics && analyticsResponse?.ok) {
           const analytics = (await analyticsResponse.json()) as {
             insights?: Partial<InsightStats> & {
               vsYesterday?: Partial<InsightStats["vsYesterday"]>;
@@ -2001,7 +2018,14 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [isAuthorized, secondaryCredentials, restaurantSlug]);
+  }, [
+    isAuthorized,
+    secondaryCredentials,
+    restaurantSlug,
+    shouldLoadAnalytics,
+    shouldLoadCategories,
+    shouldLoadSettings
+  ]);
 
   const currentShiftLabel = useMemo(() => {
     const today = new Date().getDay();
@@ -3173,7 +3197,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     });
 
     if (!response.ok) {
-      setMessage("Failed to save menu changes.");
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+      setMessage(payload?.message || "Failed to save menu changes.");
       setItems((current) =>
         current.map((item) =>
           item.id === itemId ? { ...item, saving: false } : item
@@ -3283,7 +3310,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     });
 
     if (!response.ok) {
-      setMessage("Failed to add the new menu item.");
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+      setMessage(payload?.message || "Failed to add the new menu item.");
       setNewItem((current) => ({ ...current, saving: false }));
       return;
     }
@@ -3590,7 +3620,12 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
   }, [activeDrinkCategories]);
 
   const saveCategoryDefinitions = useCallback(
-    async (nextDefinitions: EditableCategoryDefinition[]) => {
+    async (
+      nextDefinitions: EditableCategoryDefinition[]
+    ): Promise<{
+      saved: EditableCategoryDefinition[] | null;
+      errorMessage: string | null;
+    }> => {
       setCategoriesSaving(true);
       setCategoriesMessage(null);
 
@@ -3611,9 +3646,10 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         const payload = (await response.json().catch(() => null)) as
           | { message?: string }
           | null;
+        const errorMessage = payload?.message || "Failed to save categories.";
         setCategoriesSaving(false);
-        setCategoriesMessage(payload?.message || "Failed to save categories.");
-        return null;
+        setCategoriesMessage(errorMessage);
+        return { saved: null, errorMessage };
       }
 
       const saved = (await response.json()) as MenuCategoryDefinition[];
@@ -3621,9 +3657,127 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       setCategoryDefinitions(normalizedSaved);
       setCategoriesSaving(false);
       setCategoriesMessage("Categories saved.");
-      return normalizedSaved;
+      return { saved: normalizedSaved, errorMessage: null };
     },
     [restaurantSlug, secondaryCredentials?.login, secondaryCredentials?.password]
+  );
+
+  const upsertCategoryDefinition = useCallback(
+    async (
+      category: EditableCategoryDefinition
+    ): Promise<{
+      saved: EditableCategoryDefinition[] | null;
+      errorMessage: string | null;
+    }> => {
+      setCategoriesSaving(true);
+      setCategoriesMessage(null);
+      const previousDefinitions = categoryDefinitions;
+      const optimisticDefinitions = normalizeEditorCategoryDefinitions(
+        (() => {
+          const existingIndex = previousDefinitions.findIndex(
+            (entry) => entry.slug === category.slug
+          );
+          if (existingIndex >= 0) {
+            return previousDefinitions.map((entry, index) =>
+              index === existingIndex ? category : entry
+            );
+          }
+          return [...previousDefinitions, category];
+        })()
+      );
+      setCategoryDefinitions(optimisticDefinitions);
+
+      const response = await fetch("/api/menu-categories", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+          "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+        },
+        body: JSON.stringify({
+          restaurantSlug,
+          category
+        })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        const errorMessage = payload?.message || "Failed to save category.";
+        setCategoryDefinitions(previousDefinitions);
+        setCategoriesSaving(false);
+        setCategoriesMessage(errorMessage);
+        return { saved: null, errorMessage };
+      }
+
+      const saved = (await response.json()) as MenuCategoryDefinition[];
+      const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
+      setCategoryDefinitions(normalizedSaved);
+      setCategoriesSaving(false);
+      setCategoriesMessage("Categories saved.");
+      return { saved: normalizedSaved, errorMessage: null };
+    },
+    [
+      categoryDefinitions,
+      restaurantSlug,
+      secondaryCredentials?.login,
+      secondaryCredentials?.password
+    ]
+  );
+
+  const removeCategoryDefinition = useCallback(
+    async (
+      slug: string
+    ): Promise<{
+      saved: EditableCategoryDefinition[] | null;
+      errorMessage: string | null;
+    }> => {
+      setCategoriesSaving(true);
+      setCategoriesMessage(null);
+      const previousDefinitions = categoryDefinitions;
+      const optimisticDefinitions = previousDefinitions.filter(
+        (entry) => entry.slug !== slug
+      );
+      setCategoryDefinitions(optimisticDefinitions);
+
+      const response = await fetch("/api/menu-categories", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+          "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+        },
+        body: JSON.stringify({
+          restaurantSlug,
+          slug
+        })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        const errorMessage = payload?.message || "Failed to delete category.";
+        setCategoryDefinitions(previousDefinitions);
+        setCategoriesSaving(false);
+        setCategoriesMessage(errorMessage);
+        return { saved: null, errorMessage };
+      }
+
+      const saved = (await response.json()) as MenuCategoryDefinition[];
+      const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
+      setCategoryDefinitions(normalizedSaved);
+      setCategoriesSaving(false);
+      setCategoriesMessage("Category deleted.");
+      return { saved: normalizedSaved, errorMessage: null };
+    },
+    [
+      categoryDefinitions,
+      restaurantSlug,
+      secondaryCredentials?.login,
+      secondaryCredentials?.password
+    ]
   );
 
   const addCategoryDefinition = useCallback(async () => {
@@ -3656,22 +3810,19 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
-    const nextDefinitions = [
-      ...categoryDefinitions,
-      {
-        slug: normalizedSlug,
-        label: labelEn || primaryLabel,
-        labelHe: labelHe || undefined,
-        labelEn: labelEn || undefined,
-        labelRu: labelRu || undefined,
-        kind: newCategoryKind,
-        active: true,
-        linkedSlug: null,
-        sortOrder: (categoryDefinitions.length + 1) * 10
-      }
-    ];
+    const nextCategory = {
+      slug: normalizedSlug,
+      label: labelEn || primaryLabel,
+      labelHe: labelHe || undefined,
+      labelEn: labelEn || undefined,
+      labelRu: labelRu || undefined,
+      kind: newCategoryKind,
+      active: true,
+      linkedSlug: null,
+      sortOrder: (categoryDefinitions.length + 1) * 10
+    } satisfies EditableCategoryDefinition;
 
-    const saved = await saveCategoryDefinitions(nextDefinitions);
+    const { saved } = await upsertCategoryDefinition(nextCategory);
     if (saved) {
       setNewCategoryLabelHe("");
       setNewCategoryLabelEn("");
@@ -3684,7 +3835,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     newCategoryLabelEn,
     newCategoryLabelHe,
     newCategoryLabelRu,
-    saveCategoryDefinitions
+    upsertCategoryDefinition
   ]);
 
   const openCategoryEditor = useCallback(
@@ -3696,6 +3847,26 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       const target =
         categoryDefinitions.find((category) => category.slug === normalizedSlug) ?? null;
+
+      if (target?.kind === "addons") {
+        const linked = Array.isArray(target.linkedSlugs)
+          ? target.linkedSlugs
+          : target.linkedSlug
+            ? [target.linkedSlug]
+            : [];
+
+        setEditingToppingSlug(target.slug);
+        setNewToppingLabelEn(
+          String(target.labelEn ?? "").trim() || String(target.label ?? "").trim()
+        );
+        setSelectedToppingCategories(
+          linked.map((entry) => toMenuCategory(String(entry))).filter(Boolean)
+        );
+        setToppingsMessage(null);
+        setCategoryManagerOpen(false);
+        setToppingsManagerOpen(true);
+        return;
+      }
 
       const fallbackLabel =
         categoryLabels[normalizedSlug] ?? humanizeCategorySlug(normalizedSlug);
@@ -3728,6 +3899,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       setNewCategoryLabelRu(editorLabels.labelRu);
       setCategoriesMessage(null);
       setCategoryManagerOpen(true);
+      setToppingsManagerOpen(false);
     },
     [categoryDefinitions, categoryLabels, selectedKind]
   );
@@ -3747,20 +3919,22 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
-    const nextDefinitions = categoryDefinitions.map((category) =>
-      category.slug === editingCategorySlug
-        ? {
-            ...category,
-            label: labelEn || primaryLabel,
-            labelHe: labelHe || undefined,
-            labelEn: labelEn || undefined,
-            labelRu: labelRu || undefined,
-            kind: newCategoryKind
-          }
-        : category
+    const currentCategory = categoryDefinitions.find(
+      (category) => category.slug === editingCategorySlug
     );
+    if (!currentCategory) {
+      setCategoriesMessage("Category not found.");
+      return;
+    }
 
-    const saved = await saveCategoryDefinitions(nextDefinitions);
+    const { saved } = await upsertCategoryDefinition({
+      ...currentCategory,
+      label: labelEn || primaryLabel,
+      labelHe: labelHe || undefined,
+      labelEn: labelEn || undefined,
+      labelRu: labelRu || undefined,
+      kind: newCategoryKind
+    });
     if (saved) {
       setCategoriesMessage("Category saved.");
     }
@@ -3771,7 +3945,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     newCategoryLabelEn,
     newCategoryLabelHe,
     newCategoryLabelRu,
-    saveCategoryDefinitions
+    upsertCategoryDefinition
   ]);
 
   const deleteEditedCategoryDefinition = useCallback(async () => {
@@ -3786,10 +3960,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
-    const nextDefinitions = categoryDefinitions.filter(
-      (category) => category.slug !== editingCategorySlug
-    );
-    const saved = await saveCategoryDefinitions(nextDefinitions);
+    const { saved } = await removeCategoryDefinition(editingCategorySlug);
     if (saved) {
       setEditingCategorySlug(null);
       setNewCategoryLabelHe("");
@@ -3801,19 +3972,21 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     categoryDefinitions,
     editingCategorySlug,
     items,
-    saveCategoryDefinitions
+    removeCategoryDefinition
   ]);
 
   const toggleCategoryDefinitionActive = useCallback(
     async (slug: string) => {
-      const nextDefinitions = categoryDefinitions.map((category) =>
-        category.slug === slug
-          ? { ...category, active: !category.active }
-          : category
-      );
-      await saveCategoryDefinitions(nextDefinitions);
+      const currentCategory = categoryDefinitions.find((category) => category.slug === slug);
+      if (!currentCategory) {
+        return;
+      }
+      await upsertCategoryDefinition({
+        ...currentCategory,
+        active: !currentCategory.active
+      });
     },
-    [categoryDefinitions, saveCategoryDefinitions]
+    [categoryDefinitions, upsertCategoryDefinition]
   );
 
   const deleteCategoryDefinition = useCallback(
@@ -3826,15 +3999,12 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         return;
       }
 
-      const nextDefinitions = categoryDefinitions.filter(
-        (category) => category.slug !== slug
-      );
-      const saved = await saveCategoryDefinitions(nextDefinitions);
+      const { saved } = await removeCategoryDefinition(slug);
       if (saved) {
         setCategoriesMessage("Category deleted.");
       }
     },
-    [categoryDefinitions, items, saveCategoryDefinitions]
+    [items, removeCategoryDefinition]
   );
 
   const togglePreview = useCallback(() => {
@@ -3971,6 +4141,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       if (next) {
         setCategoryManagerOpen(false);
         setNewToppingLabelEn("");
+        setEditingToppingSlug(null);
         setSelectedToppingCategories([]);
         setToppingsMessage(null);
       }
@@ -4007,53 +4178,87 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
-    const toppingSlug = `addon_${baseSlug}`;
+    const toppingSlug = editingToppingSlug || `addon_${baseSlug}`;
 
-    if (categoryDefinitions.some((category) => category.slug === toppingSlug)) {
+    if (
+      !editingToppingSlug &&
+      categoryDefinitions.some((category) => category.slug === toppingSlug)
+    ) {
       setToppingsMessage("This topping already exists.");
       return;
     }
 
+    const existingSortOrder =
+      categoryDefinitions.find((category) => category.slug === toppingSlug)?.sortOrder ?? 0;
     const maxSortOrder = categoryDefinitions.reduce(
       (max, category) => Math.max(max, Number(category.sortOrder) || 0),
       0
     );
 
-    const nextDefinitions: EditableCategoryDefinition[] = [
-      ...categoryDefinitions,
-      {
-        slug: toppingSlug,
-        label: labelEn,
-        labelEn,
-        kind: "addons",
-        active: true,
-        linkedSlug: selectedToppingCategories[0] ?? null,
-        linkedSlugs: selectedToppingCategories,
-        sortOrder: maxSortOrder + 10
-      }
-    ];
+    const nextEntry: EditableCategoryDefinition = {
+      slug: toppingSlug,
+      label: labelEn,
+      labelEn,
+      kind: "addons",
+      active: true,
+      linkedSlug: selectedToppingCategories[0] ?? null,
+      linkedSlugs: selectedToppingCategories,
+      sortOrder: existingSortOrder || maxSortOrder + 10
+    };
 
     setToppingsSaving(true);
     setToppingsMessage(null);
 
-    const saved = await saveCategoryDefinitions(nextDefinitions);
+    const { saved, errorMessage } = await upsertCategoryDefinition(nextEntry);
     setToppingsSaving(false);
 
     if (!saved) {
-      setToppingsMessage("Failed to save topping.");
+      setToppingsMessage(errorMessage || "Failed to save topping.");
       return;
     }
 
-    setToppingsMessage("Topping saved.");
+    setToppingsMessage(editingToppingSlug ? "Topping updated." : "Topping saved.");
+    setEditingToppingSlug(null);
     setNewToppingLabelEn("");
     setSelectedToppingCategories([]);
     setToppingsManagerOpen(false);
   }, [
     categoryDefinitions,
+    editingToppingSlug,
     newToppingLabelEn,
-    saveCategoryDefinitions,
+    upsertCategoryDefinition,
     selectedToppingCategories
   ]);
+
+  const deleteEditedToppingDefinition = useCallback(async () => {
+    if (!editingToppingSlug) {
+      return;
+    }
+
+    const hasLinkedItems = items.some((item) => item.category === editingToppingSlug);
+    if (hasLinkedItems) {
+      setToppingsMessage(
+        "Cannot delete topping category with existing menu items. Move items first."
+      );
+      return;
+    }
+
+    setToppingsSaving(true);
+    setToppingsMessage(null);
+    const { saved, errorMessage } = await removeCategoryDefinition(editingToppingSlug);
+    setToppingsSaving(false);
+
+    if (!saved) {
+      setToppingsMessage(errorMessage || "Failed to delete topping.");
+      return;
+    }
+
+    setToppingsMessage("Topping deleted.");
+    setEditingToppingSlug(null);
+    setNewToppingLabelEn("");
+    setSelectedToppingCategories([]);
+    setToppingsManagerOpen(false);
+  }, [editingToppingSlug, items, removeCategoryDefinition]);
 
   const runRecommendationAction = useCallback(
     (recommendationId: string) => {
@@ -4313,7 +4518,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         onEditCategoryFromChip={openCategoryEditor}
         onClearSelectedCategories={clearSelectedCategories}
         editableCategories={editableCategories}
-        editableCategorySlugs={editableCategories.map((category) => category.slug)}
+        editableCategorySlugs={visibleCategories.map(([category]) => category)}
         categoriesSaving={categoriesSaving}
         categoriesMessage={categoriesMessage}
         newCategoryLabelHe={newCategoryLabelHe}
@@ -4330,12 +4535,14 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         editingCategorySlug={editingCategorySlug}
         toppingsSaving={toppingsSaving}
         toppingsMessage={toppingsMessage}
+        editingToppingSlug={editingToppingSlug}
         newToppingLabelEn={newToppingLabelEn}
         onNewToppingLabelEnChange={setNewToppingLabelEn}
         toppingCategoryOptions={toppingCategoryOptions}
         selectedToppingCategories={selectedToppingCategories}
         onToggleToppingCategory={toggleToppingCategory}
         onSaveTopping={saveToppingDefinition}
+        onDeleteEditedTopping={deleteEditedToppingDefinition}
         onToggleCategoryActive={toggleCategoryDefinitionActive}
         onDeleteCategory={deleteCategoryDefinition}
         filteredItems={filteredItems}
