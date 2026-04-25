@@ -123,6 +123,12 @@
       "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; fi; export E2E_USE_WEB_SERVER=false; echo \"[E2E] TARGET=$TARGET | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=false\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:dashboard -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: SimuLev Language Types (Choose local/dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; fi; export E2E_USE_WEB_SERVER=false; echo \"[E2E] TARGET=$TARGET | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=false\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright test tests/restaurant.order-scope.spec.ts --grep \"SCOPE-07|SCOPE-08\" --workers=1 --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Tables Shift (Choose local/dev)",
       "type": "node-terminal",
       "request": "launch",

@@ -152,6 +152,20 @@ const COUNTER_CAPTCHA_MISSING_MESSAGE = "Please complete the captcha check.";
 const COUNTER_CAPTCHA_INIT_FAILED_MESSAGE =
   "Captcha could not be initialized. Please refresh and try again.";
 
+function getQuickInfoLinks(restaurantSlug: string) {
+  const normalizedSlug = restaurantSlug.trim().toLowerCase();
+
+  if (normalizedSlug === "simulev") {
+    return [
+      "https://maps.app.goo.gl/MVeFS6CFBWwA4x5VA",
+      "https://maps.app.goo.gl/MVeFS6CFBWwA4x5VA",
+      "https://www.instagram.com/simulev.tlv/"
+    ] as const;
+  }
+
+  return [null, null, null] as const;
+}
+
 const uiText = {
   he: {
     table: "שולחן",
@@ -495,6 +509,10 @@ export function Cart({
   const sessionSyncPollCountRef = useRef(0);
   const pendingOrderRequestIdRef = useRef<string | null>(null);
   const isCounterMode = orderMode === "counter";
+  const quickInfoLinks = useMemo(
+    () => getQuickInfoLinks(restaurantSlug),
+    [restaurantSlug]
+  );
   const counterRequiresPhone =
     isCounterMode && (contactRequirement === "phone_only" || requireOtp);
   const counterRequiresNameOrPhone =
@@ -2611,11 +2629,29 @@ export function Cart({
               </div>
             </div>
             <div className="menu-quick-info" aria-label="Guest information shortcuts">
-              {text.quickInfo.map((label) => (
-                <span key={label} className="menu-quick-info__chip">
-                  {label}
-                </span>
-              ))}
+              {text.quickInfo.map((label, index) => {
+                const href = quickInfoLinks[index] ?? null;
+
+                if (!href) {
+                  return (
+                    <span key={label} className="menu-quick-info__chip">
+                      {label}
+                    </span>
+                  );
+                }
+
+                return (
+                  <a
+                    key={label}
+                    className="menu-quick-info__chip"
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {label}
+                  </a>
+                );
+              })}
             </div>
             <p className="lead">
               {orderingEnabled

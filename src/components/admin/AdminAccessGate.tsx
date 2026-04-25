@@ -4,17 +4,24 @@ import { ReactNode, useEffect, useState } from "react";
 
 type AdminAccessGateProps = {
   children: ReactNode;
-  scope?: "admin" | "waiter";
+  scope?: "admin" | "waiter" | "restaurant";
   title?: string;
+  restaurantSlug?: string;
 };
 
 export function AdminAccessGate({
   children,
   scope = "admin",
-  title
+  title,
+  restaurantSlug
 }: AdminAccessGateProps) {
   const resolvedTitle =
-    title ?? (scope === "waiter" ? "Waiter sign in" : "User sign in");
+    title ??
+    (scope === "waiter"
+      ? "Waiter sign in"
+      : scope === "restaurant"
+        ? "User sign in"
+        : "User sign in");
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [checkedAuth, setCheckedAuth] = useState(false);
   const [login, setLogin] = useState("");
@@ -26,7 +33,13 @@ export function AdminAccessGate({
     let cancelled = false;
 
     async function checkAuth() {
-      const response = await fetch(`/api/admin-auth?scope=${scope}`, {
+      const params = new URLSearchParams({ scope });
+
+      if (scope === "restaurant" && restaurantSlug) {
+        params.set("restaurantSlug", restaurantSlug);
+      }
+
+      const response = await fetch(`/api/admin-auth?${params.toString()}`, {
         cache: "no-store"
       });
 
@@ -50,7 +63,7 @@ export function AdminAccessGate({
     return () => {
       cancelled = true;
     };
-  }, [scope]);
+  }, [scope, restaurantSlug]);
 
   async function submitAuth() {
     const response = await fetch("/api/admin-auth", {
@@ -60,6 +73,7 @@ export function AdminAccessGate({
       },
       body: JSON.stringify({
         scope,
+        restaurantSlug,
         login,
         password,
         persist: true

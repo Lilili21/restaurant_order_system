@@ -124,6 +124,11 @@ async function openMenuInEnglish(page: Page, menuPath: string) {
   await expect(page.locator(".menu-sections")).toBeVisible();
 }
 
+async function switchMenuLanguage(page: Page, language: "EN" | "RU" | "HE") {
+  await page.getByRole("button", { name: language, exact: true }).click();
+  await dismissWelcomeDialogIfVisible(page);
+}
+
 async function addFirstOrderableItem(page: Page) {
   const directAdd = page
     .locator(".menu-card .menu-card__footer button")
@@ -189,8 +194,22 @@ async function setupSimuLevTypeMenu(page: Page) {
       descriptionRu: "Картофельные оладьи",
       price: 38,
       volumeOptions: [
-        { id: "type-classic", label: "Classic", price: 38 },
-        { id: "type-salmon", label: "With salmon", price: 42 }
+        {
+          id: "type-classic",
+          label: "Potato",
+          labelHe: "תפוחי אדמה",
+          labelEn: "Potato",
+          labelRu: "Картофельные",
+          price: 38
+        },
+        {
+          id: "type-salmon",
+          label: "Zucchini",
+          labelHe: "קישואים",
+          labelEn: "Zucchini",
+          labelRu: "Кабачковые",
+          price: 42
+        }
       ]
     })
   ];
@@ -686,17 +705,18 @@ test.describe("Restaurant order scoping", () => {
   test("SCOPE-06 SimuLev order sends only the chosen dish type", async ({ page }) => {
     await setupSimuLevTypeMenu(page);
 
+    type SimuLevSubmittedItem = {
+      menuItemId?: string;
+      quantity?: number;
+      volumeOptionId?: string;
+      volumeLabel?: string;
+      priceOverride?: number;
+    };
     type SimuLevSubmittedPayload = {
-      items?: Array<{
-        menuItemId?: string;
-        quantity?: number;
-        volumeOptionId?: string;
-        volumeLabel?: string;
-        priceOverride?: number;
-      }>;
+      items?: SimuLevSubmittedItem[];
     };
 
-    let submittedPayload: SimuLevSubmittedPayload | null = null;
+    let submittedItems: SimuLevSubmittedItem[] = [];
 
     await page.route("**/api/orders**", async (route, request) => {
       if (request.method() !== "POST") {
@@ -704,8 +724,9 @@ test.describe("Restaurant order scoping", () => {
         return;
       }
 
-      submittedPayload = JSON.parse(request.postData() ?? "{}") as SimuLevSubmittedPayload;
-      const submittedItem = submittedPayload?.items?.[0];
+      const submittedPayload = JSON.parse(request.postData() ?? "{}") as SimuLevSubmittedPayload;
+      submittedItems = submittedPayload.items ?? [];
+      const submittedItem = submittedItems[0];
 
       await route.fulfill({
         status: 201,
@@ -742,23 +763,81 @@ test.describe("Restaurant order scoping", () => {
     await page.getByRole("button", { name: /Starters/i }).first().click();
 
     const salmonRow = page.locator(".menu-card__volume-row").filter({
-      has: page.getByText("With salmon")
+      has: page.getByText("Zucchini")
     }).first();
     await expect(salmonRow).toBeVisible();
     await salmonRow.getByRole("button", { name: "Add" }).click();
 
     await expect(page.locator(".cart-row")).toHaveCount(1);
-    await expect(page.locator(".cart-row")).toContainText("With salmon");
+    await expect(page.locator(".cart-row")).toContainText("Zucchini");
 
     await submitOrderFromReviewDialog(page);
     await expect(page.locator(".modal-card__message")).toContainText("Your order has been sent.");
 
-    const submittedItems = submittedPayload?.items ?? [];
     expect(submittedItems).toHaveLength(1);
     expect(submittedItems[0]?.menuItemId).toBe("simulev-type-item-1");
     expect(submittedItems[0]?.quantity).toBe(1);
     expect(submittedItems[0]?.volumeOptionId).toBe("type-salmon");
-    expect(submittedItems[0]?.volumeLabel).toBe("With salmon");
+    expect(submittedItems[0]?.volumeLabel).toBe("Zucchini");
     expect(submittedItems[0]?.priceOverride).toBe(42);
+  });
+
+  test("SCOPE-07 SimuLev dish type labels switch across HE/EN/RU", async ({ page }) => {
+    await setupSimuLevTypeMenu(page);
+
+    await openMenuInEnglish(page, SIMULEV_MENU_PATH);
+    await page.getByRole("button", { name: /Dishes/i }).first().click();
+    await page.getByRole("button", { name: /Starters/i }).first().click();
+
+    const card = page.locator(".menu-card").filter({
+      has: page.getByRole("heading", { name: "Draniki" })
+    }).first();
+
+    await expect(card).toContainText("Potato");
+    await expect(card).toContainText("Zucchini");
+
+    await switchMenuLanguage(page, "RU");
+    await expect(card).toContainText("Картофельные");
+    await expect(card).toContainText("Кабачковые");
+
+    await switchMenuLanguage(page, "HE");
+    await expect(card).toContainText("תפוחי אדמה");
+    await expect(card).toContainText("קישואים");
+
+    await switchMenuLanguage(page, "EN");
+    await expect(card).toContainText("Potato");
+    await expect(card).toContainText("Zucchini");
+  });
+
+  test("SCOPE-08 SimuLev cart keeps selected type translated on language switch", async ({
+    page
+  }) => {
+    await setupSimuLevTypeMenu(page);
+
+    await openMenuInEnglish(page, SIMULEV_MENU_PATH);
+    await page.getByRole("button", { name: /Dishes/i }).first().click();
+    await page.getByRole("button", { name: /Starters/i }).first().click();
+
+    const zucchiniRow = page.locator(".menu-card__volume-row").filter({
+      has: page.getByText("Zucchini")
+    }).first();
+    await expect(zucchiniRow).toBeVisible();
+    await zucchiniRow.getByRole("button", { name: "Add" }).click();
+
+    const cartRow = page.locator(".cart-row").first();
+    await expect(cartRow).toContainText("Draniki");
+    await expect(cartRow).toContainText("Zucchini");
+
+    await switchMenuLanguage(page, "RU");
+    await expect(cartRow).toContainText("Драники");
+    await expect(cartRow).toContainText("Кабачковые");
+
+    await switchMenuLanguage(page, "HE");
+    await expect(cartRow).toContainText("דרניקי");
+    await expect(cartRow).toContainText("קישואים");
+
+    await switchMenuLanguage(page, "EN");
+    await expect(cartRow).toContainText("Draniki");
+    await expect(cartRow).toContainText("Zucchini");
   });
 });

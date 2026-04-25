@@ -44,7 +44,14 @@ type MockMenuItem = {
   showImage: boolean;
   available: boolean;
   badges: string[];
-  volumeOptions: Array<{ id: string; label: string; price: number }>;
+  volumeOptions: Array<{
+    id: string;
+    label: string;
+    labelHe?: string;
+    labelEn?: string;
+    labelRu?: string;
+    price: number;
+  }>;
 };
 
 export function createMockOrder(overrides: Partial<MockOrder> = {}): MockOrder {

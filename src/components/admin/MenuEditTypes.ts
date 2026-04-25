@@ -75,14 +75,24 @@ export type CategoryOptionsByKind = (
   kind: "dishes" | "drinks"
 ) => MenuCategory[];
 
+export type VolumeRow = {
+  label: string;
+  labelHe: string;
+  labelEn: string;
+  labelRu: string;
+  price: string;
+};
+
 export type VolumeRowsParser = (
-  value: string
-) => Array<{ label: string; price: string }>;
+  value: string,
+  kind: "dishes" | "drinks"
+) => VolumeRow[];
 
 export type VolumeRowUpdater = (
   value: string,
+  kind: "dishes" | "drinks",
   rowIndex: number,
-  field: "label" | "price",
+  field: keyof VolumeRow,
   nextValue: string
 ) => string;
 

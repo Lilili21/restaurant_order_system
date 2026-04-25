@@ -13,18 +13,28 @@ import { applyRateLimit, getRequestClientId } from "@/lib/rate-limit";
 export const maxDuration = 3;
 
 function isScope(value: string | null): value is AdminAuthScope {
-  return value === "admin" || value === "waiter" || value === "secondary";
+  return (
+    value === "admin" ||
+    value === "waiter" ||
+    value === "secondary" ||
+    value === "restaurant"
+  );
 }
 
 export async function GET(request: NextRequest) {
   const scope = request.nextUrl.searchParams.get("scope");
+  const restaurantSlug = request.nextUrl.searchParams.get("restaurantSlug") ?? undefined;
 
   if (!isScope(scope)) {
     return NextResponse.json({ message: "scope is required" }, { status: 400 });
   }
 
+  if (scope === "restaurant" && !restaurantSlug) {
+    return NextResponse.json({ message: "restaurantSlug is required" }, { status: 400 });
+  }
+
   const response = NextResponse.json({
-    authorized: await hasAdminAccess(scope)
+    authorized: await hasAdminAccess(scope, restaurantSlug)
   });
   response.headers.set("Cache-Control", "no-store");
   return response;
@@ -57,16 +67,22 @@ export async function POST(request: NextRequest) {
       persist?: boolean;
       secondaryLogin?: string;
       secondaryPassword?: string;
+      restaurantSlug?: string;
     };
 
     if (!body.scope || !isScope(body.scope)) {
       throw new Error("scope is required");
     }
 
+    if (body.scope === "restaurant" && !body.restaurantSlug) {
+      throw new Error("restaurantSlug is required");
+    }
+
     const directAuth = verifyAdminCredentials(
       body.scope,
       body.login ?? "",
-      body.password ?? ""
+      body.password ?? "",
+      body.restaurantSlug
     );
     if (!directAuth) {
       return NextResponse.json(
@@ -79,7 +95,7 @@ export async function POST(request: NextRequest) {
     response.headers.set("Cache-Control", "no-store");
 
     if (body.persist) {
-      setAdminAccessCookie(response, body.scope);
+      setAdminAccessCookie(response, body.scope, body.restaurantSlug);
     }
 
     return response;

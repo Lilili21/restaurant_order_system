@@ -2711,6 +2711,11 @@ textarea.modal-input {
   gap: 12px;
 }
 
+.menu-editor__volume-option-fields {
+  display: grid;
+  gap: 10px;
+}
+
 .menu-editor__volume-price {
   width: 100%;
 }
@@ -2718,6 +2723,12 @@ textarea.modal-input {
 .menu-editor__volume-price .modal-input {
   flex: 1 1 auto;
   width: 100%;
+}
+
+@media (max-width: 760px) {
+  .menu-editor__volume-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .menu-editor__volume-preview {
@@ -4517,5 +4528,62 @@ textarea.modal-input {
 
   .menu-hero-header .language-toggle__button {
     min-width: 54px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    width: min(100vw - 20px, 100%);
+    padding: 20px 0 44px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 11vw, 3rem);
+    line-height: 0.9;
+    margin-bottom: 10px;
+  }
+
+  .menu-hero-header,
+  .menu-page--rtl .menu-hero-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .menu-hero-header .language-toggle,
+  .menu-page--rtl .menu-hero-header .language-toggle {
+    align-self: flex-end;
+    width: fit-content;
+    max-width: 100%;
+  }
+
+  .language-toggle {
+    padding: 5px;
+    gap: 4px;
+  }
+
+  .language-toggle__button {
+    min-width: 44px;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.95rem;
+  }
+
+  .menu-quick-info {
+    gap: 6px;
+    margin: 8px 0 2px;
+  }
+
+  .menu-quick-info__chip {
+    min-height: 28px;
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .lead {
+    margin-top: 10px;
   }
 }

@@ -23,7 +23,7 @@ export default async function RestaurantLandingPage({
   }
 
   return (
-    <AdminAccessGate scope="admin">
+    <AdminAccessGate scope="restaurant" restaurantSlug={restaurant.slug}>
       <RestaurantLanding
         restaurantSlug={restaurant.slug}
         restaurantName={restaurant.name}

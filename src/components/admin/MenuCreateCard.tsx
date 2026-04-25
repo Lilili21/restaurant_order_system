@@ -32,8 +32,8 @@ type Props = {
   getCategoryOptions: CategoryOptionsByKind;
   getBadgeOptionsForKind: BadgeOptionsByKind;
   parseVolumeRows: VolumeRowsParser;
-  addVolumeRow: (value: string) => string;
-  removeVolumeRow: (value: string) => string;
+  addVolumeRow: (value: string, kind: "dishes" | "drinks") => string;
+  removeVolumeRow: (value: string, kind: "dishes" | "drinks") => string;
   updateVolumeRow: VolumeRowUpdater;
 };
 
@@ -272,7 +272,7 @@ export function MenuCreateCard({
                     onClick={() =>
                       updateNewItem(
                         "volumeOptionsText",
-                        removeVolumeRow(newItem.volumeOptionsText)
+                        removeVolumeRow(newItem.volumeOptionsText, selectedKind)
                       )
                     }
                   >
@@ -284,7 +284,7 @@ export function MenuCreateCard({
                     onClick={() =>
                       updateNewItem(
                         "volumeOptionsText",
-                        addVolumeRow(newItem.volumeOptionsText)
+                        addVolumeRow(newItem.volumeOptionsText, selectedKind)
                       )
                     }
                   >
@@ -293,36 +293,89 @@ export function MenuCreateCard({
                 </span>
               </span>
               <div className="menu-editor__volume-grid">
-                {(parseVolumeRows(newItem.volumeOptionsText).length
-                  ? parseVolumeRows(newItem.volumeOptionsText)
-                  : [{ label: "", price: "" }]
+                {(parseVolumeRows(newItem.volumeOptionsText, selectedKind).length
+                  ? parseVolumeRows(newItem.volumeOptionsText, selectedKind)
+                  : [{ label: "", labelHe: "", labelEn: "", labelRu: "", price: "" }]
                 ).map((row, index) => (
                   <div key={`new-volume-${index}`} className="menu-editor__volume-row">
-                    <input
-                      className="modal-input"
-                      type="text"
-                      placeholder={
-                        selectedKind === "drinks"
-                          ? "Volume"
-                          : newItemLanguage === "he"
-                            ? "סוג"
-                            : newItemLanguage === "ru"
-                              ? "Тип"
-                              : "Type"
-                      }
-                      value={row.label}
-                      onChange={(event) =>
-                        updateNewItem(
-                          "volumeOptionsText",
-                          updateVolumeRow(
-                            newItem.volumeOptionsText,
-                            index,
-                            "label",
-                            event.target.value
+                    {selectedKind === "drinks" ? (
+                      <input
+                        className="modal-input"
+                        type="text"
+                        placeholder="Volume"
+                        value={row.label}
+                        onChange={(event) =>
+                          updateNewItem(
+                            "volumeOptionsText",
+                            updateVolumeRow(
+                              newItem.volumeOptionsText,
+                              selectedKind,
+                              index,
+                              "label",
+                              event.target.value
+                            )
                           )
-                        )
-                      }
-                    />
+                        }
+                      />
+                    ) : (
+                      <div className="menu-editor__volume-option-fields">
+                        <input
+                          className="modal-input"
+                          type="text"
+                          placeholder="סוג בעברית (HE)"
+                          dir="rtl"
+                          value={row.labelHe}
+                          onChange={(event) =>
+                            updateNewItem(
+                              "volumeOptionsText",
+                              updateVolumeRow(
+                                newItem.volumeOptionsText,
+                                selectedKind,
+                                index,
+                                "labelHe",
+                                event.target.value
+                              )
+                            )
+                          }
+                        />
+                        <input
+                          className="modal-input"
+                          type="text"
+                          placeholder="Type in English (EN)"
+                          value={row.labelEn}
+                          onChange={(event) =>
+                            updateNewItem(
+                              "volumeOptionsText",
+                              updateVolumeRow(
+                                newItem.volumeOptionsText,
+                                selectedKind,
+                                index,
+                                "labelEn",
+                                event.target.value
+                              )
+                            )
+                          }
+                        />
+                        <input
+                          className="modal-input"
+                          type="text"
+                          placeholder="Тип на русском (RU)"
+                          value={row.labelRu}
+                          onChange={(event) =>
+                            updateNewItem(
+                              "volumeOptionsText",
+                              updateVolumeRow(
+                                newItem.volumeOptionsText,
+                                selectedKind,
+                                index,
+                                "labelRu",
+                                event.target.value
+                              )
+                            )
+                          }
+                        />
+                      </div>
+                    )}
                     <div className="menu-editor__price-input menu-editor__volume-price">
                       <input
                         className="modal-input"
@@ -335,6 +388,7 @@ export function MenuCreateCard({
                             "volumeOptionsText",
                             updateVolumeRow(
                               newItem.volumeOptionsText,
+                              selectedKind,
                               index,
                               "price",
                               event.target.value

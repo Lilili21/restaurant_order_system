@@ -31,6 +31,7 @@ import type {
   EditableRecommendationRule,
   EditablePromotion
 } from "@/components/admin/MenuPromotionTypes";
+import type { VolumeRow } from "@/components/admin/MenuEditTypes";
 
 const badgeOptions: Array<{ value: MenuBadge; label: string }> = [
   { value: "chef_special", label: "🔥 Chef's special" },
@@ -91,6 +92,10 @@ function isLikelyDrinkCategorySlug(value: string) {
   return /drink|alcohol|cocktail|draft|beer|wine|vodka|rum|whisk|tequila|gin|cognac|liker|liqueur|ouzo|absent|chaser|fluid|juice|soda|coffee|tea|kompot|kvas/.test(
     normalized
   );
+}
+
+function inferItemKindFromCategory(category: MenuCategory): "dishes" | "drinks" {
+  return isLikelyDrinkCategorySlug(String(category ?? "")) ? "drinks" : "dishes";
 }
 
 function normalizeCategoryLabel(value: string, slug: string) {
@@ -496,6 +501,7 @@ function toEditableRecommendationRule(
 }
 
 function toEditableItem(item: MenuItem): EditableMenuItem {
+  const itemKind = inferItemKindFromCategory(item.category);
   return {
     ...item,
     draftNameHe: item.nameHe || item.name,
@@ -507,18 +513,29 @@ function toEditableItem(item: MenuItem): EditableMenuItem {
       item.descriptionRu || item.descriptionEn || item.descriptionHe || item.description,
     draftCategory: item.category,
     draftPrice: String(item.price),
-    draftVolumeOptionsText: (item.volumeOptions ?? [])
-      .map((option) => `${option.label} | ${option.price}`)
-      .join("\n"),
+    draftVolumeOptionsText: formatVolumeOptionsText(item.volumeOptions, itemKind),
     draftImage: item.image,
     draftShowImage: item.showImage ?? true,
     draftBadges: item.badges ?? []
   };
 }
 
-function formatVolumeOptionsText(volumeOptions: MenuVolumeOption[] | undefined) {
+function formatVolumeOptionsText(
+  volumeOptions: MenuVolumeOption[] | undefined,
+  kind: "dishes" | "drinks"
+) {
   return (volumeOptions ?? [])
-    .map((option) => `${option.label} | ${option.price}`)
+    .map((option) => {
+      if (kind === "drinks") {
+        return `${option.label} | ${option.price}`;
+      }
+
+      const fallbackLabel = option.label?.trim() || "";
+      const labelHe = option.labelHe?.trim() || fallbackLabel;
+      const labelEn = option.labelEn?.trim() || fallbackLabel;
+      const labelRu = option.labelRu?.trim() || fallbackLabel;
+      return `${labelHe} | ${labelEn} | ${labelRu} | ${option.price}`;
+    })
     .join("\n");
 }
 
@@ -541,7 +558,10 @@ function hasUnsavedItemDraft(item: EditableMenuItem) {
   const baseDescriptionRu =
     item.descriptionRu || item.descriptionEn || item.descriptionHe || item.description;
   const baseShowImage = item.showImage ?? true;
-  const baseVolumeOptionsText = formatVolumeOptionsText(item.volumeOptions);
+  const baseVolumeOptionsText = formatVolumeOptionsText(
+    item.volumeOptions,
+    inferItemKindFromCategory(item.category)
+  );
 
   return (
     item.draftNameHe !== baseNameHe ||
@@ -656,13 +676,19 @@ function parsePriceInput(value: string) {
   return agorotToShekels(shekelsToAgorot(parsed));
 }
 
-function parseVolumeOptions(value: string): MenuVolumeOption[] {
+function parseVolumeOptions(value: string, kind: "dishes" | "drinks"): MenuVolumeOption[] {
   return value
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line, index) => {
-      const [rawLabel, rawPrice] = line.split("|").map((part) => part.trim());
+      const parts = line.split("|").map((part) => part.trim());
+      const [rawLabel, rawPrice] =
+        kind === "drinks"
+          ? [parts[0] ?? "", parts[1] ?? ""]
+          : parts.length >= 4
+            ? [parts[1] ?? parts[0] ?? "", parts[3] ?? ""]
+            : [parts[0] ?? "", parts[1] ?? ""];
       if (!rawPrice) {
         return null;
       }
@@ -673,25 +699,73 @@ function parseVolumeOptions(value: string): MenuVolumeOption[] {
         return null;
       }
 
+      if (kind === "drinks") {
+        return {
+          id: `volume_${index}_${(rawLabel || "empty").replace(/\s+/g, "_")}_${Math.max(
+            0,
+            shekelsToAgorot(price)
+          )}`,
+          label: rawLabel,
+          price: Math.max(0, price)
+        };
+      }
+
+      const fallbackLabel = rawLabel.trim();
+      const [rawLabelHe, rawLabelEn, rawLabelRu] =
+        parts.length >= 4
+          ? [parts[0] ?? "", parts[1] ?? "", parts[2] ?? ""]
+          : [fallbackLabel, fallbackLabel, fallbackLabel];
+      const labelHe = rawLabelHe.trim() || fallbackLabel;
+      const labelEn = rawLabelEn.trim() || fallbackLabel;
+      const labelRu = rawLabelRu.trim() || fallbackLabel;
+      const displayLabel = labelEn || labelHe || labelRu || fallbackLabel;
+
       return {
         id: `volume_${index}_${(rawLabel || "empty").replace(/\s+/g, "_")}_${Math.max(
           0,
           shekelsToAgorot(price)
         )}`,
-        label: rawLabel,
+        label: displayLabel,
+        labelHe,
+        labelEn,
+        labelRu,
         price: Math.max(0, price)
       };
     })
     .filter(Boolean) as MenuVolumeOption[];
 }
 
-function parseVolumeRows(value: string) {
+function parseVolumeRows(value: string, kind: "dishes" | "drinks"): VolumeRow[] {
   return value
     .split("\n")
     .filter((line) => line.trim().length > 0)
     .map((line) => {
-      const [label = "", price = ""] = line.split("|").map((part) => part.trim());
-      return { label, price };
+      const parts = line.split("|").map((part) => part.trim());
+
+      if (kind === "drinks") {
+        const [label = "", price = ""] = parts;
+        return { label, labelHe: "", labelEn: "", labelRu: "", price };
+      }
+
+      if (parts.length >= 4) {
+        const [labelHe = "", labelEn = "", labelRu = "", price = ""] = parts;
+        return {
+          label: labelEn || labelHe || labelRu,
+          labelHe,
+          labelEn,
+          labelRu,
+          price
+        };
+      }
+
+      const [label = "", price = ""] = parts;
+      return {
+        label,
+        labelHe: label,
+        labelEn: label,
+        labelRu: label,
+        price
+      };
     });
 }
 
@@ -706,40 +780,51 @@ function getEditorItemDisplayName(item: EditableMenuItem) {
   );
 }
 
-function stringifyVolumeRows(rows: Array<{ label: string; price: string }>) {
+function stringifyVolumeRows(rows: VolumeRow[], kind: "dishes" | "drinks") {
   return rows
-    .filter((row) => row.label.trim() || row.price.trim())
-    .map((row) => `${row.label.trim()} | ${row.price.trim()}`)
+    .filter((row) =>
+      kind === "drinks"
+        ? row.label.trim() || row.price.trim()
+        : row.labelHe.trim() || row.labelEn.trim() || row.labelRu.trim() || row.price.trim()
+    )
+    .map((row) => {
+      if (kind === "drinks") {
+        return `${row.label.trim()} | ${row.price.trim()}`;
+      }
+
+      return `${row.labelHe.trim()} | ${row.labelEn.trim()} | ${row.labelRu.trim()} | ${row.price.trim()}`;
+    })
     .join("\n");
 }
 
-function addVolumeRow(value: string) {
-  const rows = parseVolumeRows(value);
-  rows.push({ label: "", price: "" });
-  return rows.map((row) => `${row.label} | ${row.price}`).join("\n");
+function addVolumeRow(value: string, kind: "dishes" | "drinks") {
+  const rows = parseVolumeRows(value, kind);
+  rows.push({ label: "", labelHe: "", labelEn: "", labelRu: "", price: "" });
+  return stringifyVolumeRows(rows, kind);
 }
 
-function removeVolumeRow(value: string) {
-  const rows = parseVolumeRows(value);
+function removeVolumeRow(value: string, kind: "dishes" | "drinks") {
+  const rows = parseVolumeRows(value, kind);
 
   if (rows.length <= 1) {
     return "";
   }
 
   rows.pop();
-  return rows.map((row) => `${row.label} | ${row.price}`).join("\n");
+  return stringifyVolumeRows(rows, kind);
 }
 
 function updateVolumeRow(
   value: string,
+  kind: "dishes" | "drinks",
   rowIndex: number,
-  field: "label" | "price",
+  field: keyof VolumeRow,
   nextValue: string
 ) {
-  const rows = parseVolumeRows(value);
+  const rows = parseVolumeRows(value, kind);
 
   while (rows.length <= rowIndex) {
-    rows.push({ label: "", price: "" });
+    rows.push({ label: "", labelHe: "", labelEn: "", labelRu: "", price: "" });
   }
 
   rows[rowIndex] = {
@@ -747,7 +832,11 @@ function updateVolumeRow(
     [field]: field === "price" ? sanitizePriceInput(nextValue) : nextValue
   };
 
-  return stringifyVolumeRows(rows);
+  if (kind === "drinks" && field === "label") {
+    rows[rowIndex].label = nextValue;
+  }
+
+  return stringifyVolumeRows(rows, kind);
 }
 
 function getBasePriceForKind(
@@ -756,7 +845,7 @@ function getBasePriceForKind(
   volumeOptionsText: string
 ) {
   if (kind === "drinks") {
-    const firstVolumePrice = parseVolumeOptions(volumeOptionsText)[0]?.price;
+    const firstVolumePrice = parseVolumeOptions(volumeOptionsText, kind)[0]?.price;
     return Number.isFinite(firstVolumePrice) ? firstVolumePrice : NaN;
   }
 
@@ -764,7 +853,7 @@ function getBasePriceForKind(
 }
 
 function hasInvalidDrinkVolumeRows(value: string) {
-  const rows = parseVolumeRows(value);
+  const rows = parseVolumeRows(value, "drinks");
 
   if (rows.length === 0) {
     return true;
@@ -3186,7 +3275,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         price: basePrice,
         volumeOptions:
           includeVolumeOptions
-            ? parseVolumeOptions(currentItem.draftVolumeOptionsText)
+            ? parseVolumeOptions(currentItem.draftVolumeOptionsText, itemKind)
             : [],
         image: resolvedImage,
         showImage: currentItem.draftShowImage,
@@ -3299,7 +3388,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         price: basePrice,
         volumeOptions:
           includeVolumeOptions
-            ? parseVolumeOptions(newItem.volumeOptionsText)
+            ? parseVolumeOptions(newItem.volumeOptionsText, selectedKind)
             : [],
         image: resolvedImage,
         showImage: newItem.showImage,

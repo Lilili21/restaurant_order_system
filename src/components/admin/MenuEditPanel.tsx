@@ -10,7 +10,8 @@ import {
   DraftField,
   EditableMenuItem,
   NewItemField,
-  NewMenuItemDraft
+  NewMenuItemDraft,
+  VolumeRow
 } from "@/components/admin/MenuEditTypes";
 
 type Props = {
@@ -83,13 +84,17 @@ type Props = {
   getBadgeOptionsForKind: (
     kind: "dishes" | "drinks"
   ) => Array<{ value: MenuBadge; label: string }>;
-  parseVolumeRows: (value: string) => Array<{ label: string; price: string }>;
-  addVolumeRow: (value: string) => string;
-  removeVolumeRow: (value: string) => string;
+  parseVolumeRows: (
+    value: string,
+    kind: "dishes" | "drinks"
+  ) => VolumeRow[];
+  addVolumeRow: (value: string, kind: "dishes" | "drinks") => string;
+  removeVolumeRow: (value: string, kind: "dishes" | "drinks") => string;
   updateVolumeRow: (
     value: string,
+    kind: "dishes" | "drinks",
     rowIndex: number,
-    field: "label" | "price",
+    field: keyof VolumeRow,
     nextValue: string
   ) => string;
   getItemKind: (category: MenuCategory) => "dishes" | "drinks";
