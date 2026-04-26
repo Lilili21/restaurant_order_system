@@ -208,7 +208,7 @@ button:disabled {
 
 .menu-hero-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
 }
@@ -535,6 +535,7 @@ button:disabled {
 }
 
 .language-toggle {
+  position: relative;
   display: inline-flex;
   gap: 8px;
   padding: 6px;
@@ -545,6 +546,10 @@ button:disabled {
 }
 
 .language-toggle__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 38px;
   padding: 0 14px;
   border-radius: 999px;
@@ -553,6 +558,42 @@ button:disabled {
 }
 
 .language-toggle__button--active {
+  background: var(--control-button-accent-bg);
+  color: var(--control-button-accent-text);
+}
+
+.language-toggle__chevron {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.language-toggle__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  min-width: 92px;
+  padding: 8px;
+  border-radius: 18px;
+  border: var(--control-ui-border);
+  background: var(--control-surface);
+  box-shadow: var(--control-ui-shadow-hover);
+}
+
+.language-toggle__menu-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+}
+
+.language-toggle__menu-item--active {
   background: var(--control-button-accent-bg);
   color: var(--control-button-accent-text);
 }
@@ -4537,6 +4578,44 @@ textarea.modal-input {
     padding: 20px 0 44px;
   }
 
+  .modal-backdrop {
+    padding: 16px;
+  }
+
+  .modal-card {
+    width: min(360px, 100%);
+    gap: 12px;
+    padding: 18px 16px;
+    border-radius: 22px;
+  }
+
+  .modal-card h2 {
+    font-size: clamp(1.9rem, 7vw, 2.35rem);
+    line-height: 0.96;
+  }
+
+  .modal-card p,
+  .modal-card__message {
+    font-size: 1rem;
+    line-height: 1.35;
+  }
+
+  .modal-card button,
+  .modal-card__ack {
+    min-width: 104px;
+    min-height: 48px;
+    padding: 0.75rem 1.1rem;
+    font-size: 1rem;
+  }
+
+  .modal-card__close {
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
   .hero h1 {
     font-size: clamp(2rem, 11vw, 3rem);
     line-height: 0.9;
@@ -4545,27 +4624,40 @@ textarea.modal-input {
 
   .menu-hero-header,
   .menu-page--rtl .menu-hero-header {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 10px;
   }
 
   .menu-hero-header .language-toggle,
   .menu-page--rtl .menu-hero-header .language-toggle {
-    align-self: flex-end;
+    align-self: flex-start;
     width: fit-content;
     max-width: 100%;
   }
 
   .language-toggle {
     padding: 5px;
-    gap: 4px;
   }
 
   .language-toggle__button {
     min-width: 44px;
     padding: 0.7rem 0.9rem;
     font-size: 0.95rem;
+  }
+
+  .language-toggle__menu {
+    min-width: 84px;
+    top: calc(100% + 6px);
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .language-toggle__menu-item {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.92rem;
   }
 
   .menu-quick-info {

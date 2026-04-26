@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuItemCard } from "@/components/menu/MenuItemCard";
 import type { MenuCategoryDefinition } from "@/lib/menu-categories";
@@ -251,6 +251,7 @@ export function MenuList({
       ? "drinks"
       : "dishes"
   );
+  const sectionRefs = useRef<Partial<Record<MenuCategory, HTMLElement | null>>>({});
   const getQuantityKey = (menuItemId: string, volumeOptionId?: string) =>
     `${menuItemId}:${volumeOptionId ?? "base"}`;
   const grouped = useMemo(
@@ -279,23 +280,9 @@ export function MenuList({
       dynamicDrinkCategories.has(category) &&
       getCategoryItems(category).length > 0
   );
-  const visibleCategories = dynamicCategoryOrder.filter((category) => {
-    const hasItems = getCategoryItems(category).length > 0;
-
-    if (!hasItems) {
-      return false;
-    }
-
-    if (selectedCategory === "dishes") {
-      return !dynamicDrinkCategories.has(category);
-    }
-
-    if (selectedCategory === "drinks") {
-      return category !== "drinks" && dynamicDrinkCategories.has(category);
-    }
-
-    return selectedCategory === category;
-  });
+  const visibleCategories = dynamicCategoryOrder.filter(
+    (category) => getCategoryItems(category).length > 0
+  );
   const addonDefinitionsByCategory = useMemo(() => {
     return visibleCategories.reduce<Record<string, MenuCategoryDefinition[]>>(
       (acc, category) => {
@@ -332,17 +319,72 @@ export function MenuList({
           ? "drinks"
           : "dishes"
       );
+
+      window.setTimeout(() => {
+        if (selectedFilter === "dishes") {
+          const firstDishCategory = visibleDishCategories[0];
+          if (firstDishCategory) {
+            scrollToCategory(firstDishCategory);
+          }
+          return;
+        }
+
+        if (selectedFilter === "drinks") {
+          const firstDrinkCategory = visibleDrinkCategories[0];
+          if (firstDrinkCategory) {
+            scrollToCategory(firstDrinkCategory);
+          }
+          return;
+        }
+
+        scrollToCategory(selectedFilter as MenuCategory);
+      }, 0);
     }
-  }, [dynamicDrinkCategories, selectedFilter]);
+  }, [dynamicDrinkCategories, selectedFilter, visibleDishCategories, visibleDrinkCategories]);
+
+  useEffect(() => {
+    if (!openGroup) {
+      return;
+    }
+
+    const handleScroll = () => {
+      if (window.scrollY > 48) {
+        setOpenGroup((current) => (current ? null : current));
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [openGroup]);
+
+  function scrollToCategory(category: MenuCategory) {
+    const target = sectionRefs.current[category];
+    if (!target) {
+      return;
+    }
+
+    const top = target.getBoundingClientRect().top + window.scrollY - 120;
+    window.scrollTo({
+      top: Math.max(0, top),
+      behavior: "smooth"
+    });
+  }
 
   function handleGroupSelect(group: Exclude<MenuFilterGroup, null>) {
     setOpenGroup((current) => (current === group ? null : group));
     setSelectedCategory(group);
+
+    const targetCategory =
+      group === "drinks" ? visibleDrinkCategories[0] : visibleDishCategories[0];
+    if (targetCategory) {
+      scrollToCategory(targetCategory);
+    }
   }
 
   function handleCategorySelect(category: MenuCategory) {
     setSelectedCategory(category);
     setOpenGroup(dynamicDrinkCategories.has(category) ? "drinks" : "dishes");
+    scrollToCategory(category);
   }
 
   const formatCategoryLabel = (category: MenuCategory) =>
@@ -432,15 +474,18 @@ export function MenuList({
           const toppingsItems = linkedAddonDefinitions.flatMap(
             (addon) => grouped[addon.slug] ?? []
           );
-          const shouldHideSectionHeader = selectedCategory === category;
 
           return (
-            <section key={category} className="menu-section">
-              {shouldHideSectionHeader ? null : (
-                <div className="section-header">
-                  <h2>{formatCategorySectionLabel(category)}</h2>
-                </div>
-              )}
+            <section
+              key={category}
+              className="menu-section"
+              ref={(element) => {
+                sectionRefs.current[category] = element;
+              }}
+            >
+              <div className="section-header">
+                <h2>{formatCategorySectionLabel(category)}</h2>
+              </div>
               <div className="menu-grid">
                 {sectionItems.map((item) => (
                   <MenuItemCard

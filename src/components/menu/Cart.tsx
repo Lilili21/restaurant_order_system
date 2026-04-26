@@ -157,7 +157,7 @@ function getQuickInfoLinks(restaurantSlug: string) {
 
   if (normalizedSlug === "simulev") {
     return [
-      "https://maps.app.goo.gl/MVeFS6CFBWwA4x5VA",
+      null,
       "https://maps.app.goo.gl/MVeFS6CFBWwA4x5VA",
       "https://www.instagram.com/simulev.tlv/"
     ] as const;
@@ -455,7 +455,7 @@ export function Cart({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState<string | null>(null);
-  const [showWelcomeDialog, setShowWelcomeDialog] = useState(true);
+  const [showWelcomeDialog, setShowWelcomeDialog] = useState(orderingEnabled);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [upsellPrompt, setUpsellPrompt] = useState<
     null | "dessert" | "drinks" | "dessert_drinks"
@@ -464,6 +464,7 @@ export function Cart({
     null
   );
   const [language, setLanguage] = useState<MenuLanguage>("he");
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [liveMenu, setLiveMenu] = useState<MenuItem[]>(menu);
   const [livePromotions, setLivePromotions] = useState<PromotionSettings[]>(promotions);
   const [liveBusinessLunches, setLiveBusinessLunches] = useState<BusinessLunchSettings[]>(
@@ -503,6 +504,7 @@ export function Cart({
   const orderJumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const orderPanelRef = useRef<HTMLElement | null>(null);
   const menuSectionRef = useRef<HTMLDivElement | null>(null);
+  const languageMenuRef = useRef<HTMLDivElement | null>(null);
   const counterCaptchaContainerRef = useRef<HTMLDivElement | null>(null);
   const counterCaptchaWidgetIdRef = useRef<string | null>(null);
   const currentSessionIdRef = useRef(currentSessionId);
@@ -1534,18 +1536,48 @@ export function Cart({
 
   function setNextLanguage(nextLanguage: MenuLanguage) {
     setLanguage(nextLanguage);
+    setLanguageMenuOpen(false);
     window.localStorage.setItem(
       `menu-language:${restaurantSlug}:${tableToken}`,
       nextLanguage
     );
-    setShowWelcomeDialog(true);
+    setShowWelcomeDialog(orderingEnabled);
   }
+
+  useEffect(() => {
+    if (!languageMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!languageMenuRef.current?.contains(event.target as Node)) {
+        setLanguageMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLanguageMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [languageMenuOpen]);
 
   useEffect(() => {
     if (serviceRequestDisabled) {
       setServiceMenuOpen(false);
     }
   }, [serviceRequestDisabled]);
+
+  const languageLabel = language.toUpperCase();
+  const availableLanguages: MenuLanguage[] = ["he", "en", "ru"];
 
   useEffect(() => {
     if (!orderingEnabled) {
@@ -2367,7 +2399,7 @@ export function Cart({
         </div>
       ) : null}
 
-      {showWelcomeDialog ? (
+      {orderingEnabled && showWelcomeDialog ? (
         <div className="modal-backdrop" role="presentation">
           <div
             className="modal-card"
@@ -2592,40 +2624,46 @@ export function Cart({
           <div>
             <div className="menu-hero-header">
               <h1>{restaurantName}</h1>
-              <div className="language-toggle" role="group" aria-label="Language">
+              <div
+                ref={languageMenuRef}
+                className={
+                  languageMenuOpen
+                    ? "language-toggle language-toggle--dropdown-open"
+                    : "language-toggle"
+                }
+              >
                 <button
-                  className={
-                    language === "he"
-                      ? "language-toggle__button language-toggle__button--active"
-                      : "language-toggle__button"
-                  }
+                  className="language-toggle__button language-toggle__button--active"
                   type="button"
-                  onClick={() => setNextLanguage("he")}
+                  aria-haspopup="menu"
+                  aria-expanded={languageMenuOpen}
+                  aria-label="Language"
+                  onClick={() => setLanguageMenuOpen((current) => !current)}
                 >
-                  HE
+                  {languageLabel}
+                  <span className="language-toggle__chevron" aria-hidden="true">
+                    ▾
+                  </span>
                 </button>
-                <button
-                  className={
-                    language === "en"
-                      ? "language-toggle__button language-toggle__button--active"
-                      : "language-toggle__button"
-                  }
-                  type="button"
-                  onClick={() => setNextLanguage("en")}
-                >
-                  EN
-                </button>
-                <button
-                  className={
-                    language === "ru"
-                      ? "language-toggle__button language-toggle__button--active"
-                      : "language-toggle__button"
-                  }
-                  type="button"
-                  onClick={() => setNextLanguage("ru")}
-                >
-                  RU
-                </button>
+                {languageMenuOpen ? (
+                  <div className="language-toggle__menu" role="menu" aria-label="Language">
+                    {availableLanguages.map((candidate) => (
+                      <button
+                        key={candidate}
+                        className={
+                          candidate === language
+                            ? "language-toggle__menu-item language-toggle__menu-item--active"
+                            : "language-toggle__menu-item"
+                        }
+                        type="button"
+                        role="menuitem"
+                        onClick={() => setNextLanguage(candidate)}
+                      >
+                        {candidate.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="menu-quick-info" aria-label="Guest information shortcuts">
@@ -2653,13 +2691,11 @@ export function Cart({
                 );
               })}
             </div>
-            <p className="lead">
-              {orderingEnabled
-                ? isCounterMode
-                  ? "Counter order mode"
-                  : `${text.tableOrderingHint} ${tableNumber}`
-                : "Menu"}
-            </p>
+            {orderingEnabled ? (
+              <p className="lead">
+                {isCounterMode ? "Counter order mode" : `${text.tableOrderingHint} ${tableNumber}`}
+              </p>
+            ) : null}
             {orderingEnabled && !isCounterMode && serviceRequestDisabled ? (
               <p className="menu-service-note">{text.waiterServiceNote}</p>
             ) : null}
