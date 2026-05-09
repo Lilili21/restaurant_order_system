@@ -16,7 +16,7 @@ export function formatCurrency(value: number) {
   });
 }
 
-const simulevLegacyOptionTranslations: Record<
+const legacyOptionTranslations: Record<
   string,
   { he: string; en: string; ru: string }
 > = {
@@ -28,14 +28,14 @@ const simulevLegacyOptionTranslations: Record<
   "кабачковые": { he: "קישואים", en: "Zucchini", ru: "Кабачковые" }
 };
 
-function getLegacySimuLevOptionTranslation(label: string) {
-  return simulevLegacyOptionTranslations[label.trim().toLowerCase()] ?? null;
+function getLegacyOptionTranslation(label: string) {
+  return legacyOptionTranslations[label.trim().toLowerCase()] ?? null;
 }
 
 export function getLocalizedVolumeOptionLabel(
   option: MenuVolumeOption,
   language: MenuLanguage,
-  restaurantSlug?: string | null
+  _restaurantSlug?: string | null
 ) {
   const explicitLabel =
     language === "he"
@@ -48,11 +48,9 @@ export function getLocalizedVolumeOptionLabel(
     return explicitLabel;
   }
 
-  if ((restaurantSlug ?? "").trim().toLowerCase() === "simulev") {
-    const legacyTranslation = getLegacySimuLevOptionTranslation(option.label);
-    if (legacyTranslation) {
-      return legacyTranslation[language];
-    }
+  const legacyTranslation = getLegacyOptionTranslation(option.label);
+  if (legacyTranslation) {
+    return legacyTranslation[language];
   }
 
   return option.label;

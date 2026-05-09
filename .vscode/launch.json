@@ -18,7 +18,7 @@
       "name": "E2E: All Tests (Choose local/dev)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; fi; export E2E_USE_WEB_SERVER=false; echo \"[E2E] TARGET=$TARGET | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=false\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:all -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; RESTAURANT=\"${input:e2eRestaurant}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; export E2E_USE_WEB_SERVER=true; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; export E2E_USE_WEB_SERVER=false; fi; if [ \"$RESTAURANT\" = \"simuLev\" ]; then export E2E_DEFAULT_ORDERING_MENU_PATH=/simuLev/menu/0; export E2E_ORDERING_MENU_PATH=/simuLev/menu/0; export E2E_PREVIEW_MENU_PATH=/menu/simuLev/0; export E2E_SIMULEV_ORDERING_MENU_PATH=/simuLev/menu/0; else export E2E_DEFAULT_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC; export E2E_ORDERING_MENU_PATH=/olive-bistro/menu/tbl_GkoFz28VwFqC; export E2E_PREVIEW_MENU_PATH=/menu/olive-bistro/0; export E2E_SIMULEV_ORDERING_MENU_PATH=/simuLev/menu/0; fi; echo \"[E2E] TARGET=$TARGET | RESTAURANT=$RESTAURANT | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=$E2E_USE_WEB_SERVER\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:all -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
     },
     {
       "name": "E2E: Menu All (Choose local/dev)",
@@ -129,6 +129,12 @@
       "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; fi; export E2E_USE_WEB_SERVER=false; echo \"[E2E] TARGET=$TARGET | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=false\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright test tests/restaurant.order-scope.spec.ts --grep \"SCOPE-07|SCOPE-08\" --workers=1 --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
     },
     {
+      "name": "E2E: Olive Bistro Dish Types (Choose local/dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "cd e2e-tests && TARGET=\"${input:e2eTarget}\"; if [ \"$TARGET\" = \"local\" ]; then export E2E_BASE_URL=http://127.0.0.1:3010; else export E2E_BASE_URL=https://restaurant-order-system-blue.vercel.app; fi; export E2E_USE_WEB_SERVER=false; echo \"[E2E] TARGET=$TARGET | BASE=$E2E_BASE_URL | E2E_USE_WEB_SERVER=false\"; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npm run test:olive-types -- --reporter=line,html; TEST_EXIT=$?; NODE_OPTIONS='' PATH=\"/opt/homebrew/opt/node@22/bin:$PATH\" npx playwright show-report || true; exit $TEST_EXIT"
+    },
+    {
       "name": "E2E: Tables Shift (Choose local/dev)",
       "type": "node-terminal",
       "request": "launch",
@@ -157,6 +163,16 @@
         "dev"
       ],
       "default": "local"
+    },
+    {
+      "id": "e2eRestaurant",
+      "type": "pickString",
+      "description": "Choose default restaurant context",
+      "options": [
+        "olive-bistro",
+        "simuLev"
+      ],
+      "default": "olive-bistro"
     }
   ],
   "compounds": [

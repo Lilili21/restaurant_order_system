@@ -77,8 +77,8 @@ type ActiveOrderRow = {
   order_channel?: string | null;
   display_order_number?: string | null;
   guest_token_hash?: string | null;
-  guest_contact_name: string | null;
-  guest_contact_phone: string | null;
+  guest_contact_name?: string | null;
+  guest_contact_phone?: string | null;
   created_at: string;
   updated_at: string | null;
   total: number;
@@ -193,7 +193,7 @@ const CLOSED_SESSIONS_RECONCILE_INTERVAL_MS = 2 * 60 * 1000;
 const CLOSED_SESSIONS_RECONCILE_MAX_WRITES = 25;
 const ORDERS_STATE_KEY = "orders-state";
 const ORDERS_META_KEY = "orders-meta";
-const ORDERS_STATE_CACHE_TTL_MS = 10_000;
+const ORDERS_STATE_CACHE_TTL_MS = 250;
 const MENU_LOOKUP_CACHE_TTL_MS = 60 * 1000;
 const ORDER_REQUEST_CACHE_TTL_MS = 10 * 60 * 1000;
 const ORDER_PAYLOAD_DEDUP_WINDOW_MS = 3 * 1000;
@@ -324,10 +324,60 @@ declare global {
     | undefined;
   // eslint-disable-next-line no-var
   var __ordersPersistSignatureCache: OrdersPersistSignatureCache | undefined;
+  // eslint-disable-next-line no-var
+  var __ordersPersistQueue: Promise<void> | undefined;
+}
+
+function normalizeRestaurantSlugValue(value: string | undefined | null) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function sameRestaurantSlug(left: string | undefined | null, right: string | undefined | null) {
+  return normalizeRestaurantSlugValue(left) === normalizeRestaurantSlugValue(right);
 }
 
 function createTableKey(restaurantSlug: string, tableNumber: number) {
-  return `${restaurantSlug}:${tableNumber}`;
+  return `${normalizeRestaurantSlugValue(restaurantSlug)}:${tableNumber}`;
+}
+
+function normalizeCurrentTableSessionEntries(
+  entries: Array<[string, number]> | undefined | null
+) {
+  const normalizedEntries = new Map<string, number>();
+
+  for (const entry of entries ?? []) {
+    if (!Array.isArray(entry) || entry.length < 2) {
+      continue;
+    }
+
+    const [rawKey, rawSessionId] = entry;
+
+    if (typeof rawKey !== "string") {
+      continue;
+    }
+
+    const separatorIndex = rawKey.lastIndexOf(":");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const restaurantSlug = rawKey.slice(0, separatorIndex);
+    const tableNumber = Number.parseInt(rawKey.slice(separatorIndex + 1), 10);
+
+    if (!Number.isFinite(tableNumber)) {
+      continue;
+    }
+
+    const normalizedKey = createTableKey(restaurantSlug, tableNumber);
+    const normalizedSessionId = Math.max(1, Number(rawSessionId) || 1);
+    normalizedEntries.set(
+      normalizedKey,
+      Math.max(normalizedEntries.get(normalizedKey) ?? 1, normalizedSessionId)
+    );
+  }
+
+  return [...normalizedEntries.entries()];
 }
 
 function createPersistSignature(value: unknown) {
@@ -980,6 +1030,124 @@ function cloneOrdersPersistence(state: OrdersPersistence): OrdersPersistence {
   };
 }
 
+function hasAnyActiveOrders(state: OrdersPersistence | RuntimeState) {
+  const orders =
+    state instanceof Object && "ordersStore" in state ? state.ordersStore : state.orders;
+
+  return orders.some((order) => order.status !== "cancelled");
+}
+
+function getOrderVersionTimestamp(order: Pick<Order, "createdAt" | "updatedAt">) {
+  const updatedAtTs = order.updatedAt ? new Date(order.updatedAt).getTime() : Number.NaN;
+  if (Number.isFinite(updatedAtTs)) {
+    return updatedAtTs;
+  }
+
+  const createdAtTs = new Date(order.createdAt).getTime();
+  return Number.isFinite(createdAtTs) ? createdAtTs : 0;
+}
+
+function pickPreferredOrder(current: Order, candidate: Order) {
+  const currentTs = getOrderVersionTimestamp(current);
+  const candidateTs = getOrderVersionTimestamp(candidate);
+
+  if (candidateTs > currentTs) {
+    return candidate;
+  }
+
+  if (candidateTs < currentTs) {
+    return current;
+  }
+
+  if ((candidate.items?.length ?? 0) > (current.items?.length ?? 0)) {
+    return candidate;
+  }
+
+  if ((candidate.total ?? 0) > (current.total ?? 0)) {
+    return candidate;
+  }
+
+  return current;
+}
+
+function mergeOrdersPersistenceStates(
+  primary: OrdersPersistence,
+  secondary: OrdersPersistence
+): OrdersPersistence {
+  const mergedOrders = new Map<string, Order>();
+
+  for (const order of [...primary.orders, ...secondary.orders]) {
+    const existing = mergedOrders.get(order.id);
+    mergedOrders.set(order.id, existing ? pickPreferredOrder(existing, order) : order);
+  }
+
+  const mergedSessions = new Map<string, number>();
+  for (const [key, sessionId] of normalizeCurrentTableSessionEntries(primary.currentTableSessions)) {
+    mergedSessions.set(key, Math.max(mergedSessions.get(key) ?? 1, sessionId));
+  }
+  for (const [key, sessionId] of normalizeCurrentTableSessionEntries(secondary.currentTableSessions)) {
+    mergedSessions.set(key, Math.max(mergedSessions.get(key) ?? 1, sessionId));
+  }
+
+  return {
+    orders: [...mergedOrders.values()].sort((left, right) =>
+      right.createdAt.localeCompare(left.createdAt)
+    ),
+    currentTableSessions: [...mergedSessions.entries()],
+    closedTableSummaries: mergeClosedTableSummaries(
+      primary.closedTableSummaries,
+      secondary.closedTableSummaries
+    )
+  };
+}
+
+function getOrdersPersistenceFingerprint(state: OrdersPersistence) {
+  return JSON.stringify({
+    orders: [...state.orders]
+      .map((order) => ({
+        id: order.id,
+        restaurantSlug: normalizeRestaurantSlugValue(order.restaurantSlug),
+        tableNumber: order.tableNumber,
+        sessionId: order.sessionId,
+        kind: order.kind,
+        status: order.status,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt ?? "",
+        itemsCount: order.items?.length ?? 0,
+        total: order.total ?? 0
+      }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+    currentTableSessions: normalizeCurrentTableSessionEntries(state.currentTableSessions).sort(
+      ([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)
+    ),
+    closedTableSummaries: [...state.closedTableSummaries]
+      .map((summary) => ({
+        restaurantSlug: normalizeRestaurantSlugValue(summary.restaurantSlug),
+        tableNumber: summary.tableNumber,
+        sessionId: summary.sessionId,
+        closedAt: summary.closedAt,
+        orderIds: [...(summary.orderIds ?? [])].sort(),
+        orderCount: summary.orderCount ?? 0,
+        total: summary.total ?? 0
+      }))
+      .sort((left, right) =>
+        [
+          left.restaurantSlug,
+          String(left.tableNumber),
+          String(left.sessionId),
+          left.closedAt
+        ].join("|").localeCompare(
+          [
+            right.restaurantSlug,
+            String(right.tableNumber),
+            String(right.sessionId),
+            right.closedAt
+          ].join("|")
+        )
+      )
+  });
+}
+
 function getOrdersStateCache() {
   return globalThis.__ordersStateCache;
 }
@@ -989,6 +1157,10 @@ function setOrdersStateCache(state: OrdersPersistence) {
     state: cloneOrdersPersistence(state),
     expiresAt: Date.now() + ORDERS_STATE_CACHE_TTL_MS
   };
+}
+
+function clearOrdersStateCache() {
+  globalThis.__ordersStateCache = undefined;
 }
 
 function getOrderRequestCache() {
@@ -1033,7 +1205,7 @@ function findOrderByClientRequestId(
   }
 
   if (
-    entry.restaurantSlug !== restaurantSlug ||
+    !sameRestaurantSlug(entry.restaurantSlug, restaurantSlug) ||
     entry.tableNumber !== tableNumber ||
     entry.orderChannel !== orderChannel ||
     (entry.guestTokenHash ?? "") !== (guestTokenHash ?? "")
@@ -1115,7 +1287,7 @@ function findRecentOrderByPayload(
 ) {
   for (const entry of getRecentOrderPayloadCache().values()) {
     if (
-      entry.restaurantSlug !== restaurantSlug ||
+      !sameRestaurantSlug(entry.restaurantSlug, restaurantSlug) ||
       entry.tableNumber !== tableNumber ||
       entry.sessionId !== sessionId ||
       entry.orderChannel !== orderChannel ||
@@ -1649,13 +1821,29 @@ function mapClosedSessionRowsToSummaries(
     .filter(Boolean) as ClosedTableSummary[];
 }
 
+function extractErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof (error as { message?: unknown }).message === "string"
+  ) {
+    return (error as { message: string }).message;
+  }
+
+  return "";
+}
+
 function isMissingTableError(error: unknown) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const message = extractErrorMessage(error);
 
   return (
     message.includes("relation") &&
@@ -1672,31 +1860,24 @@ function isMissingTableError(error: unknown) {
 }
 
 function isMissingOrderAdvancedColumnError(error: unknown) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const message = extractErrorMessage(error);
 
   return (
     message.includes("column") &&
     (
+      message.includes("table_id") ||
       message.includes("order_channel") ||
       message.includes("display_order_number") ||
-      message.includes("guest_token_hash")
+      message.includes("guest_token_hash") ||
+      message.includes("guest_contact_name") ||
+      message.includes("guest_contact_phone")
     ) &&
     message.includes("does not exist")
   );
 }
 
 function isMissingMoneyColumnError(error: unknown) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const message = extractErrorMessage(error);
 
   return (
     message.includes("column") &&
@@ -1706,12 +1887,7 @@ function isMissingMoneyColumnError(error: unknown) {
 }
 
 function isInvalidIntegerMoneyInputError(error: unknown) {
-  const message =
-    error instanceof Error
-      ? error.message
-      : typeof error === "string"
-        ? error
-        : "";
+  const message = extractErrorMessage(error);
 
   return (
     message.includes("invalid input syntax for type integer") &&
@@ -2197,7 +2373,7 @@ function closeServiceRequestsForSession(
   for (const order of state.ordersStore) {
     if (
       !isServiceRequest(order) ||
-      order.restaurantSlug !== restaurantSlug ||
+      !sameRestaurantSlug(order.restaurantSlug, restaurantSlug) ||
       order.tableNumber !== tableNumber ||
       order.sessionId !== sessionId
     ) {
@@ -2254,14 +2430,17 @@ function loadState(): OrdersPersistence {
       : null;
 
   if (!readableStorePath) {
+    logOrdersDebug("loadState.no_store_file", {
+      ordersStorePath: ORDERS_STORE_PATH,
+      bundledOrdersStorePath: BUNDLED_ORDERS_STORE_PATH
+    });
     return getDefaultState();
   }
 
   try {
     const raw = readFileSync(readableStorePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<OrdersPersistence>;
-
-    return {
+    const loadedState: OrdersPersistence = {
       orders: Array.isArray(parsed.orders)
         ? (parsed.orders as Order[])
         : cloneInitialOrders(),
@@ -2272,7 +2451,19 @@ function loadState(): OrdersPersistence {
         ? (parsed.closedTableSummaries as ClosedTableSummary[])
         : []
     };
+
+    logOrdersDebug("loadState.file_read", {
+      readableStorePath,
+      ordersCount: loadedState.orders.length,
+      closedSummariesCount: loadedState.closedTableSummaries.length,
+      tableSessionsCount: loadedState.currentTableSessions.length
+    });
+
+    return loadedState;
   } catch {
+    logOrdersDebug("loadState.file_read_error", {
+      readableStorePath
+    });
     return getDefaultState();
   }
 }
@@ -2289,7 +2480,7 @@ function readRuntimeState(): RuntimeState {
   return {
     ordersStore: persistedState.orders,
     currentTableSessions: new Map<string, number>(
-      persistedState.currentTableSessions
+      normalizeCurrentTableSessionEntries(persistedState.currentTableSessions)
     ),
     closedTableSummaries: persistedState.closedTableSummaries
   };
@@ -2375,7 +2566,7 @@ async function loadStateFromLegacySupabase(
   return {
     orders,
     currentTableSessions: Array.isArray(parsed.currentTableSessions)
-      ? parsed.currentTableSessions
+      ? normalizeCurrentTableSessionEntries(parsed.currentTableSessions)
       : [...createDefaultTableSessions().entries()],
     closedTableSummaries
   };
@@ -2441,19 +2632,50 @@ async function loadStateFromRowSupabase(
   );
 
   try {
-    const [ordersResult, orderItemsResult] = await Promise.all([
-      supabase
+    let ordersResult: {
+      data: ActiveOrderRow[] | null;
+      error: { message: string } | null;
+    } = await supabase
+      .from("orders")
+      .select(
+        "id, restaurant_id, table_id, table_number, session_id, kind, serve_mode, status, restaurant_name, order_channel, display_order_number, guest_token_hash, guest_contact_name, guest_contact_phone, created_at, updated_at, total, total_agorot"
+      )
+      .order("created_at", { ascending: false });
+
+    if (ordersResult.error && isMissingOrderAdvancedColumnError(ordersResult.error)) {
+      ordersResult = await supabase
         .from("orders")
         .select(
-          "id, restaurant_id, table_id, table_number, session_id, kind, serve_mode, status, restaurant_name, order_channel, display_order_number, guest_token_hash, guest_contact_name, guest_contact_phone, created_at, updated_at, total, total_agorot"
+          "id, restaurant_id, table_number, session_id, kind, serve_mode, status, restaurant_name, created_at, updated_at, total, total_agorot"
         )
-        .order("created_at", { ascending: false }),
-      supabase
+        .order("created_at", { ascending: false });
+    }
+
+    if (ordersResult.error && isMissingMoneyColumnError(ordersResult.error)) {
+      ordersResult = await supabase
+        .from("orders")
+        .select(
+          "id, restaurant_id, table_number, session_id, kind, serve_mode, status, restaurant_name, created_at, updated_at, total"
+        )
+        .order("created_at", { ascending: false });
+    }
+
+    let orderItemsResult: {
+      data: ActiveOrderItemRow[] | null;
+      error: { message: string } | null;
+    } = await supabase
+      .from("order_items")
+      .select(
+        "id, order_id, restaurant_id, menu_item_id, category, name, volume_option_id, volume_label, price, quantity, note, served, created_at, price_agorot"
+      );
+
+    if (orderItemsResult.error && isMissingMoneyColumnError(orderItemsResult.error)) {
+      orderItemsResult = await supabase
         .from("order_items")
         .select(
-          "id, order_id, restaurant_id, menu_item_id, category, name, volume_option_id, volume_label, price, quantity, note, served, created_at, price_agorot"
-        )
-    ]);
+          "id, order_id, restaurant_id, menu_item_id, category, name, volume_option_id, volume_label, price, quantity, note, served, created_at"
+        );
+    }
 
     if (ordersResult.error) {
       throw new Error(ordersResult.error.message);
@@ -2520,7 +2742,7 @@ async function loadStateFromRowSupabase(
     })
     .filter(Boolean) as Array<[string, number]>);
   const fallbackSessions = Array.isArray(parsedMeta?.currentTableSessions)
-    ? parsedMeta.currentTableSessions
+    ? normalizeCurrentTableSessionEntries(parsedMeta.currentTableSessions)
     : defaultSessionsFromRows;
   const mergedCurrentSessions = new Map<string, number>(fallbackSessions);
 
@@ -2528,7 +2750,9 @@ async function loadStateFromRowSupabase(
     mergedCurrentSessions.set(tableKey, sessionId);
   }
 
-  const currentTableSessions = [...mergedCurrentSessions.entries()];
+  const currentTableSessions = normalizeCurrentTableSessionEntries([
+    ...mergedCurrentSessions.entries()
+  ]);
 
   const parsedMetaClosedSummaries = Array.isArray(parsedMeta?.closedTableSummaries)
     ? (parsedMeta.closedTableSummaries as ClosedTableSummary[])
@@ -2602,19 +2826,25 @@ async function persistStateToRowSupabase(
 
   const restaurantRows = (restaurantRowsResult.data ?? []) as RestaurantRow[];
   const restaurantIdBySlug = new Map(
-    restaurantRows.map((restaurant) => [restaurant.slug, restaurant.id] as const)
+    restaurantRows.map(
+      (restaurant) => [normalizeRestaurantSlugValue(restaurant.slug), restaurant.id] as const
+    )
   );
   const restaurantLookup = new Map(
     restaurantRows.map((restaurant) => [restaurant.id, restaurant] as const)
   );
   const activeOrderRows = standardOrders
     .map((order) => {
-      const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+      const restaurantId = restaurantIdBySlug.get(
+        normalizeRestaurantSlugValue(order.restaurantSlug)
+      );
       return restaurantId ? mapOrderToActiveRow(order, restaurantId) : null;
     })
     .filter((row): row is ActiveOrderRow => Boolean(row));
   const activeOrderItemRows = standardOrders.flatMap((order) => {
-    const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+    const restaurantId = restaurantIdBySlug.get(
+      normalizeRestaurantSlugValue(order.restaurantSlug)
+    );
     return restaurantId
       ? order.items.map((item) => mapOrderItemToActiveRow(order.id, restaurantId, item))
       : [];
@@ -2725,17 +2955,6 @@ async function persistStateToRowSupabase(
           .filter((id) => !orderIdsSet.has(id));
       }
 
-      if (staleIds.length > 0) {
-        const { error: deleteStaleOrdersError } = await supabase
-          .from("orders")
-          .delete()
-          .in("id", staleIds);
-
-        if (deleteStaleOrdersError) {
-          throw new Error(deleteStaleOrdersError.message);
-        }
-      }
-
       const changedOrderItems = getChangedRows(
         activeOrderItemRowsToPersist,
         (row) => row.id,
@@ -2817,6 +3036,20 @@ async function persistStateToRowSupabase(
 
         if (deleteStaleItemsError) {
           throw new Error(deleteStaleItemsError.message);
+        }
+      }
+
+      // Delete stale parent orders only after their child items were synchronized.
+      // This avoids transient FK failures when concurrent requests persist the same
+      // runtime state from separate serverless invocations.
+      if (staleIds.length > 0) {
+        const { error: deleteStaleOrdersError } = await supabase
+          .from("orders")
+          .delete()
+          .in("id", staleIds);
+
+        if (deleteStaleOrdersError) {
+          throw new Error(deleteStaleOrdersError.message);
         }
       }
 
@@ -2976,7 +3209,9 @@ async function persistStateToRowSupabase(
 
   const serviceRequestRows = serviceRequestOrders
     .map((order) => {
-      const restaurantId = restaurantIdBySlug.get(order.restaurantSlug);
+      const restaurantId = restaurantIdBySlug.get(
+        normalizeRestaurantSlugValue(order.restaurantSlug)
+      );
       return restaurantId ? mapServiceRequestToRow(order, restaurantId) : null;
     })
     .filter((row): row is ServiceRequestRow => Boolean(row));
@@ -3114,7 +3349,9 @@ async function persistStateToRowSupabase(
 
   let closedSessionRows = mergedClosedSummaries
     .map((summary) => {
-      const restaurantId = restaurantIdBySlug.get(summary.restaurantSlug);
+      const restaurantId = restaurantIdBySlug.get(
+        normalizeRestaurantSlugValue(summary.restaurantSlug)
+      );
       return restaurantId ? mapClosedSummaryToRow(summary, restaurantId) : null;
     })
     .filter((row): row is ClosedSessionRow => Boolean(row));
@@ -3222,7 +3459,9 @@ async function persistStateToRowSupabase(
   const tableSessionRows = [...state.currentTableSessions.entries()]
     .map(([key, currentSessionId]) => {
       const [restaurantSlug, tableNumberRaw] = key.split(":");
-      const restaurantId = restaurantIdBySlug.get(restaurantSlug);
+      const restaurantId = restaurantIdBySlug.get(
+        normalizeRestaurantSlugValue(restaurantSlug)
+      );
       const tableNumber = Number.parseInt(tableNumberRaw ?? "", 10);
 
       if (!restaurantId || !Number.isFinite(tableNumber)) {
@@ -3299,6 +3538,33 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
   const cached = getOrdersStateCache();
 
   if (cached && cached.expiresAt > Date.now()) {
+    const localState = loadState();
+    if (localState.orders.length > 0 || localState.closedTableSummaries.length > 0) {
+      const mergedCachedState = mergeOrdersPersistenceStates(cached.state, localState);
+      const mergedCachedStateFingerprint = getOrdersPersistenceFingerprint(mergedCachedState);
+      const cachedStateFingerprint = getOrdersPersistenceFingerprint(cached.state);
+
+      if (mergedCachedStateFingerprint !== cachedStateFingerprint) {
+        logOrdersDebug("loadStateAsync.cache_hit_merged_with_local", {
+          cachedOrdersCount: cached.state.orders.length,
+          localOrdersCount: localState.orders.length,
+          mergedOrdersCount: mergedCachedState.orders.length,
+          cachedClosedSummariesCount: cached.state.closedTableSummaries.length,
+          localClosedSummariesCount: localState.closedTableSummaries.length,
+          mergedClosedSummariesCount: mergedCachedState.closedTableSummaries.length,
+          ttlMsRemaining: cached.expiresAt - Date.now()
+        });
+        setOrdersStateCache(mergedCachedState);
+        return cloneOrdersPersistence(mergedCachedState);
+      }
+    }
+
+    logOrdersDebug("loadStateAsync.cache_hit", {
+      ordersCount: cached.state.orders.length,
+      closedSummariesCount: cached.state.closedTableSummaries.length,
+      tableSessionsCount: cached.state.currentTableSessions.length,
+      ttlMsRemaining: cached.expiresAt - Date.now()
+    });
     return cloneOrdersPersistence(cached.state);
   }
 
@@ -3323,6 +3589,32 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
 
     try {
       const normalizedState = await loadStateFromRowSupabase(supabase);
+      const localState = loadState();
+
+      if (localState.orders.length > 0 || localState.closedTableSummaries.length > 0) {
+        const mergedState = mergeOrdersPersistenceStates(normalizedState, localState);
+        const mergedStateIsDifferent =
+          getOrdersPersistenceFingerprint(mergedState) !==
+          getOrdersPersistenceFingerprint(normalizedState);
+
+        if (mergedStateIsDifferent) {
+          try {
+            await persistStateToRowSupabase(supabase, toRuntimeState(mergedState));
+          } catch {
+            // ignore sync failures, still serve merged state
+          }
+          logOrdersDebug("loadStateAsync.merged_row_and_local_state", {
+            rowOrdersCount: normalizedState.orders.length,
+            localOrdersCount: localState.orders.length,
+            mergedOrdersCount: mergedState.orders.length,
+            rowClosedSummariesCount: normalizedState.closedTableSummaries.length,
+            localClosedSummariesCount: localState.closedTableSummaries.length,
+            mergedClosedSummariesCount: mergedState.closedTableSummaries.length
+          });
+          setOrdersStateCache(mergedState);
+          return cloneOrdersPersistence(mergedState);
+        }
+      }
 
       if (normalizedState.orders.length === 0) {
         try {
@@ -3344,6 +3636,21 @@ async function loadStateAsync(): Promise<OrdersPersistence> {
           }
         } catch {
           // ignore and keep row-based state
+        }
+        if (localState.orders.length > 0) {
+          try {
+            await persistStateToRowSupabase(supabase, toRuntimeState(localState));
+          } catch {
+            // ignore migration failures, keep serving local mirrored state
+          }
+          logOrdersDebug("loadStateAsync.local_fallback_after_empty_row_state", {
+            rowOrdersCount: normalizedState.orders.length,
+            rowClosedSummariesCount: normalizedState.closedTableSummaries.length,
+            localOrdersCount: localState.orders.length,
+            localClosedSummariesCount: localState.closedTableSummaries.length
+          });
+          setOrdersStateCache(localState);
+          return cloneOrdersPersistence(localState);
         }
       }
 
@@ -3394,7 +3701,7 @@ async function readRuntimeStateAsync(): Promise<RuntimeState> {
   const state: RuntimeState = {
     ordersStore: persistedState.orders,
     currentTableSessions: new Map<string, number>(
-      persistedState.currentTableSessions
+      normalizeCurrentTableSessionEntries(persistedState.currentTableSessions)
     ),
     closedTableSummaries: persistedState.closedTableSummaries
   };
@@ -3481,45 +3788,183 @@ function persistState(state: RuntimeState) {
   if (previousPayload !== serializedPayload) {
     writeFileSync(ORDERS_STORE_PATH, serializedPayload, "utf8");
     globalThis.__ordersPersistedPayload = serializedPayload;
+    logOrdersDebug("persistState.file_write", {
+      ordersStorePath: ORDERS_STORE_PATH,
+      ordersCount: payload.orders.length,
+      closedSummariesCount: payload.closedTableSummaries.length,
+      tableSessionsCount: payload.currentTableSessions.length
+    });
+  } else {
+    logOrdersDebug("persistState.file_write_skipped_same_payload", {
+      ordersStorePath: ORDERS_STORE_PATH,
+      ordersCount: payload.orders.length,
+      closedSummariesCount: payload.closedTableSummaries.length,
+      tableSessionsCount: payload.currentTableSessions.length
+    });
   }
 
   setOrdersStateCache(payload);
 }
 
 async function persistStateAsync(state: RuntimeState) {
-  const supabase = getSupabaseAdminClient();
+  const previousPersist = globalThis.__ordersPersistQueue ?? Promise.resolve();
+  const runPersist = previousPersist.catch(() => undefined).then(async () => {
+    const localMirrorBeforePersist = loadState();
+    const cachedStateBeforePersist = getOrdersStateCache()?.state;
+    const incomingPayload = buildOrdersPersistencePayload(state);
+    const incomingHasActiveOrders = hasAnyActiveOrders(incomingPayload);
+    const localMirrorHasActiveOrders = hasAnyActiveOrders(localMirrorBeforePersist);
+    const cachedHasActiveOrders = cachedStateBeforePersist
+      ? hasAnyActiveOrders(cachedStateBeforePersist)
+      : false;
 
-  if (!supabase) {
-    persistState(state);
-    return;
-  }
-
-  const payload = buildOrdersPersistencePayload(state);
-
-  try {
-    await persistStateToRowSupabase(supabase, state);
-  } catch (error) {
-    if (!isMissingTableError(error)) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Supabase persist failed: ${message}`);
+    if (
+      !incomingHasActiveOrders &&
+      incomingPayload.closedTableSummaries.length === 0 &&
+      (localMirrorHasActiveOrders || cachedHasActiveOrders)
+    ) {
+      logOrdersDebug("persistStateAsync.skip_empty_overwrite", {
+        incomingOrdersCount: incomingPayload.orders.length,
+        localMirrorOrdersCount: localMirrorBeforePersist.orders.length,
+        cachedOrdersCount: cachedStateBeforePersist?.orders.length ?? 0,
+        localMirrorClosedSummariesCount: localMirrorBeforePersist.closedTableSummaries.length,
+        cachedClosedSummariesCount:
+          cachedStateBeforePersist?.closedTableSummaries.length ?? 0
+      });
+      return;
     }
 
-    // Backward compatibility fallback: keep old app_state storage
-    const { error: legacyError } = await supabase.from("app_state").upsert(
+    const supabase = getSupabaseAdminClient();
+
+    if (!supabase) {
+      persistState(state);
+      return;
+    }
+
+    const payload = incomingPayload;
+
+    try {
+      await persistStateToRowSupabase(supabase, state);
+    } catch (error) {
+      if (!isMissingTableError(error)) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Supabase persist failed: ${message}`);
+      }
+
+      // Backward compatibility fallback: keep old app_state storage
+      const { error: legacyError } = await supabase.from("app_state").upsert(
+        {
+          key: ORDERS_STATE_KEY,
+          value: payload,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "key" }
+      );
+
+      if (legacyError) {
+        throw new Error(`Supabase persist failed: ${legacyError.message}`);
+      }
+    }
+
+    // Keep a local mirror even in Supabase mode so local/dev reads can recover
+    // from transient empty row-state without losing newly created orders.
+    persistState(state);
+  });
+
+  globalThis.__ordersPersistQueue = runPersist.then(
+    () => undefined,
+    () => undefined
+  );
+
+  await runPersist;
+}
+
+async function persistTableSessionsOnlyAsync(state: RuntimeState) {
+  const previousPersist = globalThis.__ordersPersistQueue ?? Promise.resolve();
+  const runPersist = previousPersist.catch(() => undefined).then(async () => {
+    const supabase = getSupabaseAdminClient();
+
+    if (!supabase) {
+      persistState(state);
+      return;
+    }
+
+    const restaurantRowsResult = await supabase.from("restaurants").select("id, slug");
+
+    if (restaurantRowsResult.error) {
+      throw new Error(`Supabase table session persist failed: ${restaurantRowsResult.error.message}`);
+    }
+
+    const restaurantRows = (restaurantRowsResult.data ?? []) as Array<{
+      id: string;
+      slug: string;
+    }>;
+    const restaurantIdBySlug = new Map(
+      restaurantRows.map(
+        (restaurant) => [normalizeRestaurantSlugValue(restaurant.slug), restaurant.id] as const
+      )
+    );
+    const tableSessionRows = normalizeCurrentTableSessionEntries([
+      ...state.currentTableSessions.entries()
+    ])
+      .map(([key, currentSessionId]) => {
+        const [restaurantSlug, tableNumberRaw] = key.split(":");
+        const restaurantId = restaurantIdBySlug.get(
+          normalizeRestaurantSlugValue(restaurantSlug)
+        );
+        const tableNumber = Number.parseInt(tableNumberRaw ?? "", 10);
+
+        if (!restaurantId || !Number.isFinite(tableNumber)) {
+          return null;
+        }
+
+        return {
+          restaurant_id: restaurantId,
+          table_number: tableNumber,
+          current_session_id: currentSessionId
+        };
+      })
+      .filter(Boolean);
+
+    if (tableSessionRows.length > 0) {
+      const { error: upsertTableSessionsError } = await supabase
+        .from("restaurant_table_sessions")
+        .upsert(tableSessionRows, { onConflict: "restaurant_id,table_number" });
+
+      if (
+        upsertTableSessionsError &&
+        !isMissingTableError(upsertTableSessionsError.message)
+      ) {
+        throw new Error(
+          `Supabase table session persist failed: ${upsertTableSessionsError.message}`
+        );
+      }
+    }
+
+    const { error: metaError } = await supabase.from("app_state").upsert(
       {
-        key: ORDERS_STATE_KEY,
-        value: payload,
+        key: ORDERS_META_KEY,
+        value: toOrdersMetaPersistence(state),
         updated_at: new Date().toISOString()
       },
       { onConflict: "key" }
     );
 
-    if (legacyError) {
-      throw new Error(`Supabase persist failed: ${legacyError.message}`);
+    if (metaError) {
+      throw new Error(`Supabase table session persist failed: ${metaError.message}`);
     }
-  }
 
-  setOrdersStateCache(payload);
+    // A session-only persist can start from a stale/empty reader. Do not keep that
+    // snapshot in memory cache, force the next read to reload fresh persisted orders.
+    clearOrdersStateCache();
+  });
+
+  globalThis.__ordersPersistQueue = runPersist.then(
+    () => undefined,
+    () => undefined
+  );
+
+  await runPersist;
 }
 
 function ensureCurrentSessionId(
@@ -3531,10 +3976,24 @@ function ensureCurrentSessionId(
   const existing = state.currentTableSessions.get(key);
 
   if (existing) {
+    logOrdersDebug("ensureCurrentSessionId.existing", {
+      restaurantSlug,
+      normalizedRestaurantSlug: normalizeRestaurantSlugValue(restaurantSlug),
+      tableNumber,
+      tableKey: key,
+      sessionId: existing
+    });
     return { sessionId: existing, created: false };
   }
 
   state.currentTableSessions.set(key, 1);
+  logOrdersDebug("ensureCurrentSessionId.created", {
+    restaurantSlug,
+    normalizedRestaurantSlug: normalizeRestaurantSlugValue(restaurantSlug),
+    tableNumber,
+    tableKey: key,
+    sessionId: 1
+  });
   return { sessionId: 1, created: true };
 }
 
@@ -3550,7 +4009,7 @@ export async function getCurrentTableSessionId(
   );
 
   if (created) {
-    await persistStateAsync(state);
+    await persistTableSessionsOnlyAsync(state);
   }
 
   return sessionId;
@@ -3752,7 +4211,7 @@ export async function getOrders(restaurantSlug?: string) {
 
   return ordersStore
     .filter((order) => {
-      if (restaurantSlug && order.restaurantSlug !== restaurantSlug) {
+      if (restaurantSlug && !sameRestaurantSlug(order.restaurantSlug, restaurantSlug)) {
         return false;
       }
 
@@ -3770,7 +4229,7 @@ export async function getAllStoredOrders(restaurantSlug?: string) {
 
   return ordersStore
     .filter((order) => {
-      if (restaurantSlug && order.restaurantSlug !== restaurantSlug) {
+      if (restaurantSlug && !sameRestaurantSlug(order.restaurantSlug, restaurantSlug)) {
         return false;
       }
 
@@ -3795,7 +4254,7 @@ export async function getOrdersByGuestToken(
   return ordersStore
     .filter(
       (order) =>
-        order.restaurantSlug === restaurantSlug &&
+        sameRestaurantSlug(order.restaurantSlug, restaurantSlug) &&
         order.kind !== "waiter_call" &&
         order.kind !== "bill_request" &&
         order.status !== "cancelled" &&
@@ -3938,7 +4397,7 @@ export async function getTableSessionSnapshot(
   );
 
   if (created) {
-    await persistStateAsync(state);
+    await persistTableSessionsOnlyAsync(state);
   }
 
   const submittedOrders: Order[] = [];
@@ -3946,7 +4405,7 @@ export async function getTableSessionSnapshot(
 
   for (const order of state.ordersStore) {
     if (
-      order.restaurantSlug !== restaurantSlug ||
+      !sameRestaurantSlug(order.restaurantSlug, restaurantSlug) ||
       order.tableNumber !== tableNumber ||
       order.sessionId !== sessionId ||
       order.status === "cancelled"
@@ -3966,6 +4425,34 @@ export async function getTableSessionSnapshot(
 
   submittedOrders.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   activeServiceRequests.sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+  const sameTableAllOrders = state.ordersStore.filter(
+    (order) =>
+      sameRestaurantSlug(order.restaurantSlug, restaurantSlug) &&
+      order.tableNumber === tableNumber &&
+      order.status !== "cancelled"
+  );
+  const sameTableOtherSessionOrders = sameTableAllOrders.filter(
+    (order) => order.sessionId !== sessionId
+  );
+
+  logOrdersDebug("getTableSessionSnapshot.result", {
+    restaurantSlug,
+    normalizedRestaurantSlug: normalizeRestaurantSlugValue(restaurantSlug),
+    tableNumber,
+    currentSessionId: sessionId,
+    sessionCreatedOnRead: created,
+    submittedOrdersCount: submittedOrders.length,
+    activeServiceRequestsCount: activeServiceRequests.length,
+    sameTableAllOrdersCount: sameTableAllOrders.length,
+    sameTableOtherSessionOrdersCount: sameTableOtherSessionOrders.length,
+    sameTableOrderIds: sameTableAllOrders.map((order) => ({
+      id: order.id,
+      sessionId: order.sessionId,
+      status: order.status,
+      kind: order.kind
+    }))
+  });
 
   return {
     currentSessionId: sessionId,
@@ -4173,6 +4660,20 @@ export async function createOrder(input: {
 
   state.ordersStore.unshift(order);
 
+  logOrdersDebug("createOrder.before_persist", {
+    orderId: order.id,
+    restaurantSlug: order.restaurantSlug,
+    normalizedRestaurantSlug: normalizeRestaurantSlugValue(order.restaurantSlug),
+    tableNumber: order.tableNumber,
+    sessionId: order.sessionId,
+    orderChannel,
+    itemsCount: order.items.length,
+    total: order.total,
+    currentTableSessionForKey:
+      state.currentTableSessions.get(createTableKey(order.restaurantSlug, order.tableNumber)) ??
+      null
+  });
+
   rememberRecentOrderPayload(
     order,
     input.restaurantSlug,
@@ -4195,6 +4696,15 @@ export async function createOrder(input: {
   }
 
   await persistStateAsync(state);
+
+  logOrdersDebug("createOrder.after_persist", {
+    orderId: order.id,
+    restaurantSlug: order.restaurantSlug,
+    normalizedRestaurantSlug: normalizeRestaurantSlugValue(order.restaurantSlug),
+    tableNumber: order.tableNumber,
+    sessionId: order.sessionId,
+    stateOrdersCount: state.ordersStore.length
+  });
 
   return order;
 }
@@ -4445,7 +4955,7 @@ export async function getTableOverviews(
 
   const overviews = (await getRestaurants())
     .filter((restaurant) =>
-      restaurantSlug ? restaurant.slug === restaurantSlug : true
+      restaurantSlug ? sameRestaurantSlug(restaurant.slug, restaurantSlug) : true
     )
     .flatMap((restaurant) =>
       restaurant.tables.map((table) => {
@@ -4563,7 +5073,7 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
   closeServiceRequestsForSession(state, restaurantSlug, tableNumber, sessionId);
   const orders = state.ordersStore.filter(
     (order) =>
-      order.restaurantSlug === restaurantSlug &&
+      sameRestaurantSlug(order.restaurantSlug, restaurantSlug) &&
       order.tableNumber === tableNumber &&
       order.sessionId === sessionId
   );
@@ -4574,7 +5084,7 @@ export async function closeTable(restaurantSlug: string, tableNumber: number) {
 
   const existingSummary = state.closedTableSummaries.find(
     (summary) =>
-      summary.restaurantSlug === restaurantSlug &&
+      sameRestaurantSlug(summary.restaurantSlug, restaurantSlug) &&
       summary.tableNumber === tableNumber &&
       summary.sessionId === sessionId
   );
@@ -4745,7 +5255,7 @@ export async function moveTableOrders(
 
   const movableOrders = state.ordersStore.filter(
     (order) =>
-      order.restaurantSlug === restaurantSlug &&
+      sameRestaurantSlug(order.restaurantSlug, restaurantSlug) &&
       order.tableNumber === fromTableNumber &&
       order.sessionId === fromSessionId &&
       order.kind !== "waiter_call" &&
@@ -4784,7 +5294,7 @@ export async function getClosedTableSummaries(
 ) {
   const { closedTableSummaries } = await readRuntimeStateAsync();
   const restaurantFiltered = closedTableSummaries.filter((summary) =>
-    restaurantSlug ? summary.restaurantSlug === restaurantSlug : true
+    restaurantSlug ? sameRestaurantSlug(summary.restaurantSlug, restaurantSlug) : true
   );
 
   if (options?.scope !== "current_shift") {

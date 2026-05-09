@@ -119,13 +119,15 @@ async function dismissWelcomeDialogIfVisible(page: Page) {
 async function openMenuInEnglish(page: Page, menuPath: string) {
   await page.goto(menuPath, { waitUntil: "domcontentloaded" });
   await dismissWelcomeDialogIfVisible(page);
-  await page.getByRole("button", { name: "EN", exact: true }).click();
+  await page.getByRole("button", { name: "Language" }).click();
+  await page.getByRole("menuitem", { name: "EN", exact: true }).click();
   await dismissWelcomeDialogIfVisible(page);
   await expect(page.locator(".menu-sections")).toBeVisible();
 }
 
 async function switchMenuLanguage(page: Page, language: "EN" | "RU" | "HE") {
-  await page.getByRole("button", { name: language, exact: true }).click();
+  await page.getByRole("button", { name: "Language" }).click();
+  await page.getByRole("menuitem", { name: language, exact: true }).click();
   await dismissWelcomeDialogIfVisible(page);
 }
 

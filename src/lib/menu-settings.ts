@@ -943,7 +943,7 @@ async function getRestaurantIdBySlug(
   const { data, error } = await supabase
     .from("restaurants")
     .select("id, slug")
-    .eq("slug", restaurantSlug)
+    .ilike("slug", restaurantSlug)
     .maybeSingle();
 
   if (error || !data) {

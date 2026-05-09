@@ -2669,6 +2669,11 @@ export function Cart({
             <div className="menu-quick-info" aria-label="Guest information shortcuts">
               {text.quickInfo.map((label, index) => {
                 const href = quickInfoLinks[index] ?? null;
+                const shouldHideChip = restaurantSlug.trim().toLowerCase() === "simulev" && index === 0;
+
+                if (shouldHideChip) {
+                  return null;
+                }
 
                 if (!href) {
                   return (

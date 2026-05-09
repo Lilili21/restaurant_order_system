@@ -456,10 +456,6 @@ function getPromotionValidationMessage(promotion: EditablePromotion) {
   return null;
 }
 
-function isSimuLevRestaurantSlug(slug: string) {
-  return slug.trim().toLowerCase() === "simulev";
-}
-
 function toEditablePromotion(promotion: PromotionSettings): EditablePromotion {
   return {
     id: promotion.id,
@@ -1034,7 +1030,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     price: "",
     volumeOptionsText: "",
     image: "",
-    showImage: true,
+    showImage: false,
     badges: [],
     category: "",
     available: true,
@@ -1052,10 +1048,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     [pathSegments]
   );
   const menuPreviewHref = useMemo(() => `/${restaurantSlug}/menu/0`, [restaurantSlug]);
-  const enableDishAddons = useMemo(
-    () => isSimuLevRestaurantSlug(restaurantSlug),
-    [restaurantSlug]
-  );
+  const enableDishAddons = true;
   const categoryLabels = useMemo<Record<MenuCategory, string>>(() => {
     const nextLabels: Record<MenuCategory, string> = {};
 
@@ -3420,7 +3413,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       price: "",
       volumeOptionsText: "",
       image: "",
-      showImage: true,
+      showImage: false,
       badges: [],
       category: sourceCategories.includes(newItem.category)
         ? newItem.category
@@ -4064,6 +4057,65 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     removeCategoryDefinition
   ]);
 
+  const moveCategoryDefinition = useCallback(
+    async (slug: string, direction: "up" | "down") => {
+      const currentCategory = categoryDefinitions.find((category) => category.slug === slug);
+
+      if (!currentCategory || currentCategory.kind === "addons") {
+        return;
+      }
+
+      const sameKindCategories = categoryDefinitions
+        .filter(
+          (category): category is EditableCategoryDefinition & {
+            kind: "dishes" | "drinks";
+          } => category.kind === currentCategory.kind
+        )
+        .sort((left, right) => left.sortOrder - right.sortOrder);
+
+      const currentIndex = sameKindCategories.findIndex(
+        (category) => category.slug === slug
+      );
+
+      if (currentIndex < 0) {
+        return;
+      }
+
+      const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= sameKindCategories.length) {
+        return;
+      }
+
+      const reordered = [...sameKindCategories];
+      const [movedCategory] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, movedCategory);
+
+      const reorderedMap = new Map(
+        reordered.map((category, index) => [
+          category.slug,
+          {
+            ...category,
+            sortOrder: (index + 1) * 10
+          }
+        ])
+      );
+
+      const previousDefinitions = categoryDefinitions;
+      const nextDefinitions = categoryDefinitions.map((category) =>
+        reorderedMap.get(category.slug) ?? category
+      );
+
+      setCategoryDefinitions(nextDefinitions);
+      const { saved } = await saveCategoryDefinitions(nextDefinitions);
+
+      if (!saved) {
+        setCategoryDefinitions(previousDefinitions);
+      }
+    },
+    [categoryDefinitions, saveCategoryDefinitions]
+  );
+
   const toggleCategoryDefinitionActive = useCallback(
     async (slug: string) => {
       const currentCategory = categoryDefinitions.find((category) => category.slug === slug);
@@ -4621,6 +4673,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         onAddCategory={addCategoryDefinition}
         onSaveCategory={saveEditedCategoryDefinition}
         onDeleteEditedCategory={deleteEditedCategoryDefinition}
+        onMoveCategory={moveCategoryDefinition}
         editingCategorySlug={editingCategorySlug}
         toppingsSaving={toppingsSaving}
         toppingsMessage={toppingsMessage}

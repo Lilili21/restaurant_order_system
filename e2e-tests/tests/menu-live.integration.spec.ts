@@ -90,11 +90,18 @@ async function dismissWelcomeDialogIfVisible(page: Page) {
 }
 
 async function clickLanguageButtonWithRetry(page: Page, language: "EN" | "RU" | "HE") {
-  const languageButton = page.getByRole("button", { name: language, exact: true });
+  const languageToggle = page.getByRole("button", { name: "Language" });
+  const languageOption = page.getByRole("menuitem", { name: language, exact: true });
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await languageButton.click({ timeout: 3000 });
+      const optionVisible = await languageOption.isVisible().catch(() => false);
+
+      if (!optionVisible) {
+        await languageToggle.click({ timeout: 3000 });
+      }
+
+      await languageOption.click({ timeout: 3000 });
       return;
     } catch (error) {
       if (attempt === 2) {
@@ -102,6 +109,7 @@ async function clickLanguageButtonWithRetry(page: Page, language: "EN" | "RU" | 
       }
 
       await dismissWelcomeDialogIfVisible(page);
+      await page.keyboard.press("Escape").catch(() => {});
       await page.waitForTimeout(150);
     }
   }

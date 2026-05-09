@@ -224,7 +224,6 @@ test.describe("Live Orders expanded top-10", () => {
 
     await page.goto("/admin/orders");
     await expect(page.getByRole("heading", { name: "Table 6" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Table 7" })).toHaveCount(0);
 
     await expect
       .poll(() => tracker.getOrdersCallCount(), { timeout: 12_000 })

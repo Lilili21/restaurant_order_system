@@ -1,72 +1,91 @@
 {
-  "orders": [],
+  "orders": [
+    {
+      "id": "ord_1778344005071",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "orderChannel": "table",
+      "serveMode": "as_ready",
+      "status": "preparing",
+      "createdAt": "2026-05-09T16:26:45.073+00:00",
+      "updatedAt": "2026-05-09T16:28:46.817Z",
+      "items": [
+        {
+          "id": "item_1778344005071_hgbqav",
+          "menuItemId": "m1",
+          "category": "starters",
+          "name": "Hummus with pita",
+          "price": 24,
+          "quantity": 1,
+          "note": "__menu_order_kitchen_ready__",
+          "served": false
+        }
+      ],
+      "total": 24
+    },
+    {
+      "id": "ord_1778343260337",
+      "restaurantSlug": "olive-bistro",
+      "restaurantName": "Olive Bistro",
+      "tableNumber": 1,
+      "sessionId": 4,
+      "orderChannel": "table",
+      "serveMode": "as_ready",
+      "status": "served",
+      "createdAt": "2026-05-09T16:14:20.339+00:00",
+      "updatedAt": "2026-05-09T16:28:31.447+00:00",
+      "items": [
+        {
+          "id": "item_1778343260336_ylwzs4",
+          "menuItemId": "m6",
+          "category": "desserts",
+          "name": "Kanafeh",
+          "price": 32,
+          "quantity": 1,
+          "note": "__menu_order_kitchen_ready__",
+          "served": true
+        }
+      ],
+      "total": 32
+    }
+  ],
   "currentTableSessions": [
     [
       "olive-bistro:3",
-      4
-    ],
-    [
-      "olive-bistro:6",
-      4
-    ],
-    [
-      "olive-bistro:1",
-      9
-    ],
-    [
-      "olive-bistro:2",
-      9
-    ],
-    [
-      "olive-bistro:4",
-      8
-    ],
-    [
-      "olive-bistro:5",
-      5
-    ],
-    [
-      "olive-bistro:7",
-      4
-    ],
-    [
-      "olive-bistro:8",
-      6
-    ],
-    [
-      "olive-bistro:14",
-      1
-    ],
-    [
-      "olive-bistro:20",
-      1
-    ],
-    [
-      "olive-bistro:19",
-      1
-    ],
-    [
-      "olive-bistro:9",
-      3
-    ],
-    [
-      "olive-bistro:10",
-      1
-    ],
-    [
-      "olive-bistro:11",
-      1
-    ],
-    [
-      "olive-bistro:12",
-      1
-    ],
-    [
-      "olive-bistro:13",
       2
     ],
     [
-      "olive-bistro:15",
+      "olive-bistro:1",
+      4
+    ],
+    [
+      "olive-bistro:2",
+      2
+    ],
+    [
+      "olive-bistro:4",
+      5
+    ],
+    [
+      "olive-bistro:5",
+      1
+    ],
+    [
+      "olive-bistro:6",
+      1
+    ],
+    [
+      "olive-bistro:7",
+      1
+    ],
+    [
+      "olive-bistro:8",
+      1
+    ],
+    [
+      "simulev:5",
       1
     ],
     [
@@ -78,8 +97,84 @@
       1
     ],
     [
+      "simulev:3",
+      1
+    ],
+    [
+      "simulev:0",
+      1
+    ],
+    [
+      "simulev:4",
+      1
+    ],
+    [
+      "simulev:2",
+      1
+    ],
+    [
+      "simulev:1",
+      1
+    ],
+    [
+      "olive-bistro:10",
+      1
+    ],
+    [
+      "olive-bistro:11",
+      1
+    ],
+    [
+      "olive-bistro:15",
+      1
+    ],
+    [
+      "olive-bistro:14",
+      1
+    ],
+    [
+      "olive-bistro:20",
+      1
+    ],
+    [
+      "simulev:10",
+      1
+    ],
+    [
+      "simulev:6",
+      1
+    ],
+    [
+      "olive-bistro:9",
+      3
+    ],
+    [
       "olive-bistro:18",
       1
+    ],
+    [
+      "simulev:7",
+      1
+    ],
+    [
+      "simulev:8",
+      1
+    ],
+    [
+      "simulev:9",
+      1
+    ],
+    [
+      "olive-bistro:19",
+      1
+    ],
+    [
+      "olive-bistro:12",
+      1
+    ],
+    [
+      "olive-bistro:13",
+      2
     ]
   ],
   "closedTableSummaries": []

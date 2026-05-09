@@ -173,7 +173,12 @@ export async function getRestaurants() {
 }
 
 export async function getRestaurantBySlug(slug: string) {
-  return (await getRestaurants()).find((restaurant) => restaurant.slug === slug) ?? null;
+  const normalizedSlug = slug.trim().toLowerCase();
+  return (
+    (await getRestaurants()).find(
+      (restaurant) => restaurant.slug.trim().toLowerCase() === normalizedSlug
+    ) ?? null
+  );
 }
 
 export async function getTableSession(

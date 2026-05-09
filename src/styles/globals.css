@@ -2537,6 +2537,44 @@ textarea.modal-input {
   font-size: 0.86rem;
 }
 
+.category-manager-modal__list {
+  display: grid;
+  gap: 10px;
+}
+
+.category-manager-modal__list-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.category-manager-modal__list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.category-manager-modal__list-label {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: #594433;
+  padding: 14px 18px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.category-manager-modal__list-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.category-manager-modal__move {
+  min-width: 56px;
+  padding-inline: 0;
+}
+
 .category-manager-modal__chips {
   margin-top: 6px;
   max-height: 240px;

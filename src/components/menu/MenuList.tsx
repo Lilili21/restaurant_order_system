@@ -220,7 +220,19 @@ export function MenuList({
   const dynamicDrinkCategories =
     activeBaseDefinitions.length > 0 ? definedDrinkCategories : drinkCategories;
   const dynamicCategoryOrder: MenuCategory[] = useMemo(() => {
-    const preferred = activeBaseDefinitions.map((category) => category.slug);
+    const preferred = [...activeBaseDefinitions]
+      .sort((left, right) => {
+        if (left.kind !== right.kind) {
+          return left.kind === "dishes" ? -1 : 1;
+        }
+
+        if (left.sortOrder !== right.sortOrder) {
+          return left.sortOrder - right.sortOrder;
+        }
+
+        return left.slug.localeCompare(right.slug);
+      })
+      .map((category) => category.slug);
     if (preferred.length > 0) {
       return preferred;
     }
@@ -252,6 +264,8 @@ export function MenuList({
       : "dishes"
   );
   const sectionRefs = useRef<Partial<Record<MenuCategory, HTMLElement | null>>>({});
+  const openGroupScrollStartRef = useRef(0);
+  const userStartedScrollingRef = useRef(false);
   const getQuantityKey = (menuItemId: string, volumeOptionId?: string) =>
     `${menuItemId}:${volumeOptionId ?? "base"}`;
   const grouped = useMemo(
@@ -347,14 +361,31 @@ export function MenuList({
       return;
     }
 
+    openGroupScrollStartRef.current = window.scrollY;
+    userStartedScrollingRef.current = false;
+
+    const markUserScrollIntent = () => {
+      userStartedScrollingRef.current = true;
+    };
+
     const handleScroll = () => {
-      if (window.scrollY > 48) {
+      if (!userStartedScrollingRef.current) {
+        return;
+      }
+
+      if (window.scrollY - openGroupScrollStartRef.current > 80) {
         setOpenGroup((current) => (current ? null : current));
       }
     };
 
+    window.addEventListener("wheel", markUserScrollIntent, { passive: true });
+    window.addEventListener("touchmove", markUserScrollIntent, { passive: true });
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("wheel", markUserScrollIntent);
+      window.removeEventListener("touchmove", markUserScrollIntent);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, [openGroup]);
 
   function scrollToCategory(category: MenuCategory) {
@@ -373,18 +404,15 @@ export function MenuList({
   function handleGroupSelect(group: Exclude<MenuFilterGroup, null>) {
     setOpenGroup((current) => (current === group ? null : group));
     setSelectedCategory(group);
-
-    const targetCategory =
-      group === "drinks" ? visibleDrinkCategories[0] : visibleDishCategories[0];
-    if (targetCategory) {
-      scrollToCategory(targetCategory);
-    }
   }
 
   function handleCategorySelect(category: MenuCategory) {
     setSelectedCategory(category);
     setOpenGroup(dynamicDrinkCategories.has(category) ? "drinks" : "dishes");
     scrollToCategory(category);
+    window.setTimeout(() => {
+      setOpenGroup(null);
+    }, 220);
   }
 
   const formatCategoryLabel = (category: MenuCategory) =>

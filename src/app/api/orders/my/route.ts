@@ -12,7 +12,7 @@ function isValidSlug(value: unknown): value is string {
     typeof value === "string" &&
     value.length > 0 &&
     value.length <= 80 &&
-    /^[a-z0-9-]+$/.test(value)
+    /^[a-z0-9-]+$/i.test(value)
   );
 }
 

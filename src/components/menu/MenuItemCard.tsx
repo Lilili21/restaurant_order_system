@@ -137,12 +137,8 @@ export function MenuItemCard({
         return leftPriority - rightPriority;
       });
   const hasVolumeOptions = Boolean(item.volumeOptions?.length);
-  const isSimuLevRestaurant =
-    item.restaurantSlug.trim().toLowerCase() === "simulev";
   const useTypeSelector =
-    isSimuLevRestaurant &&
-    hasVolumeOptions &&
-    !drinkCategories.has(item.category);
+    hasVolumeOptions && !drinkCategories.has(item.category);
   const displayVolumeOptions = hasVolumeOptions;
   const resolvedImage = resolveMenuImageForRestaurant(
     item.image,

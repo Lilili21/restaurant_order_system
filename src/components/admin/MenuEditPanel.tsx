@@ -53,6 +53,7 @@ type Props = {
   onAddCategory: () => Promise<void>;
   onSaveCategory: () => Promise<void>;
   onDeleteEditedCategory: () => Promise<void>;
+  onMoveCategory: (slug: string, direction: "up" | "down") => Promise<void>;
   editingCategorySlug: string | null;
   toppingsSaving: boolean;
   toppingsMessage: string | null;
@@ -150,6 +151,7 @@ function MenuEditPanelComponent({
   onAddCategory,
   onSaveCategory,
   onDeleteEditedCategory,
+  onMoveCategory,
   editingCategorySlug,
   toppingsSaving,
   toppingsMessage,
@@ -280,6 +282,48 @@ function MenuEditPanelComponent({
             </div>
             {categoriesMessage ? (
               <p className="category-manager-modal__message">{categoriesMessage}</p>
+            ) : null}
+            {editableCategories.length > 0 ? (
+              <div className="category-manager-modal__list">
+                <p className="category-manager-modal__hint">Current order</p>
+                <div className="category-manager-modal__list-grid">
+                  {editableCategories.map((category, index) => (
+                    <div
+                      key={category.slug}
+                      className="category-manager-modal__list-row"
+                    >
+                      <button
+                        type="button"
+                        className="category-manager-modal__list-label"
+                        onClick={() => onEditCategoryFromChip(category.slug as MenuCategory)}
+                        title="Open category editor"
+                      >
+                        {category.labelEn || category.label || category.slug}
+                      </button>
+                      <div className="category-manager-modal__list-actions">
+                        <button
+                          type="button"
+                          className="button-neutral category-manager-modal__move"
+                          onClick={() => void onMoveCategory(category.slug, "up")}
+                          disabled={categoriesSaving || index === 0}
+                          aria-label={`Move ${category.slug} up`}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="button-neutral category-manager-modal__move"
+                          onClick={() => void onMoveCategory(category.slug, "down")}
+                          disabled={categoriesSaving || index === editableCategories.length - 1}
+                          aria-label={`Move ${category.slug} down`}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </div>
         </div>
