@@ -96,10 +96,11 @@ const DRINK_CATEGORIES = new Set<string>([
 ]);
 const TABLES_VIEW_CACHE_TTL_MS = 30 * 1000;
 const TABLES_VIEW_CACHE_KEY = "admin-tables-overview-cache-v1";
-const TABLES_ACTIVE_POLL_MS = 4_000;
-const TABLES_HIDDEN_POLL_MS = 12_000;
+const TABLES_ACTIVE_POLL_MS = 6_000;
+const TABLES_HIDDEN_POLL_MS = 18_000;
 const TABLES_MENU_SETTINGS_POLL_MS = 30_000;
 const TABLES_REQUEST_TIMEOUT_MS = 8_000;
+const LOCAL_MUTATION_REFETCH_COOLDOWN_MS = 2_500;
 
 type MonthlyExportRange = {
   key: string;
@@ -596,6 +597,7 @@ export function TablesOverview({
   const [posSyncStates, setPosSyncStates] = useState<Record<string, PosSyncState>>({});
   const monthlyExportRanges = useMemo(() => getMonthlyExportRanges(new Date(), 4), []);
   const lastEmittedOrderModeRef = useRef<RestaurantOrderMode>("tables");
+  const localMutationCooldownUntilRef = useRef(0);
 
   function getPosSyncKey(table: TableOverview) {
     return `${table.restaurantSlug}:${table.tableNumber}:${table.currentSessionId}`;
@@ -680,6 +682,11 @@ export function TablesOverview({
 
     async function load() {
       if (cancelled || loadingInFlight) {
+        return;
+      }
+
+      if (Date.now() < localMutationCooldownUntilRef.current) {
+        scheduleNextLoad();
         return;
       }
 
@@ -826,6 +833,7 @@ export function TablesOverview({
     }
 
     const summary = (await response.json()) as ClosedTableSummary;
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     const discountAmount = agorotToShekels(
       (summary.orders ?? []).reduce(
         (sum, order) =>
@@ -873,6 +881,7 @@ export function TablesOverview({
     setServiceRequests((current) =>
       current.filter((order) => order.id !== orderId)
     );
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
   }
 
   function requestMoveTable(table: TableOverview) {
@@ -943,6 +952,7 @@ export function TablesOverview({
     }
 
     closeMoveDialog();
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     setDialogMessage(
       `Orders moved from table ${moveAuthTable.tableNumber} to table ${nextTableNumber}.`
     );

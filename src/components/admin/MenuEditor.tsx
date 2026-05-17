@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { ControlCenterDashboard } from "@/components/admin/ControlCenterDashboard";
@@ -54,6 +54,8 @@ const MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const DASHBOARD_ACTIVE_POLL_MS = 12_000;
 const DASHBOARD_HIDDEN_POLL_MS = 30_000;
 const DASHBOARD_REQUEST_TIMEOUT_MS = 8_000;
+const LOCAL_MUTATION_REFETCH_COOLDOWN_MS = 2_500;
+const RECOMMENDATION_RULES_SAVE_DEBOUNCE_MS = 500;
 
 function toFiniteNumber(value: unknown) {
   const parsed = typeof value === "number" ? value : Number(value);
@@ -166,6 +168,32 @@ function deriveEditorCategoryLabels(
     labelEn: language === "en" ? baseLabel : "",
     labelRu: language === "ru" ? baseLabel : ""
   };
+}
+
+function normalizeRecommendationRulesInput(
+  nextRecommendationRules: EditableRecommendationRule[]
+) {
+  return nextRecommendationRules
+    .map((recommendation, index): EditableRecommendationRule => ({
+      ...recommendation,
+      id: recommendation.id || `recommendation-${index + 1}`,
+      triggerItemId: recommendation.triggerItemId.trim(),
+      suggestedItemId: recommendation.suggestedItemId.trim(),
+      suggestedCategory: recommendation.suggestedCategory
+        ? recommendation.suggestedCategory
+        : ""
+    }))
+    .filter(
+      (recommendation) =>
+        recommendation.triggerItemId &&
+        (recommendation.suggestedType === "category"
+          ? Boolean(recommendation.suggestedCategory)
+          : Boolean(recommendation.suggestedItemId)) &&
+        !(
+          recommendation.suggestedType === "item" &&
+          recommendation.triggerItemId === recommendation.suggestedItemId
+        )
+    );
 }
 
 function mergeDefinitionsWithMenuItems(
@@ -966,6 +994,13 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     ordersByHour: [],
     revenueTrend: []
   });
+  useEffect(() => {
+    return () => {
+      if (recommendationRulesSaveTimeoutRef.current !== null) {
+        window.clearTimeout(recommendationRulesSaveTimeoutRef.current);
+      }
+    };
+  }, []);
   const [dashboardMeta, setDashboardMeta] = useState<DashboardMeta>({
     orderMode: "tables",
     ordersLabel: "Active + closed tables",
@@ -978,6 +1013,12 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     useState<RestaurantOrderMode>("tables");
   const [selectedKind, setSelectedKind] = useState<"dishes" | "drinks">("dishes");
   const [selectedCategories, setSelectedCategories] = useState<MenuCategory[]>([]);
+  const localMutationCooldownUntilRef = useRef(0);
+  const recommendationRulesSaveTimeoutRef = useRef<number | null>(null);
+  const latestRecommendationRulesRef = useRef<EditableRecommendationRule[]>([]);
+  const lastPersistedRecommendationRulesRef = useRef<EditableRecommendationRule[]>([]);
+  const lastMenuSettingsPatchFingerprintRef = useRef<string | null>(null);
+  const menuSettingsPatchInFlightFingerprintRef = useRef<string | null>(null);
   const [categoryDefinitions, setCategoryDefinitions] = useState<
     EditableCategoryDefinition[]
   >([]);
@@ -1064,36 +1105,42 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     return nextLabels;
   }, [categoryDefinitions, items]);
-  const activeDishCategories = useMemo<MenuCategory[]>(() => {
-    return categoryDefinitions
-      .filter((category) => category.active && category.kind === "dishes")
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map((category) => toMenuCategory(category.slug));
-  }, [categoryDefinitions]);
-  const activeDrinkCategories = useMemo<MenuCategory[]>(() => {
-    return categoryDefinitions
-      .filter((category) => category.active && category.kind === "drinks")
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map((category) => toMenuCategory(category.slug));
-  }, [categoryDefinitions]);
-  const activeAddonCategories = useMemo<MenuCategory[]>(() => {
-    return categoryDefinitions
-      .filter((category) => category.active && category.kind === "addons")
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map((category) => toMenuCategory(category.slug));
-  }, [categoryDefinitions]);
-  const toppingCategoryOptions = useMemo<Array<[MenuCategory, string]>>(
-    () =>
-      categoryDefinitions
-        .filter((category) => category.active && category.kind !== "addons")
-        .sort((left, right) => left.sortOrder - right.sortOrder)
-        .map((category) => [
-          toMenuCategory(category.slug),
-          categoryLabels[toMenuCategory(category.slug)] ??
-            humanizeCategorySlug(category.slug)
-        ]),
-    [categoryDefinitions, categoryLabels]
-  );
+  const groupedActiveCategories = useMemo(() => {
+    const next = {
+      dishes: [] as MenuCategory[],
+      drinks: [] as MenuCategory[],
+      addons: [] as MenuCategory[],
+      toppingOptions: [] as Array<[MenuCategory, string]>
+    };
+    const sortedActiveCategories = [...categoryDefinitions]
+      .filter((category) => category.active)
+      .sort((left, right) => left.sortOrder - right.sortOrder);
+
+    for (const category of sortedActiveCategories) {
+      const categorySlug = toMenuCategory(category.slug);
+
+      if (category.kind === "dishes") {
+        next.dishes.push(categorySlug);
+      } else if (category.kind === "drinks") {
+        next.drinks.push(categorySlug);
+      } else if (category.kind === "addons") {
+        next.addons.push(categorySlug);
+      }
+
+      if (category.kind !== "addons") {
+        next.toppingOptions.push([
+          categorySlug,
+          categoryLabels[categorySlug] ?? humanizeCategorySlug(category.slug)
+        ]);
+      }
+    }
+
+    return next;
+  }, [categoryDefinitions, categoryLabels]);
+  const activeDishCategories = groupedActiveCategories.dishes;
+  const activeDrinkCategories = groupedActiveCategories.drinks;
+  const activeAddonCategories = groupedActiveCategories.addons;
+  const toppingCategoryOptions = groupedActiveCategories.toppingOptions;
   const isDrinkCategory = useCallback(
     (category: MenuCategory) => activeDrinkCategories.includes(category),
     [activeDrinkCategories]
@@ -1176,25 +1223,26 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     Record<string, RecommendationSmartSuggestion[]>
   >(() => {
     const availableItems = items.filter((item) => item.available);
-    const pickBestItemForCategory = (category: MenuCategory) =>
-      availableItems
-        .filter((item) => item.draftCategory === category)
-        .sort((left, right) => {
-          const leftScore =
-            Number(left.draftBadges.includes("most_popular")) * 4 +
-            Number(left.draftBadges.includes("new")) * 2 +
-            Number(Boolean(left.draftImage && left.draftShowImage));
-          const rightScore =
-            Number(right.draftBadges.includes("most_popular")) * 4 +
-            Number(right.draftBadges.includes("new")) * 2 +
-            Number(Boolean(right.draftImage && right.draftShowImage));
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+    const availableCategories = new Set<MenuCategory>();
+    const bestAvailableItemByCategory = new Map<MenuCategory, EditableMenuItem>();
+    const getItemSuggestionScore = (item: EditableMenuItem) =>
+      Number(item.draftBadges.includes("most_popular")) * 4 +
+      Number(item.draftBadges.includes("new")) * 2 +
+      Number(Boolean(item.draftImage && item.draftShowImage));
 
-          return rightScore - leftScore;
-        })[0] ?? null;
+    for (const item of availableItems) {
+      availableCategories.add(item.draftCategory);
+      const currentBest = bestAvailableItemByCategory.get(item.draftCategory);
+
+      if (!currentBest || getItemSuggestionScore(item) > getItemSuggestionScore(currentBest)) {
+        bestAvailableItemByCategory.set(item.draftCategory, item);
+      }
+    }
 
     return Object.fromEntries(
       recommendationRules.map((rule) => {
-        const triggerItem = items.find((item) => item.id === rule.triggerItemId);
+        const triggerItem = itemsById.get(rule.triggerItemId);
         const triggerIsDrink = triggerItem
           ? isDrinkCategory(triggerItem.draftCategory)
           : false;
@@ -1203,20 +1251,25 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
             ? [...activeDishCategories, ...activeDrinkCategories]
             : [...activeDrinkCategories, ...activeDishCategories]
           : [...activeDishCategories, ...activeDrinkCategories];
-        const candidateCategories = orderedCandidates.filter(
-          (category, index, current) =>
-            current.indexOf(category) === index &&
-            category !== triggerItem?.draftCategory
-        );
+        const seenCandidateCategories = new Set<MenuCategory>();
+        const candidateCategories: MenuCategory[] = [];
+
+        for (const category of orderedCandidates) {
+          if (
+            seenCandidateCategories.has(category) ||
+            category === triggerItem?.draftCategory
+          ) {
+            continue;
+          }
+
+          seenCandidateCategories.add(category);
+          candidateCategories.push(category);
+        }
 
         const nextSuggestions: RecommendationSmartSuggestion[] = [];
 
         for (const category of candidateCategories) {
-          const hasCategoryItems = availableItems.some(
-            (item) => item.draftCategory === category
-          );
-
-          if (!hasCategoryItems) {
+          if (!availableCategories.has(category)) {
             continue;
           }
 
@@ -1228,7 +1281,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
             suggestedCategory: category
           });
 
-          const bestItem = pickBestItemForCategory(category);
+          const bestItem = bestAvailableItemByCategory.get(category) ?? null;
 
           if (bestItem) {
             nextSuggestions.push({
@@ -1264,95 +1317,102 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         .replace(/\s+/g, " ")
         .replace(/[^\p{L}\p{N}\s]/gu, "")
         .trim();
-    const availableItems = items.filter((item) => item.available);
-    const unavailableDishes = items
-      .filter(
-        (item) =>
-          !item.available && !isDrinkCategory(item.draftCategory)
-      )
-      .slice(0, 3);
-    const unavailableDrinks = items
-      .filter(
-        (item) =>
-          !item.available && isDrinkCategory(item.draftCategory)
-      )
-      .slice(0, 3);
-    const availableDishes = availableItems.filter(
-      (item) => !isDrinkCategory(item.draftCategory)
-    );
-    const availableDrinks = availableItems.filter((item) =>
-      isDrinkCategory(item.draftCategory)
-    );
-    const dishesWithoutDescription = availableDishes
-      .filter(
-        (item) =>
-          !item.draftDescriptionHe.trim() && !item.draftDescriptionEn.trim()
-      )
-      .slice(0, 3);
-    const drinksWithoutDescription = availableDrinks
-      .filter(
-        (item) =>
-          !item.draftDescriptionHe.trim() && !item.draftDescriptionEn.trim()
-      )
-      .slice(0, 3);
-    const availableDesserts = availableItems.filter(
-      (item) => item.draftCategory === "desserts"
-    );
-    const itemsWithoutImage = availableItems.filter(
-      (item) => !item.draftImage.trim() || !item.draftShowImage
-    );
-    const imageDishes = itemsWithoutImage
-      .filter((item) => !isDrinkCategory(item.draftCategory))
-      .slice(0, 3);
-    const imageDrinks = itemsWithoutImage
-      .filter((item) => isDrinkCategory(item.draftCategory))
-      .slice(0, 3);
-    const itemsWithoutBadges = availableItems.filter(
-      (item) => (item.draftBadges ?? []).length === 0
-    );
-    const badgeDishes = itemsWithoutBadges
-      .filter((item) => !isDrinkCategory(item.draftCategory))
-      .slice(0, 3);
-    const badgeDrinks = itemsWithoutBadges
-      .filter((item) => isDrinkCategory(item.draftCategory))
-      .slice(0, 3);
-    const hiddenImageDishes = availableDishes
-      .filter((item) => item.draftImage.trim() && !item.draftShowImage)
-      .slice(0, 3);
-    const hiddenImageDrinks = availableDrinks
-      .filter((item) => item.draftImage.trim() && !item.draftShowImage)
-      .slice(0, 3);
-    const drinksWithoutVolumeOptions = availableDrinks
-      .filter((item) => !item.draftVolumeOptionsText.trim())
-      .slice(0, 3);
-    const drinksWithoutHighlight = availableDrinks
-      .filter(
-        (item) =>
-          !(item.draftBadges ?? []).includes("most_popular") &&
-          !(item.draftBadges ?? []).includes("new")
-      )
-      .slice(0, 3);
     const topDishNames = insightStats.topDish
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
-    const topDishesMissingBadge = availableDishes
-      .filter((item) => {
-        const normalizedName = normalizeAdviceName(getEditorItemDisplayName(item));
-        return (
-          topDishNames.some(
-            (topDishName) => normalizeAdviceName(topDishName) === normalizedName
-          ) && !(item.draftBadges ?? []).includes("most_popular")
-        );
-      })
-      .slice(0, 3);
+    const normalizedTopDishNames = new Set(topDishNames.map(normalizeAdviceName));
+    const availableItems: EditableMenuItem[] = [];
+    const availableDishes: EditableMenuItem[] = [];
+    const availableDrinks: EditableMenuItem[] = [];
+    const availableDesserts: EditableMenuItem[] = [];
+    const unavailableDishes: EditableMenuItem[] = [];
+    const unavailableDrinks: EditableMenuItem[] = [];
+    const dishesWithoutDescription: EditableMenuItem[] = [];
+    const drinksWithoutDescription: EditableMenuItem[] = [];
+    const imageDishes: EditableMenuItem[] = [];
+    const imageDrinks: EditableMenuItem[] = [];
+    const badgeDishes: EditableMenuItem[] = [];
+    const badgeDrinks: EditableMenuItem[] = [];
+    const hiddenImageDishes: EditableMenuItem[] = [];
+    const hiddenImageDrinks: EditableMenuItem[] = [];
+    const drinksWithoutVolumeOptions: EditableMenuItem[] = [];
+    const drinksWithoutHighlight: EditableMenuItem[] = [];
+    const topDishesMissingBadge: EditableMenuItem[] = [];
+    const availableDishCategories = new Set<MenuCategory>();
+    const pushLimited = (collection: EditableMenuItem[], item: EditableMenuItem) => {
+      if (collection.length < 3) {
+        collection.push(item);
+      }
+    };
+
+    for (const item of items) {
+      const itemIsDrink = isDrinkCategory(item.draftCategory);
+      const hasDescription =
+        item.draftDescriptionHe.trim().length > 0 || item.draftDescriptionEn.trim().length > 0;
+      const hasVisibleImage = item.draftImage.trim().length > 0 && item.draftShowImage;
+      const hasAnyImage = item.draftImage.trim().length > 0;
+      const badges = item.draftBadges ?? [];
+      const hasHighlight =
+        badges.includes("most_popular") || badges.includes("new");
+
+      if (!item.available) {
+        pushLimited(itemIsDrink ? unavailableDrinks : unavailableDishes, item);
+        continue;
+      }
+
+      availableItems.push(item);
+
+      if (itemIsDrink) {
+        availableDrinks.push(item);
+      } else {
+        availableDishes.push(item);
+        availableDishCategories.add(item.draftCategory);
+      }
+
+      if (item.draftCategory === "desserts") {
+        availableDesserts.push(item);
+      }
+
+      if (!hasDescription) {
+        pushLimited(itemIsDrink ? drinksWithoutDescription : dishesWithoutDescription, item);
+      }
+
+      if (!hasVisibleImage) {
+        pushLimited(itemIsDrink ? imageDrinks : imageDishes, item);
+      }
+
+      if (badges.length === 0) {
+        pushLimited(itemIsDrink ? badgeDrinks : badgeDishes, item);
+      }
+
+      if (hasAnyImage && !item.draftShowImage) {
+        pushLimited(itemIsDrink ? hiddenImageDrinks : hiddenImageDishes, item);
+      }
+
+      if (itemIsDrink && !item.draftVolumeOptionsText.trim()) {
+        pushLimited(drinksWithoutVolumeOptions, item);
+      }
+
+      if (itemIsDrink && !hasHighlight) {
+        pushLimited(drinksWithoutHighlight, item);
+      }
+
+      if (
+        !itemIsDrink &&
+        !badges.includes("most_popular") &&
+        normalizedTopDishNames.has(normalizeAdviceName(getEditorItemDisplayName(item)))
+      ) {
+        pushLimited(topDishesMissingBadge, item);
+      }
+    }
     const primaryDishCategory = activeDishCategories[0] ?? null;
     const secondaryDishCategory = activeDishCategories[1] ?? null;
     const startersAvailable = primaryDishCategory
-      ? availableDishes.some((item) => item.draftCategory === primaryDishCategory)
+      ? availableDishCategories.has(primaryDishCategory)
       : true;
     const mainsAvailable = secondaryDishCategory
-      ? availableDishes.some((item) => item.draftCategory === secondaryDishCategory)
+      ? availableDishCategories.has(secondaryDishCategory)
       : true;
     const hasEnabledBusinessLunch = businessLunches.some(
       (businessLunch) => businessLunch.enabled
@@ -1705,6 +1765,47 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     [menuOpen, categoryManagerOpen, toppingsManagerOpen]
   );
   const shouldLoadAnalytics = useMemo(() => dashboardOpen, [dashboardOpen]);
+  const markLocalMutationCooldown = useCallback(() => {
+    localMutationCooldownUntilRef.current =
+      Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
+  }, []);
+  const patchMenuSettings = useCallback(
+    async (payload: Record<string, unknown>) => {
+      const fingerprint = JSON.stringify(payload);
+
+      if (
+        menuSettingsPatchInFlightFingerprintRef.current === fingerprint ||
+        lastMenuSettingsPatchFingerprintRef.current === fingerprint
+      ) {
+        return { skipped: true as const, response: null };
+      }
+
+      menuSettingsPatchInFlightFingerprintRef.current = fingerprint;
+
+      try {
+        const response = await fetch("/api/menu-settings", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-admin-secondary-login": secondaryCredentials?.login ?? "",
+            "x-admin-secondary-password": secondaryCredentials?.password ?? ""
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+          lastMenuSettingsPatchFingerprintRef.current = fingerprint;
+        }
+
+        return { skipped: false as const, response };
+      } finally {
+        if (menuSettingsPatchInFlightFingerprintRef.current === fingerprint) {
+          menuSettingsPatchInFlightFingerprintRef.current = null;
+        }
+      }
+    },
+    [secondaryCredentials?.login, secondaryCredentials?.password]
+  );
 
   useEffect(() => {
     if (!isAuthorized) {
@@ -1753,6 +1854,20 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
     async function load() {
       if (cancelled || loadingInFlight) {
+        return;
+      }
+
+      const cooldownRemainingMs =
+        localMutationCooldownUntilRef.current - Date.now();
+
+      if (cooldownRemainingMs > 0) {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
+
+        timeoutId = window.setTimeout(() => {
+          void load();
+        }, cooldownRemainingMs);
         return;
       }
 
@@ -1895,6 +2010,8 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           setPromotions(nextPromotions);
           setPromotionMessage(null);
           setRecommendationRules(nextRecommendationRules);
+          latestRecommendationRulesRef.current = nextRecommendationRules;
+          lastPersistedRecommendationRulesRef.current = nextRecommendationRules;
           setRecommendationRulesMessage(null);
           setWorkingHoursRules(
             Array.isArray(settings.workingHoursRules) ? settings.workingHoursRules : []
@@ -2080,9 +2197,19 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         return;
       }
 
+      const cooldownRemainingMs =
+        localMutationCooldownUntilRef.current - Date.now();
+
       if (timeoutId !== null) {
         window.clearTimeout(timeoutId);
         timeoutId = null;
+      }
+
+      if (cooldownRemainingMs > 0) {
+        timeoutId = window.setTimeout(() => {
+          void load();
+        }, cooldownRemainingMs);
+        return;
       }
 
       void load();
@@ -2382,26 +2509,19 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setKitchenLoadWarningEnabled(nextValue);
     setKitchenLoadWarningSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        kitchenLoadWarningEnabled: nextValue
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      kitchenLoadWarningEnabled: nextValue
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
       setKitchenLoadWarningEnabled(!nextValue);
       setMessage("Failed to update the kitchen warning.");
       setKitchenLoadWarningSaving(false);
       return;
     }
 
+    markLocalMutationCooldown();
     setKitchenLoadWarningSaving(false);
   }
 
@@ -2464,38 +2584,31 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setBusinessLunches(normalizedBusinessLunches);
     setBusinessLunchSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        businessLunches: normalizedBusinessLunches.map((businessLunch) => ({
-          id: businessLunch.id,
-          enabled: businessLunch.enabled,
-          text: businessLunch.text,
-          categories: businessLunch.categories,
-          days: businessLunch.days,
-          startsFrom: businessLunch.enabled
-            ? toPromotionIsoTimeValue(businessLunch.startsFrom)
-            : null,
-          until: businessLunch.enabled
-            ? toPromotionIsoTimeValue(businessLunch.until)
-            : null
-        }))
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      businessLunches: normalizedBusinessLunches.map((businessLunch) => ({
+        id: businessLunch.id,
+        enabled: businessLunch.enabled,
+        text: businessLunch.text,
+        categories: businessLunch.categories,
+        days: businessLunch.days,
+        startsFrom: businessLunch.enabled
+          ? toPromotionIsoTimeValue(businessLunch.startsFrom)
+          : null,
+        until: businessLunch.enabled
+          ? toPromotionIsoTimeValue(businessLunch.until)
+          : null
+      }))
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
       setBusinessLunches(previousBusinessLunches);
       setBusinessLunchMessage("Failed to update business lunch.");
       setBusinessLunchSaving(false);
       return false;
     }
 
+    markLocalMutationCooldown();
     setBusinessLunchSaving(false);
     setBusinessLunchMessage(null);
     return true;
@@ -2541,70 +2654,39 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setPromotions(normalizedPromotions);
     setPromotionSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        promotions: normalizedPromotions.map((promotion) => ({
-          id: promotion.id,
-          enabled: promotion.enabled,
-          text: promotion.text,
-          categories: promotion.categories,
-          days: promotion.days,
-          discountPercent: normalizeDiscountPercentInput(promotion.discountPercent),
-          startsFrom: promotion.enabled
-            ? toPromotionIsoTimeValue(promotion.startsFrom)
-            : null,
-          until: promotion.enabled ? toPromotionIsoTimeValue(promotion.until) : null
-        }))
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      promotions: normalizedPromotions.map((promotion) => ({
+        id: promotion.id,
+        enabled: promotion.enabled,
+        text: promotion.text,
+        categories: promotion.categories,
+        days: promotion.days,
+        discountPercent: normalizeDiscountPercentInput(promotion.discountPercent),
+        startsFrom: promotion.enabled
+          ? toPromotionIsoTimeValue(promotion.startsFrom)
+          : null,
+        until: promotion.enabled ? toPromotionIsoTimeValue(promotion.until) : null
+      }))
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
       setPromotions(previousPromotions);
       setPromotionMessage("Failed to update promo.");
       setPromotionSaving(false);
       return false;
     }
 
+    markLocalMutationCooldown();
     setPromotionSaving(false);
     setPromotionMessage(null);
     return true;
   }
 
-  async function saveRecommendationRules(
-    nextRecommendationRules: EditableRecommendationRule[]
+  async function persistRecommendationRules(
+    normalizedRecommendationRules: EditableRecommendationRule[]
   ) {
-    const previousRecommendationRules = recommendationRules;
-    const normalizedRecommendationRules: EditableRecommendationRule[] =
-      nextRecommendationRules
-      .map((recommendation, index): EditableRecommendationRule => ({
-        ...recommendation,
-        id: recommendation.id || `recommendation-${index + 1}`,
-        triggerItemId: recommendation.triggerItemId.trim(),
-        suggestedItemId: recommendation.suggestedItemId.trim(),
-        suggestedCategory: recommendation.suggestedCategory
-          ? recommendation.suggestedCategory
-          : ""
-      }))
-      .filter(
-        (recommendation) =>
-          recommendation.triggerItemId &&
-          (
-            recommendation.suggestedType === "category"
-              ? Boolean(recommendation.suggestedCategory)
-              : Boolean(recommendation.suggestedItemId)
-          ) &&
-          !(
-            recommendation.suggestedType === "item" &&
-            recommendation.triggerItemId === recommendation.suggestedItemId
-          )
-      );
+    const previousRecommendationRules = lastPersistedRecommendationRulesRef.current;
 
     const recommendationCountsByTrigger = normalizedRecommendationRules.reduce<
       Record<string, number>
@@ -2627,47 +2709,82 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return false;
     }
 
-    setRecommendationRulesMessage(null);
-    setRecommendationRules(normalizedRecommendationRules);
     setRecommendationRulesSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        recommendations: normalizedRecommendationRules.map((recommendation) => ({
-          id: recommendation.id,
-          enabled: recommendation.enabled,
-          triggerItemId: recommendation.triggerItemId,
-          suggestedType: recommendation.suggestedType,
-          suggestedItemId:
-            recommendation.suggestedType === "item"
-              ? recommendation.suggestedItemId
-              : "",
-          suggestedCategory:
-            recommendation.suggestedType === "category"
-              ? recommendation.suggestedCategory
-              : null
-        }))
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      recommendations: normalizedRecommendationRules.map((recommendation) => ({
+        id: recommendation.id,
+        enabled: recommendation.enabled,
+        triggerItemId: recommendation.triggerItemId,
+        suggestedType: recommendation.suggestedType,
+        suggestedItemId:
+          recommendation.suggestedType === "item"
+            ? recommendation.suggestedItemId
+            : "",
+        suggestedCategory:
+          recommendation.suggestedType === "category"
+            ? recommendation.suggestedCategory
+            : null
+      }))
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
+      latestRecommendationRulesRef.current = previousRecommendationRules;
       setRecommendationRules(previousRecommendationRules);
       setRecommendationRulesMessage("Failed to update recommendations.");
       setRecommendationRulesSaving(false);
       return false;
     }
 
+    lastPersistedRecommendationRulesRef.current = normalizedRecommendationRules;
+    markLocalMutationCooldown();
     setRecommendationRulesSaving(false);
     setRecommendationRulesMessage(null);
     return true;
   }
+
+  const scheduleRecommendationRulesSave = useCallback(
+    (nextRecommendationRules: EditableRecommendationRule[]) => {
+      const normalizedRecommendationRules =
+        normalizeRecommendationRulesInput(nextRecommendationRules);
+      const recommendationCountsByTrigger = normalizedRecommendationRules.reduce<
+        Record<string, number>
+      >((acc, recommendation) => {
+        acc[recommendation.triggerItemId] =
+          (acc[recommendation.triggerItemId] ?? 0) + 1;
+        return acc;
+      }, {});
+      const overLimitTriggerItemId = Object.entries(
+        recommendationCountsByTrigger
+      ).find(([, count]) => count > MAX_RECOMMENDATIONS_PER_TRIGGER_ITEM)?.[0];
+
+      if (overLimitTriggerItemId) {
+        const triggerItem = items.find((item) => item.id === overLimitTriggerItemId);
+        setRecommendationRulesMessage(
+          triggerItem
+            ? `You can keep up to 3 recommendations for ${getEditorItemDisplayName(triggerItem)}.`
+            : "You can keep up to 3 recommendations per dish."
+        );
+        return;
+      }
+
+      setRecommendationRulesMessage(null);
+      latestRecommendationRulesRef.current = normalizedRecommendationRules;
+      setRecommendationRules(normalizedRecommendationRules);
+      setRecommendationRulesSaving(true);
+
+      if (recommendationRulesSaveTimeoutRef.current !== null) {
+        window.clearTimeout(recommendationRulesSaveTimeoutRef.current);
+      }
+
+      recommendationRulesSaveTimeoutRef.current = window.setTimeout(() => {
+        recommendationRulesSaveTimeoutRef.current = null;
+        void persistRecommendationRules(latestRecommendationRulesRef.current);
+      }, RECOMMENDATION_RULES_SAVE_DEBOUNCE_MS);
+    },
+    [items]
+  );
 
   const openNewBusinessLunchModal = useCallback(
     function openNewBusinessLunchModal() {
@@ -2878,9 +2995,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           };
         });
 
-      void saveRecommendationRules(nextRecommendationRules);
+      scheduleRecommendationRulesSave(nextRecommendationRules);
     },
-    [recommendationRules]
+    [recommendationRules, scheduleRecommendationRulesSave]
   );
 
   const addRecommendationRule = useCallback(function addRecommendationRule() {
@@ -2889,7 +3006,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
-    void saveRecommendationRules([
+    scheduleRecommendationRulesSave([
       ...recommendationRules,
       {
         ...createEditableRecommendationRule(),
@@ -2899,15 +3016,15 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
         suggestedCategory: ""
       }
     ]);
-  }, [items, recommendationRules]);
+  }, [items, recommendationRules, scheduleRecommendationRulesSave]);
 
   const deleteRecommendationRule = useCallback(
     function deleteRecommendationRule(ruleId: string) {
-      void saveRecommendationRules(
+      scheduleRecommendationRulesSave(
         recommendationRules.filter((recommendation) => recommendation.id !== ruleId)
       );
     },
-    [recommendationRules]
+    [recommendationRules, scheduleRecommendationRulesSave]
   );
 
   const applyRecommendationSmartSuggestion = useCallback(
@@ -2930,9 +3047,9 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
           : recommendation
       );
 
-      void saveRecommendationRules(nextRecommendationRules);
+      scheduleRecommendationRulesSave(nextRecommendationRules);
     },
-    [recommendationRules]
+    [recommendationRules, scheduleRecommendationRulesSave]
   );
 
   const openEditPromotionModal = useCallback(
@@ -3081,21 +3198,13 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setKitchenOpenUntil(normalizedTime);
     setKitchenOpenSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        kitchenOpenEnabled: nextEnabled,
-        kitchenOpenUntil: nextEnabled ? isoValue : null
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      kitchenOpenEnabled: nextEnabled,
+      kitchenOpenUntil: nextEnabled ? isoValue : null
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
       setKitchenOpenEnabled(previousEnabled);
       setKitchenOpenUntil(previousTime);
       setMessage("Failed to update kitchen open settings.");
@@ -3103,6 +3212,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
+    markLocalMutationCooldown();
     setKitchenOpenSaving(false);
     if (nextEnabled) {
       setMessage(`Kitchen open time saved until ${normalizedTime}.`);
@@ -3139,21 +3249,13 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     setBarOpenUntil(normalizedTime);
     setBarOpenSaving(true);
 
-    const response = await fetch("/api/menu-settings", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "x-admin-secondary-login": secondaryCredentials?.login ?? "",
-        "x-admin-secondary-password": secondaryCredentials?.password ?? ""
-      },
-      body: JSON.stringify({
-        restaurantSlug,
-        barOpenEnabled: nextEnabled,
-        barOpenUntil: nextEnabled ? isoValue : null
-      })
+    const { skipped, response } = await patchMenuSettings({
+      restaurantSlug,
+      barOpenEnabled: nextEnabled,
+      barOpenUntil: nextEnabled ? isoValue : null
     });
 
-    if (!response.ok) {
+    if (!skipped && !response?.ok) {
       setBarOpenEnabled(previousEnabled);
       setBarOpenUntil(previousTime);
       setMessage("Failed to update bar open settings.");
@@ -3161,6 +3263,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
+    markLocalMutationCooldown();
     setBarOpenSaving(false);
     if (nextEnabled) {
       setMessage(`Bar open time saved until ${normalizedTime}.`);
@@ -3292,6 +3395,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     }
 
     const updatedItem = (await response.json()) as MenuItem;
+    markLocalMutationCooldown();
     setItems((current) =>
       current.map((item) =>
         item.id === itemId
@@ -3401,6 +3505,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     }
 
     const createdItem = (await response.json()) as MenuItem;
+    markLocalMutationCooldown();
     setItems((current) => [toEditableItem(createdItem), ...current]);
     setShowCreateForm(false);
     setNewItem({
@@ -3440,6 +3545,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
       return;
     }
 
+    markLocalMutationCooldown();
     setItems((current) => current.filter((item) => item.id !== itemId));
     setMessage("Dish deleted.");
   }
@@ -3736,12 +3842,18 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       const saved = (await response.json()) as MenuCategoryDefinition[];
       const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
+      markLocalMutationCooldown();
       setCategoryDefinitions(normalizedSaved);
       setCategoriesSaving(false);
       setCategoriesMessage("Categories saved.");
       return { saved: normalizedSaved, errorMessage: null };
     },
-    [restaurantSlug, secondaryCredentials?.login, secondaryCredentials?.password]
+    [
+      markLocalMutationCooldown,
+      restaurantSlug,
+      secondaryCredentials?.login,
+      secondaryCredentials?.password
+    ]
   );
 
   const upsertCategoryDefinition = useCallback(
@@ -3795,6 +3907,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       const saved = (await response.json()) as MenuCategoryDefinition[];
       const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
+      markLocalMutationCooldown();
       setCategoryDefinitions(normalizedSaved);
       setCategoriesSaving(false);
       setCategoriesMessage("Categories saved.");
@@ -3802,6 +3915,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     },
     [
       categoryDefinitions,
+      markLocalMutationCooldown,
       restaurantSlug,
       secondaryCredentials?.login,
       secondaryCredentials?.password
@@ -3849,6 +3963,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
 
       const saved = (await response.json()) as MenuCategoryDefinition[];
       const normalizedSaved = normalizeEditorCategoryDefinitions(saved);
+      markLocalMutationCooldown();
       setCategoryDefinitions(normalizedSaved);
       setCategoriesSaving(false);
       setCategoriesMessage("Category deleted.");
@@ -3856,6 +3971,7 @@ export function MenuEditor({ onOrderModeChange }: MenuEditorProps = {}) {
     },
     [
       categoryDefinitions,
+      markLocalMutationCooldown,
       restaurantSlug,
       secondaryCredentials?.login,
       secondaryCredentials?.password

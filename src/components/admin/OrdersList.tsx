@@ -19,8 +19,8 @@ const WAITER_CALLS_STORAGE_KEY = "admin-waiter-calls-v2";
 const NEW_HIGHLIGHT_MS = 2 * 60 * 1000;
 const COOKED_HIGHLIGHT_MS = 5 * 60 * 1000;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
-const ACTIVE_POLL_MS = 4_000;
-const HIDDEN_POLL_MS = 12_000;
+const ACTIVE_POLL_MS = 6_000;
+const HIDDEN_POLL_MS = 18_000;
 const INITIAL_RENDERED_ORDERS = 24;
 const RENDER_ORDERS_CHUNK = 16;
 const SERVER_PAGE_SIZE = 80;
@@ -30,6 +30,7 @@ const ORDERS_FILTERS_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const ORDERS_CACHE_KEY = "admin-orders-cache-v1";
 const ORDERS_FILTERS_CACHE_KEY = "admin-orders-filters-v1";
 const REALTIME_RELOAD_DEBOUNCE_MS = 250;
+const LOCAL_MUTATION_REFETCH_COOLDOWN_MS = 2_500;
 
 const statusLabels = {
   new: "New",
@@ -348,6 +349,7 @@ export function OrdersList({
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const loadOrdersRef = useRef<(() => Promise<void>) | null>(null);
+  const localMutationCooldownUntilRef = useRef(0);
 
   useEffect(() => {
     if (!isCounterMode) {
@@ -455,6 +457,11 @@ export function OrdersList({
         return;
       }
 
+      if (Date.now() < localMutationCooldownUntilRef.current) {
+        scheduleNextLoad();
+        return;
+      }
+
       if (document.visibilityState === "hidden") {
         scheduleNextLoad();
         return;
@@ -539,6 +546,9 @@ export function OrdersList({
       }
 
       debounceId = window.setTimeout(() => {
+        if (Date.now() < localMutationCooldownUntilRef.current) {
+          return;
+        }
         void loadOrdersRef.current?.();
       }, REALTIME_RELOAD_DEBOUNCE_MS);
     };
@@ -610,6 +620,7 @@ export function OrdersList({
     }
 
     const updatedOrder = (await response.json()) as Order;
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (
@@ -648,6 +659,7 @@ export function OrdersList({
     }
 
     const updatedOrder = (await response.json()) as Order;
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (updatedOrder.status === "served" || updatedOrder.status === "cancelled") {
@@ -676,6 +688,7 @@ export function OrdersList({
     }
 
     const updatedOrder = (await response.json()) as Order;
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     setCurrentTimestamp(Date.now());
     setOrders((current) =>
       current.map((order) => (order.id === orderId ? updatedOrder : order))
@@ -700,6 +713,7 @@ export function OrdersList({
     }
 
     const updatedOrder = (await response.json()) as Order;
+    localMutationCooldownUntilRef.current = Date.now() + LOCAL_MUTATION_REFETCH_COOLDOWN_MS;
     setCurrentTimestamp(Date.now());
     setOrders((current) => {
       if (updatedOrder.status === "served" || updatedOrder.status === "cancelled") {

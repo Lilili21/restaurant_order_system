@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminAccess } from "@/lib/admin-auth";
 import {
+  getMenuSettingsSubset,
   getMenuSettings,
   isCounterModeAllowedForRestaurant,
   updateMenuSettings
@@ -72,6 +73,10 @@ export async function GET(request: NextRequest) {
   );
   const includeTableTokens =
     request.nextUrl.searchParams.get("includeTableTokens") === "1";
+  const needsTableData =
+    includeTableTokens ||
+    requestedFields.has("tableCount") ||
+    requestedFields.has("tableTokens");
 
   if (includeTableTokens) {
     const unauthorized = await requireAdminAccess(request, "secondary");
@@ -90,6 +95,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { message: "restaurantSlug is required" },
       { status: 400 }
+    );
+  }
+
+  if (requestedFields.size > 0 && !needsTableData) {
+    return NextResponse.json(
+      await getMenuSettingsSubset(restaurantSlug, [...requestedFields])
     );
   }
 
@@ -123,10 +134,11 @@ export async function GET(request: NextRequest) {
   };
 
   if (requestedFields.size > 0) {
-    const filteredPayload = Object.fromEntries(
-      Object.entries(payload).filter(([key]) => requestedFields.has(key))
+    return NextResponse.json(
+      Object.fromEntries(
+        Object.entries(payload).filter(([key]) => requestedFields.has(key))
+      )
     );
-    return NextResponse.json(filteredPayload);
   }
 
   return NextResponse.json(payload);

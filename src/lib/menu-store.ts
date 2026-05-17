@@ -136,6 +136,8 @@ declare global {
   // eslint-disable-next-line no-var
   var __menuStoreCache: MenuStoreCacheEntry | undefined;
   // eslint-disable-next-line no-var
+  var __menuStoreByRestaurantCache: Map<string, MenuStoreCacheEntry> | undefined;
+  // eslint-disable-next-line no-var
   var __availableMenuCache: Map<string, AvailableMenuCacheEntry> | undefined;
   // eslint-disable-next-line no-var
   var __tableSessionCache: Map<string, TableSessionCacheEntry> | undefined;
@@ -184,6 +186,29 @@ function setMenuStoreCache(items: MenuItem[]) {
     items: cloneMenuItems(items),
     expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
   };
+}
+
+function getMenuStoreByRestaurantCache() {
+  globalThis.__menuStoreByRestaurantCache ??= new Map();
+
+  for (const [key, entry] of globalThis.__menuStoreByRestaurantCache.entries()) {
+    if (entry.expiresAt <= Date.now()) {
+      globalThis.__menuStoreByRestaurantCache.delete(key);
+    }
+  }
+
+  return globalThis.__menuStoreByRestaurantCache;
+}
+
+function getMenuStoreCacheForRestaurant(restaurantSlug: string) {
+  return getMenuStoreByRestaurantCache().get(restaurantSlug.trim().toLowerCase());
+}
+
+function setMenuStoreCacheForRestaurant(restaurantSlug: string, items: MenuItem[]) {
+  getMenuStoreByRestaurantCache().set(restaurantSlug.trim().toLowerCase(), {
+    items: cloneMenuItems(items),
+    expiresAt: Date.now() + MENU_STORE_CACHE_TTL_MS
+  });
 }
 
 function getRestaurantLookupCache() {
@@ -401,21 +426,32 @@ function toLegacyCompatibleMenuItemRow(
   return legacyCompatibleRow;
 }
 
-async function loadMenuItemsFromSupabase() {
+async function loadMenuItemsFromSupabase(restaurantSlug?: string) {
   const supabase = getSupabaseAdminClient();
 
   if (!supabase) {
     return null;
   }
 
-  const restaurantSlugMap = await getRestaurantSlugMap(supabase);
-  const { data, error } = await supabase
+  const restaurant = restaurantSlug
+    ? await getRestaurantIdBySlug(supabase, restaurantSlug)
+    : null;
+  const restaurantSlugMap = restaurant
+    ? new Map([[restaurant.id, restaurant.slug] as const])
+    : await getRestaurantSlugMap(supabase);
+  let query = supabase
     .from("menu_items")
     .select(
       "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, price_agorot, image, show_image, available, badges, volume_options, sort_order"
     )
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+
+  if (restaurant) {
+    query = query.eq("restaurant_id", restaurant.id);
+  }
+
+  const { data, error } = await query;
 
   let rows: MenuItemRow[] = [];
 
@@ -424,13 +460,19 @@ async function loadMenuItemsFromSupabase() {
       throw new Error(error.message);
     }
 
-    const legacyResult = await supabase
+    let legacyQuery = supabase
       .from("menu_items")
       .select(
         "id, restaurant_id, category, name_he, name_en, name_ru, description_he, description_en, description_ru, price, image, show_image, available, badges, volume_options, sort_order"
       )
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
+
+    if (restaurant) {
+      legacyQuery = legacyQuery.eq("restaurant_id", restaurant.id);
+    }
+
+    const legacyResult = await legacyQuery;
 
     if (legacyResult.error) {
       throw new Error(legacyResult.error.message);
@@ -478,17 +520,26 @@ function getTableSessionCache() {
 function clearDerivedMenuCaches(restaurantSlug?: string) {
   const availableMenuCache = getAvailableMenuCache();
   const tableSessionCache = getTableSessionCache();
+  const byRestaurantCache = getMenuStoreByRestaurantCache();
 
   if (!restaurantSlug) {
     availableMenuCache.clear();
     tableSessionCache.clear();
+    byRestaurantCache.clear();
     return;
   }
 
+  const normalizedRestaurantSlug = restaurantSlug.trim().toLowerCase();
+
   availableMenuCache.delete(restaurantSlug);
+  availableMenuCache.delete(normalizedRestaurantSlug);
+  byRestaurantCache.delete(normalizedRestaurantSlug);
 
   for (const key of tableSessionCache.keys()) {
-    if (key.startsWith(`${restaurantSlug}:`)) {
+    if (
+      key.startsWith(`${restaurantSlug}:`) ||
+      key.startsWith(`${normalizedRestaurantSlug}:`)
+    ) {
       tableSessionCache.delete(key);
     }
   }
@@ -666,6 +717,42 @@ async function loadMenuItemsAsync(): Promise<MenuItem[]> {
   }
 }
 
+async function loadMenuItemsForRestaurantAsync(
+  restaurantSlug: string
+): Promise<MenuItem[]> {
+  const normalizedRestaurantSlug = restaurantSlug.trim().toLowerCase();
+  const cached = getMenuStoreCacheForRestaurant(normalizedRestaurantSlug);
+
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneMenuItems(cached.items);
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const localItems = loadMenuItemsFromDisk().filter(
+      (item) => item.restaurantSlug.trim().toLowerCase() === normalizedRestaurantSlug
+    );
+    setMenuStoreCacheForRestaurant(normalizedRestaurantSlug, localItems);
+    return cloneMenuItems(localItems);
+  }
+
+  try {
+    const supabaseItems = (await loadMenuItemsFromSupabase(restaurantSlug)) ?? [];
+    const mergedItems = appendMissingRestaurantDefaults(supabaseItems).filter(
+      (item) => item.restaurantSlug.trim().toLowerCase() === normalizedRestaurantSlug
+    );
+    setMenuStoreCacheForRestaurant(normalizedRestaurantSlug, mergedItems);
+    return cloneMenuItems(mergedItems);
+  } catch {
+    const localItems = loadMenuItemsFromDisk().filter(
+      (item) => item.restaurantSlug.trim().toLowerCase() === normalizedRestaurantSlug
+    );
+    setMenuStoreCacheForRestaurant(normalizedRestaurantSlug, localItems);
+    return cloneMenuItems(localItems);
+  }
+}
+
 async function persistMenuItemsAsync(items: MenuItem[]) {
   const normalized = items.map((item) => normalizeMenuItem(item));
   const supabase = getSupabaseAdminClient();
@@ -746,10 +833,11 @@ function buildSessionCacheKey(restaurantSlug: string, tableToken: string) {
 }
 
 export async function getAllMenuItems(restaurantSlug?: string) {
-  const items = await loadMenuItemsAsync();
-  return items.filter((item) =>
-    restaurantSlug ? item.restaurantSlug === restaurantSlug : true
-  );
+  if (restaurantSlug) {
+    return loadMenuItemsForRestaurantAsync(restaurantSlug);
+  }
+
+  return loadMenuItemsAsync();
 }
 
 export async function getAvailableMenuByRestaurant(restaurantSlug: string) {

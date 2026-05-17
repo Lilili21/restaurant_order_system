@@ -112,6 +112,34 @@ export type MenuSettings = {
   tableTokens: Record<string, string>;
 };
 
+export type MenuSettingsResponsePayload = {
+  kitchenLoadWarningEnabled: boolean;
+  workingHoursRules: MenuSettings["workingHoursRules"];
+  workingHoursFrom: string | null;
+  workingHoursUntil: string | null;
+  happyHourEnabled: boolean;
+  happyHourText: string;
+  happyHourCategories: MenuCategory[];
+  happyHourDays: number[];
+  happyHourDiscountPercent: number;
+  happyHourStartsFrom: string | null;
+  happyHourUntil: string | null;
+  promotions: PromotionSettings[];
+  businessLunches: BusinessLunchSettings[];
+  recommendations: RecommendationRuleSettings[];
+  kitchenOpenEnabled: boolean;
+  kitchenOpenUntil: string | null;
+  barOpenEnabled: boolean;
+  barOpenUntil: string | null;
+  orderMode: RestaurantOrderMode;
+  contactRequirement: ContactRequirement;
+  requireOtp: boolean;
+  orderNumberPrefix: string;
+  showGuestOrderHistory: boolean;
+  tableCount: number;
+  tableTokens?: Record<string, string>;
+};
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const MENU_SETTINGS_PATH = path.join(DATA_DIR, "menu-settings.json");
 const MENU_SETTINGS_KEY = "menu-settings";
@@ -717,6 +745,39 @@ function applyMenuRuntimePolicies(settings: MenuSettings, restaurantSlug?: strin
   return applyOpenTimersShiftPolicy(applyOrderModePolicy(settings, restaurantSlug));
 }
 
+function buildMenuSettingsResponsePayload(
+  settings: MenuSettings,
+  options?: { includeTableTokens?: boolean }
+): MenuSettingsResponsePayload {
+  return {
+    kitchenLoadWarningEnabled: settings.kitchenLoadWarningEnabled,
+    workingHoursRules: settings.workingHoursRules,
+    workingHoursFrom: settings.workingHoursFrom,
+    workingHoursUntil: settings.workingHoursUntil,
+    happyHourEnabled: settings.happyHourEnabled,
+    happyHourText: settings.happyHourText,
+    happyHourCategories: settings.happyHourCategories,
+    happyHourDays: settings.happyHourDays,
+    happyHourDiscountPercent: settings.happyHourDiscountPercent,
+    happyHourStartsFrom: settings.happyHourStartsFrom,
+    happyHourUntil: settings.happyHourUntil,
+    promotions: settings.promotions,
+    businessLunches: settings.businessLunches,
+    recommendations: settings.recommendations,
+    kitchenOpenEnabled: settings.kitchenOpenEnabled,
+    kitchenOpenUntil: settings.kitchenOpenUntil,
+    barOpenEnabled: settings.barOpenEnabled,
+    barOpenUntil: settings.barOpenUntil,
+    orderMode: settings.orderMode,
+    contactRequirement: settings.contactRequirement,
+    requireOtp: settings.requireOtp,
+    orderNumberPrefix: settings.orderNumberPrefix,
+    showGuestOrderHistory: settings.showGuestOrderHistory,
+    tableCount: settings.tableCount,
+    ...(options?.includeTableTokens ? { tableTokens: settings.tableTokens } : {})
+  };
+}
+
 function mapRestaurantSettingsRowToSettings(
   row: RestaurantSettingsRow | null | undefined
 ): Partial<MenuSettings> {
@@ -967,7 +1028,9 @@ async function getRestaurantSettingsFromSupabase(
     await Promise.all([
       supabase
         .from("restaurant_settings")
-        .select("*")
+        .select(
+          "restaurant_id, working_hours_from, working_hours_until, working_hours_rules, kitchen_load_warning_enabled, happy_hour_enabled, happy_hour_text, happy_hour_categories, happy_hour_days, happy_hour_discount_percent, happy_hour_starts_from, happy_hour_until, promotions, business_lunches, recommendations, kitchen_open_enabled, kitchen_open_until, bar_open_enabled, bar_open_until, order_mode, contact_requirement, require_otp, order_number_prefix, show_guest_order_history, updated_at"
+        )
         .eq("restaurant_id", restaurant.id)
         .maybeSingle(),
       supabase
@@ -1026,6 +1089,35 @@ async function getRestaurantSettingsFromSupabase(
   return normalized;
 }
 
+async function getRestaurantSettingsLiteFromSupabase(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantSlug: string
+) {
+  const restaurant = await getRestaurantIdBySlug(supabase, restaurantSlug);
+
+  if (!restaurant) {
+    return null;
+  }
+
+  const { data: settingsRow, error: settingsError } = await supabase
+    .from("restaurant_settings")
+    .select(
+      "restaurant_id, working_hours_from, working_hours_until, working_hours_rules, kitchen_load_warning_enabled, happy_hour_enabled, happy_hour_text, happy_hour_categories, happy_hour_days, happy_hour_discount_percent, happy_hour_starts_from, happy_hour_until, promotions, business_lunches, recommendations, kitchen_open_enabled, kitchen_open_until, bar_open_enabled, bar_open_until, order_mode, contact_requirement, require_otp, order_number_prefix, show_guest_order_history, updated_at"
+    )
+    .eq("restaurant_id", restaurant.id)
+    .maybeSingle();
+
+  if (settingsError) {
+    return null;
+  }
+
+  return normalizeSettings(
+    mapRestaurantSettingsRowToSettings(
+      (settingsRow ?? null) as RestaurantSettingsRow | null
+    )
+  );
+}
+
 async function getLegacyMenuSettingsFromSupabase(
   supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>
 ) {
@@ -1060,43 +1152,7 @@ async function persistRestaurantSettingsAsync(
     throw new Error(`Restaurant not found: ${restaurantSlug}`);
   }
 
-  const fullSettingsPayload = mapSettingsToRestaurantSettingsRow(restaurant.id, settings, {
-    includeAdvancedOrderSettings: true
-  });
-  const { error: upsertWithAdvancedSettingsError } = await supabase
-    .from("restaurant_settings")
-    .upsert(fullSettingsPayload, {
-      onConflict: "restaurant_id"
-    });
-  if (upsertWithAdvancedSettingsError) {
-    const missingAdvancedColumns =
-      upsertWithAdvancedSettingsError.message.includes("column") &&
-      (
-        upsertWithAdvancedSettingsError.message.includes("order_mode") ||
-        upsertWithAdvancedSettingsError.message.includes("contact_requirement") ||
-        upsertWithAdvancedSettingsError.message.includes("require_otp") ||
-        upsertWithAdvancedSettingsError.message.includes("order_number_prefix") ||
-        upsertWithAdvancedSettingsError.message.includes("show_guest_order_history")
-      ) &&
-      upsertWithAdvancedSettingsError.message.includes("does not exist");
-
-    if (!missingAdvancedColumns) {
-      throw new Error(`Supabase persist failed: ${upsertWithAdvancedSettingsError.message}`);
-    }
-
-    const legacySettingsPayload = mapSettingsToRestaurantSettingsRow(restaurant.id, settings, {
-      includeAdvancedOrderSettings: false
-    });
-    const { error: fallbackUpsertError } = await supabase
-      .from("restaurant_settings")
-      .upsert(legacySettingsPayload, {
-        onConflict: "restaurant_id"
-      });
-
-    if (fallbackUpsertError) {
-      throw new Error(`Supabase persist failed: ${fallbackUpsertError.message}`);
-    }
-  }
+  await persistRestaurantSettingsRowAsync(supabase, restaurant.id, settings);
 
   const { data: existingTableRows, error: existingTablesError } = await supabase
     .from("restaurant_tables")
@@ -1195,6 +1251,74 @@ async function persistRestaurantSettingsAsync(
   invalidateRestaurantsCache();
   setSettingsCache(syncedSettings, restaurantSlug);
   return syncedSettings;
+}
+
+async function persistRestaurantSettingsRowAsync(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdminClient>>,
+  restaurantId: string,
+  settings: MenuSettings
+) {
+  const fullSettingsPayload = mapSettingsToRestaurantSettingsRow(restaurantId, settings, {
+    includeAdvancedOrderSettings: true
+  });
+  const { error: upsertWithAdvancedSettingsError } = await supabase
+    .from("restaurant_settings")
+    .upsert(fullSettingsPayload, {
+      onConflict: "restaurant_id"
+    });
+  if (upsertWithAdvancedSettingsError) {
+    const missingAdvancedColumns =
+      upsertWithAdvancedSettingsError.message.includes("column") &&
+      (
+        upsertWithAdvancedSettingsError.message.includes("order_mode") ||
+        upsertWithAdvancedSettingsError.message.includes("contact_requirement") ||
+        upsertWithAdvancedSettingsError.message.includes("require_otp") ||
+        upsertWithAdvancedSettingsError.message.includes("order_number_prefix") ||
+        upsertWithAdvancedSettingsError.message.includes("show_guest_order_history")
+      ) &&
+      upsertWithAdvancedSettingsError.message.includes("does not exist");
+
+    if (!missingAdvancedColumns) {
+      throw new Error(`Supabase persist failed: ${upsertWithAdvancedSettingsError.message}`);
+    }
+
+    const legacySettingsPayload = mapSettingsToRestaurantSettingsRow(restaurantId, settings, {
+      includeAdvancedOrderSettings: false
+    });
+    const { error: fallbackUpsertError } = await supabase
+      .from("restaurant_settings")
+      .upsert(legacySettingsPayload, {
+        onConflict: "restaurant_id"
+      });
+
+    if (fallbackUpsertError) {
+      throw new Error(`Supabase persist failed: ${fallbackUpsertError.message}`);
+    }
+  }
+}
+
+async function persistRestaurantSettingsWithoutTableSyncAsync(
+  restaurantSlug: string,
+  settings: MenuSettings
+): Promise<MenuSettings> {
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    persistMenuSettings(settings);
+    setSettingsCache(settings, restaurantSlug);
+    return settings;
+  }
+
+  const restaurant = await getRestaurantIdBySlug(supabase, restaurantSlug);
+
+  if (!restaurant) {
+    throw new Error(`Restaurant not found: ${restaurantSlug}`);
+  }
+
+  await persistRestaurantSettingsRowAsync(supabase, restaurant.id, settings);
+  invalidateRestaurantsCache();
+  setSettingsCache(settings, restaurantSlug);
+  return settings;
 }
 
 export async function getMenuSettings(
@@ -1304,6 +1428,54 @@ export async function getMenuSettings(
   }
 }
 
+export async function getMenuSettingsSubset(
+  restaurantSlug: string,
+  fields: string[]
+): Promise<Partial<MenuSettingsResponsePayload>> {
+  const normalizedFields = [...new Set(fields.map((field) => field.trim()).filter(Boolean))];
+
+  if (normalizedFields.length === 0) {
+    return {};
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  if (!supabase) {
+    const settings = await getMenuSettings(restaurantSlug);
+    const payload = buildMenuSettingsResponsePayload(settings);
+    return Object.fromEntries(
+      Object.entries(payload).filter(([key]) => normalizedFields.includes(key))
+    );
+  }
+
+  const liteSettings = await getRestaurantSettingsLiteFromSupabase(
+    supabase,
+    restaurantSlug
+  );
+
+  if (!liteSettings) {
+    const settings = await getMenuSettings(restaurantSlug, { skipCache: true });
+    const payload = buildMenuSettingsResponsePayload(settings);
+    return Object.fromEntries(
+      Object.entries(payload).filter(([key]) => normalizedFields.includes(key))
+    );
+  }
+
+  const nextSettings = applyMenuRuntimePolicies(
+    hasWorkingHoursConfigured(liteSettings)
+      ? liteSettings
+      : mergeRestaurantSettingsWithFallback(
+          liteSettings,
+          (await getLegacyMenuSettingsFromSupabase(supabase)) ?? getMenuSettingsSync()
+        ),
+    restaurantSlug
+  );
+  const payload = buildMenuSettingsResponsePayload(nextSettings);
+  return Object.fromEntries(
+    Object.entries(payload).filter(([key]) => normalizedFields.includes(key))
+  );
+}
+
 export async function updateMenuSettings(
   restaurantSlugOrUpdates: string | undefined | Partial<MenuSettings>,
   maybeUpdates?: Partial<MenuSettings>
@@ -1333,8 +1505,17 @@ export async function updateMenuSettings(
     restaurantSlug
   );
 
+  if (JSON.stringify(next) === JSON.stringify(current)) {
+    return current;
+  }
+
   if (restaurantSlug) {
-    const saved = await persistRestaurantSettingsAsync(restaurantSlug, next);
+    const touchesTableConfig =
+      definedUpdates.tableCount !== undefined ||
+      definedUpdates.tableTokens !== undefined;
+    const saved = touchesTableConfig
+      ? await persistRestaurantSettingsAsync(restaurantSlug, next)
+      : await persistRestaurantSettingsWithoutTableSyncAsync(restaurantSlug, next);
     invalidateSettingsCache(restaurantSlug);
     return saved;
   } else {

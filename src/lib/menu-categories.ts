@@ -546,7 +546,7 @@ async function syncSingleMenuCategoryTable(
   const { data: existingRow, error: existingError } = await supabase
     .from("menu_categories")
     .select(
-      "id, restaurant_id, slug, kind, category_type, name_he, name_en, name_ru, sort_order, is_active"
+      "id, slug, kind, category_type, name_he, name_en, name_ru, sort_order, is_active"
     )
     .eq("restaurant_id", restaurant.id)
     .ilike("slug", slug)

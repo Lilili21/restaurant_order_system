@@ -142,6 +142,8 @@ const SERVICE_REQUEST_COOLDOWN_MS = 5 * 60 * 1000;
 const MAX_CART_RECOMMENDATIONS_PER_TRIGGER_ITEM = 3;
 const AUTO_COOKING_AFTER_MS = 3 * 60 * 1000;
 const MENU_SETTINGS_FALLBACK_POLL_MS = 60_000;
+const TABLE_SESSION_ACTIVE_POLL_MS = 6_000;
+const TABLE_SESSION_HIDDEN_POLL_MS = 18_000;
 const MENU_SETTINGS_REALTIME_DEBOUNCE_MS = 300;
 const COUNTER_CAPTCHA_SITE_KEY =
   process.env.NEXT_PUBLIC_COUNTER_CAPTCHA_SITE_KEY?.trim() ?? "";
@@ -515,6 +517,10 @@ export function Cart({
     () => getQuickInfoLinks(restaurantSlug),
     [restaurantSlug]
   );
+  const liveMenuById = useMemo(
+    () => new Map(liveMenu.map((item) => [item.id, item])),
+    [liveMenu]
+  );
   const counterRequiresPhone =
     isCounterMode && (contactRequirement === "phone_only" || requireOtp);
   const counterRequiresNameOrPhone =
@@ -690,25 +696,68 @@ export function Cart({
   const detailedItems = useMemo(() => {
     return items
       .map((cartItem) => {
-        const menuItem = liveMenu.find((item) => item.id === cartItem.menuItemId);
+        const menuItem = liveMenuById.get(cartItem.menuItemId);
         return menuItem ? { cartItem, menuItem } : null;
       })
       .filter(Boolean) as { cartItem: CartItem; menuItem: MenuItem }[];
-  }, [items, liveMenu]);
+  }, [items, liveMenuById]);
 
-  const pendingOrderItemsCount = items.reduce(
-    (sum, item) => sum + item.quantity,
-    0
-  );
-  const hasDessertInOrder = detailedItems.some(
-    ({ menuItem }) => menuItem.category === "desserts"
-  );
-  const hasDrinksInOrder = detailedItems.some(({ menuItem }) =>
-    drinkCategories.has(menuItem.category)
-  );
-  const hasDishesInOrder = detailedItems.some(
-    ({ menuItem }) => !drinkCategories.has(menuItem.category)
-  );
+  const cartItemMetrics = useMemo(() => {
+    const quantities: Record<string, number> = {};
+    let pendingOrderItemsCount = 0;
+
+    for (const item of items) {
+      pendingOrderItemsCount += item.quantity;
+      quantities[`${item.menuItemId}:${item.volumeOptionId ?? "base"}`] = item.quantity;
+    }
+
+    return { pendingOrderItemsCount, quantities };
+  }, [items]);
+  const { pendingOrderItemsCount, quantities } = cartItemMetrics;
+  const detailedOrderState = useMemo(() => {
+    const currentOrderItemIds = new Set<string>();
+    const currentOrderCategories = new Set<MenuCategory>();
+    const uniqueTriggerItemIdsInOrder: string[] = [];
+    let hasDessertInOrder = false;
+    let hasDrinksInOrder = false;
+    let hasDishesInOrder = false;
+
+    for (const { menuItem } of detailedItems) {
+      currentOrderCategories.add(menuItem.category);
+
+      if (!currentOrderItemIds.has(menuItem.id)) {
+        currentOrderItemIds.add(menuItem.id);
+        uniqueTriggerItemIdsInOrder.push(menuItem.id);
+      }
+
+      if (menuItem.category === "desserts") {
+        hasDessertInOrder = true;
+      }
+
+      if (drinkCategories.has(menuItem.category)) {
+        hasDrinksInOrder = true;
+      } else {
+        hasDishesInOrder = true;
+      }
+    }
+
+    return {
+      currentOrderItemIds,
+      currentOrderCategories,
+      uniqueTriggerItemIdsInOrder,
+      hasDessertInOrder,
+      hasDrinksInOrder,
+      hasDishesInOrder
+    };
+  }, [detailedItems, drinkCategories]);
+  const {
+    currentOrderItemIds,
+    currentOrderCategories,
+    uniqueTriggerItemIdsInOrder,
+    hasDessertInOrder,
+    hasDrinksInOrder,
+    hasDishesInOrder
+  } = detailedOrderState;
   const normalizedGuestPhone = useMemo(() => {
     const normalized = guestContactPhone.replace(/[^\d+]/g, "").trim();
 
@@ -747,11 +796,6 @@ export function Cart({
     isCounterMode
   ]);
 
-  const quantities = items.reduce<Record<string, number>>((acc, item) => {
-    acc[`${item.menuItemId}:${item.volumeOptionId ?? "base"}`] = item.quantity;
-    return acc;
-  }, {});
-
   const submittedOrdersTotal = agorotToShekels(
     submittedOrders.reduce(
       (sum, order) => sum + shekelsToAgorot(order.total),
@@ -759,19 +803,28 @@ export function Cart({
     )
   );
   const submittedOrdersSummaryStatus = useMemo(() => {
-    const visibleStatuses = submittedOrders
-      .map((order) => getGuestVisibleOrderStatus(order))
-      .filter(Boolean) as OrderStatus[];
+    let hasPreparing = false;
+    let hasServed = false;
 
-    if (visibleStatuses.includes("new")) {
-      return "new" as const;
+    for (const order of submittedOrders) {
+      const status = getGuestVisibleOrderStatus(order);
+
+      if (status === "new") {
+        return "new" as const;
+      }
+
+      if (status === "preparing") {
+        hasPreparing = true;
+      } else if (status === "served") {
+        hasServed = true;
+      }
     }
 
-    if (visibleStatuses.includes("preparing")) {
+    if (hasPreparing) {
       return "preparing" as const;
     }
 
-    if (visibleStatuses.includes("served")) {
+    if (hasServed) {
       return "served" as const;
     }
 
@@ -949,13 +1002,17 @@ export function Cart({
         activeBusinessLunchCategories.has(item.category)
     );
   }, [activeBusinessLunches, liveBusinessLunches, liveMenu]);
+  const visibleMenuCategories = useMemo(
+    () => new Set(visibleMenu.map((item) => item.category)),
+    [visibleMenu]
+  );
 
   const effectiveSelectedFilter =
     selectedMenuFilter &&
-    !visibleMenu.some((item) =>
+    !(
       selectedMenuFilter === "drinks"
-        ? drinkCategories.has(item.category)
-        : item.category === selectedMenuFilter
+        ? [...visibleMenuCategories].some((category) => drinkCategories.has(category))
+        : visibleMenuCategories.has(selectedMenuFilter)
     )
       ? null
       : selectedMenuFilter;
@@ -1067,7 +1124,7 @@ export function Cart({
     menuItemId: string,
     volumeLabel?: string | null
   ) {
-    const menuItem = liveMenu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenuById.get(menuItemId);
 
     if (!menuItem) {
       return "";
@@ -1141,10 +1198,6 @@ export function Cart({
   }
 
   const activeCartRecommendations = useMemo(() => {
-    const currentOrderItemIds = new Set(detailedItems.map(({ menuItem }) => menuItem.id));
-    const uniqueTriggerItemIdsInOrder = [
-      ...new Set(detailedItems.map(({ menuItem }) => menuItem.id))
-    ];
     const nextRecommendations: Array<
       | {
           kind: "item";
@@ -1176,8 +1229,8 @@ export function Cart({
 
           if (
             !suggestedCategory ||
-            detailedItems.some(({ menuItem }) => menuItem.category === suggestedCategory) ||
-            !visibleMenu.some((item) => item.category === suggestedCategory) ||
+            currentOrderCategories.has(suggestedCategory) ||
+            !visibleMenuCategories.has(suggestedCategory) ||
             (isKitchenClosed && !drinkCategories.has(suggestedCategory)) ||
             (isBarClosed && drinkCategories.has(suggestedCategory))
           ) {
@@ -1187,7 +1240,7 @@ export function Cart({
           return true;
         }
 
-        const suggestedItem = liveMenu.find((item) => item.id === recommendation.suggestedItemId);
+        const suggestedItem = liveMenuById.get(recommendation.suggestedItemId);
 
         if (!suggestedItem || !suggestedItem.available) {
           return false;
@@ -1229,10 +1282,10 @@ export function Cart({
         continue;
       }
 
-      const triggerItem = liveMenu.find((item) => item.id === recommendation.triggerItemId);
+      const triggerItem = liveMenuById.get(recommendation.triggerItemId);
       const suggestedItem =
         recommendation.suggestedType === "item"
-          ? liveMenu.find((item) => item.id === recommendation.suggestedItemId)
+          ? liveMenuById.get(recommendation.suggestedItemId)
           : null;
 
       if (!triggerItem) {
@@ -1247,14 +1300,8 @@ export function Cart({
         }
 
         if (
-          currentOrderItemIds.size > 0 &&
-          detailedItems.some(({ menuItem }) => menuItem.category === suggestedCategory)
-        ) {
-          continue;
-        }
-
-        if (
-          !visibleMenu.some((item) => item.category === suggestedCategory) ||
+          currentOrderCategories.has(suggestedCategory) ||
+          !visibleMenuCategories.has(suggestedCategory) ||
           (isKitchenClosed && !drinkCategories.has(suggestedCategory)) ||
           (isBarClosed && drinkCategories.has(suggestedCategory))
         ) {
@@ -1312,12 +1359,14 @@ export function Cart({
 
     return nextRecommendations;
   }, [
-    detailedItems,
+    currentOrderCategories,
+    currentOrderItemIds,
     isBarClosed,
     isKitchenClosed,
-    liveMenu,
+    liveMenuById,
     liveRecommendations,
-    visibleMenu
+    uniqueTriggerItemIdsInOrder,
+    visibleMenuCategories
   ]);
   function jumpToMenuFilter(filter: MenuFilter) {
     setSelectedMenuFilter(filter);
@@ -1462,7 +1511,7 @@ export function Cart({
           );
         })
         .map((item) => {
-          const menuItem = liveMenu.find((candidate) => candidate.id === item.menuItemId);
+          const menuItem = liveMenuById.get(item.menuItemId);
           const matchedVolumeOption = menuItem?.volumeOptions?.find(
             (option) => option.id === item.volumeOptionId
           );
@@ -1492,7 +1541,7 @@ export function Cart({
                 : matchedVolumeOption?.price
           };
         })
-        .filter((item) => liveMenu.some((menuItem) => menuItem.id === item.menuItemId));
+        .filter((item) => liveMenuById.has(item.menuItemId));
 
       if (restoredItems.length) {
         setItems(restoredItems);
@@ -1500,7 +1549,7 @@ export function Cart({
     } catch {
       window.localStorage.removeItem(cartStorageKey);
     }
-  }, [cartStorageKey, liveMenu]);
+  }, [cartStorageKey, language, liveMenuById]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -1587,16 +1636,19 @@ export function Cart({
     let cancelled = false;
     let inFlightAbortController: AbortController | null = null;
     let pollTimeoutId: number | null = null;
-    const POLL_INTERVAL_MS = 4000;
-
     function scheduleNextSync() {
       if (cancelled) {
         return;
       }
 
+      const pollIntervalMs =
+        document.visibilityState === "hidden"
+          ? TABLE_SESSION_HIDDEN_POLL_MS
+          : TABLE_SESSION_ACTIVE_POLL_MS;
+
       pollTimeoutId = window.setTimeout(() => {
         void syncSubmittedOrders();
-      }, POLL_INTERVAL_MS);
+      }, pollIntervalMs);
     }
 
     async function syncSubmittedOrders() {
@@ -1762,7 +1814,7 @@ export function Cart({
     sourceElement?: HTMLElement | null
   ) {
     const targetElement = orderJumpButtonRef.current;
-    const menuItem = liveMenu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenuById.get(menuItemId);
 
     if (!sourceElement || !targetElement || !menuItem) {
       return;
@@ -1807,7 +1859,7 @@ export function Cart({
     }
   ) {
     animateOrderMovement(menuItemId, "to-order", sourceElement);
-    const menuItem = liveMenu.find((item) => item.id === menuItemId);
+    const menuItem = liveMenuById.get(menuItemId);
     const matchedVolumeOption = menuItem?.volumeOptions?.find(
       (option) => option.id === volumeOptionId
     );
